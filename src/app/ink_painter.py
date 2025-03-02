@@ -1,0 +1,323 @@
+"""
+绘画模块
+调用说明：
+1. 初始化：painter = InkPainter()
+   - 创建全屏透明画布
+   - 自动加载手势配置
+   - 启动鼠标监听线程
+
+2. 关闭：painter.shutdown()
+   - 安全销毁所有资源
+   - 停止监听循环
+"""
+
+import time
+import math
+import base64
+import json
+import numpy as np
+import tkinter as tk
+import pyautogui
+import win32api
+import win32con
+from .gesture_parser import GestureParser
+from .log import log
+
+class InkPainter:
+    def __init__(self):
+        # 硬件参数
+        self.screen_width = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+        self.screen_height = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+        self.file_name = "ink_painter"
+        
+        log(self.file_name, "绘画模块初始化")
+        # 绘画参数
+        self.load_drawing_settings()  # 加载绘画参数
+        
+        # 抗锯齿预计算
+        log(self.file_name, "开始抗锯齿颜色预计算")
+        self.antialias_colors = []
+        base_color = np.array([int(self.line_color[1:3], 16), 
+                              int(self.line_color[3:5], 16), 
+                              int(self.line_color[5:7], 16)])
+        for i in range(self.antialias_layers):
+            ratio = i / self.antialias_layers
+            fade = 0.8 * (1 - ratio**0.3)
+            blend = ratio * 0.1
+            color = base_color * fade + (255 - base_color) * blend
+            self.antialias_colors.append("#{:02X}{:02X}{:02X}".format(*np.clip(color, 0, 255).astype(int)))
+        log(self.file_name, f"完成抗锯齿颜色预计算，共生成{len(self.antialias_colors)}种颜色")
+            
+        # 状态控制
+        self.drawing = False              # 绘画状态标志
+        self.running = True                # 运行状态标志
+        self.current_stroke = []           # 当前笔画数据
+        self.active_lines = []             # 画布线条对象
+        self.fade_animations = []          # 渐隐动画队列
+        self.start_point = None            # 记录起始点
+        
+        # 初始化系统
+        self.load_gestures()               # 加载手势配置
+        self.init_canvas()                 # 创建GUI界面
+        self.start_listening()             # 启动监听循环
+
+    def init_canvas(self):
+        """创建全屏透明画布窗口"""
+        log(self.file_name, "开始初始化画布窗口")
+        self.root = tk.Tk()
+        self.root.overrideredirect(True)
+        self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
+        self.root.attributes("-alpha", 0.85)
+        self.root.attributes("-topmost", True)
+        self.root.attributes("-transparentcolor", "white")
+        
+        self.canvas = tk.Canvas(self.root, bg='white', highlightthickness=0)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        log(self.file_name, "画布窗口初始化完成")
+
+    def load_drawing_settings(self):
+        """从settings.json加载绘画参数"""
+        log(self.file_name, "开始加载绘画参数")
+        try:
+            with open('settings.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            drawing_settings = config['drawing_settings']
+            self.base_width = drawing_settings['base_width']                  # 基础线宽
+            self.min_width = drawing_settings['min_width']                    # 最小线宽
+            self.max_width = drawing_settings['max_width']                    # 最大线宽
+            self.speed_factor = drawing_settings['speed_factor']              # 速度敏感度
+            self.fade_duration = drawing_settings['fade_duration']            # 渐隐时长
+            self.antialias_layers = drawing_settings['antialias_layers']      # 抗锯齿层数
+            self.min_distance = drawing_settings['min_distance']              # 最小触发距离
+            self.line_color = drawing_settings['line_color']                  # 线条颜色
+            log(self.file_name, f"成功加载绘画参数: {drawing_settings}")
+        except Exception as e:
+            log(self.file_name, f"加载绘画参数失败: {str(e)}", level='error')
+            raise
+
+    def load_gestures(self):
+        """从settings.json加载手势配置"""
+        log(self.file_name, "开始加载手势配置")
+        try:
+            with open('settings.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            self.gesture_lib = []
+            for name, gesture in config['gestures'].items():
+                self.gesture_lib.append({
+                    'name': name,
+                    'directions': gesture['directions'],
+                    'action': gesture['action']
+                })
+            log(self.file_name, f"成功加载{len(self.gesture_lib)}个手势")
+        except Exception as e:
+            log(self.file_name, f"加载手势配置失败: {str(e)}", level='error')
+            raise
+
+    def start_listening(self):
+        """启动鼠标监听循环"""
+        log(self.file_name, "启动鼠标监听循环")
+        self.last_right_state = False
+        self.root.after(5, self.listen_mouse)
+
+    def listen_mouse(self):
+        """核心监听逻辑"""
+        if not self.running:
+            return
+            
+        right_pressed = win32api.GetAsyncKeyState(win32con.VK_RBUTTON) < 0
+        x, y = pyautogui.position()
+        
+        # 状态切换处理
+        if right_pressed and not self.last_right_state:
+            self.start_point = (x, y)  # 记录起始点
+        elif right_pressed and not self.drawing and self.start_point:
+            # 计算移动距离
+            dx = x - self.start_point[0]
+            dy = y - self.start_point[1]
+            distance = math.hypot(dx, dy)
+            if distance >= self.min_distance:
+                self.start_drawing(x, y)
+        elif right_pressed and self.drawing:
+            self.update_drawing(x, y)
+        elif not right_pressed and self.last_right_state:
+            self.finish_drawing()
+            self.start_point = None
+        
+        self.last_right_state = right_pressed
+        self.root.after(5, self.listen_mouse)
+
+    def start_drawing(self, x, y):
+        """初始化新笔画"""
+        log(self.file_name, f"开始新笔画，起始点: ({x}, {y})")
+        self.drawing = True
+        self.current_stroke = [(x, y, time.time(), self.base_width)]
+        self.active_lines = []
+
+    def update_drawing(self, x, y):
+        """更新绘画轨迹"""
+        log(self.file_name, f"更新绘画轨迹，当前点: ({x}, {y})", level='debug')
+        
+        if len(self.current_stroke) > 100:  # 限制最大轨迹点数
+            self.current_stroke.pop(0)
+
+        current_time = time.time()
+        prev_x, prev_y, prev_time, prev_width = self.current_stroke[-1]
+        
+        # 计算动态线宽
+        dx = x - prev_x
+        dy = y - prev_y
+        distance = math.hypot(dx, dy)
+        delta_time = current_time - prev_time
+        if delta_time > 0.001:
+            speed = distance / delta_time
+        else:
+            speed = 0
+        
+        # 计算目标宽度
+        target_width = self.base_width / (1 + self.speed_factor * speed**0.7)
+        target_width = max(self.min_width, min(self.max_width, target_width))
+        
+        # 平滑过渡到目标宽度
+        if len(self.current_stroke) > 1:
+            # 使用加权平均实现平滑过渡
+            smooth_factor = 0.3  # 调整这个值可以控制过渡速度
+            current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+        else:
+            current_width = target_width
+        
+        # 记录轨迹点
+        self.current_stroke.append((x, y, current_time, current_width))
+        
+        # 抗锯齿绘制
+        self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
+
+    def draw_antialiased_line(self, x1, y1, x2, y2, w1, w2):
+        """生成抗锯齿线条"""
+        line_group = []
+        
+        # 先绘制最外层的抗锯齿层
+        for i in reversed(range(self.antialias_layers)):
+            ratio = i / self.antialias_layers
+            width = w1 * (1 - ratio) + w2 * ratio
+            expand = 1 + 1.0 * (1 - ratio**0.5)
+            
+            # 计算抗锯齿颜色
+            base_color = np.array([int(self.line_color[1:3], 16), 
+                                 int(self.line_color[3:5], 16), 
+                                 int(self.line_color[5:7], 16)])
+            fade = 0.85 * (1 - ratio**0.3)
+            blend = ratio * 0.1
+            color = base_color * fade + (255 - base_color) * blend
+            antialias_color = "#{:02X}{:02X}{:02X}".format(*np.clip(color, 0, 255).astype(int))
+            
+            layer = self.canvas.create_line(
+                x1, y1, x2, y2,
+                width=width * expand,
+                fill=antialias_color,
+                capstyle=tk.ROUND,
+                smooth=True,
+                joinstyle=tk.ROUND
+            )
+            line_group.append(layer)
+        
+        # 最后绘制主线条
+        main_line = self.canvas.create_line(
+            x1, y1, x2, y2,
+            width=w2,
+            fill=self.line_color,
+            capstyle=tk.ROUND,
+            smooth=True,
+            joinstyle=tk.ROUND
+        )
+        line_group.append(main_line)
+        
+        self.active_lines.extend(line_group)
+
+    def finish_drawing(self):
+        """结束并处理当前笔画"""
+        log(self.file_name, "结束当前笔画")
+        self.drawing = False
+        
+        # 触发渐隐动画
+        if self.active_lines:
+            log(self.file_name, f"触发渐隐动画，线条数: {len(self.active_lines)}")
+            self.fade_animations.append({
+                'lines': self.active_lines,
+                'start_time': time.time(),
+                'base_color': "#00BFFF"
+            })
+            self.active_lines = []
+            self.process_fade_animation()
+        
+        # 手势识别
+        if len(self.current_stroke) >= 5:
+            log(self.file_name, f"开始手势识别，轨迹点数: {len(self.current_stroke)}")
+            trail_points = [(x, y) for x, y, *_ in self.current_stroke]
+            parser = GestureParser(trail_points)
+            if operation := parser.parse():
+                log(self.file_name, f"识别到手势，执行操作: {operation}")
+                self.execute_operation(operation)
+        
+        self.current_stroke = []
+
+    def process_fade_animation(self):
+        """处理渐隐动画帧"""
+        current_time = time.time()
+        removals = []
+        
+        for anim in self.fade_animations:
+            elapsed = current_time - anim['start_time']
+            progress = min(elapsed / self.fade_duration, 1.0)
+            
+            # 计算渐变颜色
+            fade_factor = int(255 * (1 - progress))
+            fade_color = f"#{fade_factor:02X}{fade_factor:02X}FF"
+            
+            # 更新线条颜色
+            for line_id in anim['lines']:
+                try:
+                    self.canvas.itemconfig(line_id, fill=fade_color)
+                except tk.TclError:
+                    pass
+            
+            if progress >= 1.0:
+                for line_id in anim['lines']:
+                    try:
+                        self.canvas.delete(line_id)
+                    except tk.TclError:
+                        pass
+                removals.append(anim)
+        
+        # 清理完成动画
+        for anim in removals:
+            self.fade_animations.remove(anim)
+        
+        # 继续动画循环
+        if self.fade_animations:
+            self.root.after(25, self.process_fade_animation)
+
+    def execute_operation(self, encoded_cmd):
+        """执行Base64编码的操作指令"""
+        try:
+            decoded = base64.b64decode(encoded_cmd).decode('utf-8')
+            exec(decoded)
+            log(self.file_name, f"成功执行操作: {decoded}")
+        except Exception as e:
+            log(self.file_name, f"操作执行失败: {str(e)}", level='error')
+
+    def shutdown(self):
+        """安全关闭资源"""
+        log(self.file_name, "正在关闭绘画模块...")
+        self.running = False
+        self.root.destroy()
+        self.canvas = None
+        log(self.file_name, "绘画模块已关闭")
+
+if __name__ == "__main__":
+    print("额，非常不建议您这么启动")
+    print("不过也不是不行，就是会报错《而已》。你只需要修改一下开头即可")
+    time.sleep(1)
+    test_painter = InkPainter()
+    test_painter.root.mainloop()
