@@ -9,7 +9,7 @@
         "min_distance": 20,
         "line_color": "#00BFFF",
         "max_stroke_points": 200,
-        "max_stroke_duration": 15
+        "max_stroke_duration": 5
     },
     "gestures": {
         "打开开始菜单": {

@@ -51,12 +51,13 @@ class InkPainter:
         log(self.file_name, f"完成抗锯齿颜色预计算，共生成{len(self.antialias_colors)}种颜色")
             
         # 状态控制
-        self.drawing = False              # 绘画状态标志
+        self.drawing = False               # 绘画状态标志
         self.running = True                # 运行状态标志
         self.current_stroke = []           # 当前笔画数据
         self.active_lines = []             # 画布线条对象
         self.fade_animations = []          # 渐隐动画队列
         self.start_point = None            # 记录起始点
+        self.pending_points = []           # 存储达到触发条件前的轨迹点
         
         # 初始化系统
         self.load_gestures()               # 加载手势配置
@@ -139,36 +140,89 @@ class InkPainter:
         """核心监听逻辑"""
         if not self.running:
             return
-            
+                
         right_pressed = win32api.GetAsyncKeyState(win32con.VK_RBUTTON) < 0
         x, y = pyautogui.position()
         
         # 状态切换处理
         if right_pressed and not self.last_right_state:
             self.start_point = (x, y)  # 记录起始点
+            self.pending_points = [(x, y, time.time())]  # 初始化缓存
         elif right_pressed and not self.drawing and self.start_point:
-            # 计算移动距离
-            dx = x - self.start_point[0]
-            dy = y - self.start_point[1]
-            distance = math.hypot(dx, dy)
-            if distance >= self.min_distance:
-                self.start_drawing(x, y)
+            # 持续缓存轨迹点（即使未达触发距离）
+            self.pending_points.append((x, y, time.time()))
+            
+            # 检查触发条件
+            # 修复代码：提取元组中的坐标分量
+            start_x, start_y = self.start_point
+            dx = x - start_x
+            dy = y - start_y
+            if math.hypot(dx, dy) >= self.min_distance:
+                self.start_drawing()  # 触发后开始绘制历史轨迹
         elif right_pressed and self.drawing:
             self.update_drawing(x, y)
         elif not right_pressed and self.last_right_state:
+            # 松开右键时清理
+            if self.pending_points:
+                log(self.file_name, "松开右键，清理未完成的轨迹")
+                for line in self.active_lines:
+                    try:
+                        self.canvas.delete(line)
+                    except tk.TclError:
+                        pass
+                self.active_lines = []
+                self.pending_points = []
             self.finish_drawing()
             self.start_point = None
         
         self.last_right_state = right_pressed
         self.root.after(5, self.listen_mouse)
 
-    def start_drawing(self, x, y):
-        """初始化新笔画"""
-        log(self.file_name, f"开始新笔画，起始点: ({x}, {y})")
+    def start_drawing(self):
+        """从缓存点开始初始化笔画"""
+        if not self.pending_points:
+            return
+        
+        log(self.file_name, "触发绘制条件，开始处理历史轨迹")
+        
+        # 转换缓存点并记录线条
+        self.current_stroke = []
+        active_lines = []  # 临时存储历史轨迹线条
+        
+        # 生成初始线宽
+        base_width = self.base_width
+        for i in range(len(self.pending_points)):
+            x, y, t = self.pending_points[i]
+            if i == 0:
+                current_width = base_width
+            else:
+                # 计算动态线宽（与实时绘制相同逻辑）
+                prev_x, prev_y, prev_t = self.pending_points[i-1]
+                dx = x - prev_x
+                dy = y - prev_y
+                dt = t - prev_t
+                speed = math.hypot(dx, dy) / dt if dt > 0 else 0
+                target_width = base_width / (1 + self.speed_factor * speed**0.7)
+                target_width = max(self.min_width, min(self.max_width, target_width))
+                current_width = target_width
+            
+            self.current_stroke.append((x, y, t, current_width))
+            
+            # 绘制线段
+            if i > 0:
+                prev_x, prev_y, prev_t, prev_width = self.current_stroke[i-1]
+                lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
+                active_lines.extend(lines)
+        
+        # 将历史轨迹线条加入动画队列
+        self.active_lines.extend(active_lines)
+        
+        self.active_lines.extend(active_lines)
+        # 清空缓存
+        self.pending_points = []
         self.drawing = True
-        self.current_stroke = [(x, y, time.time(), self.base_width)]
-        self.active_lines = []
         self.stroke_start_time = time.time()
+        log(self.file_name, f"已加载 {len(self.current_stroke)} 个历史轨迹点")
 
     def update_drawing(self, x, y):
         """更新绘画轨迹"""
@@ -180,7 +234,7 @@ class InkPainter:
             current_time - self.stroke_start_time >= self.max_stroke_duration):
             log(self.file_name, "触发自动清理机制")
             self.finish_drawing()
-            self.start_drawing(x, y)  # 重新开始绘制
+            self.start_drawing()  # 移除非法的坐标参数
             return
         
         # 原有逻辑
@@ -213,10 +267,12 @@ class InkPainter:
         self.current_stroke.append((x, y, current_time, current_width))
         
         # 抗锯齿绘制
-        self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
+        lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
+        self.active_lines.extend(lines)
+
 
     def draw_antialiased_line(self, x1, y1, x2, y2, w1, w2):
-        """生成抗锯齿线条"""
+        """生成抗锯齿线条，并返回线条对象列表"""
         line_group = []
         
         # 先绘制最外层的抗锯齿层
@@ -227,8 +283,8 @@ class InkPainter:
             
             # 计算抗锯齿颜色
             base_color = np.array([int(self.line_color[1:3], 16), 
-                                 int(self.line_color[3:5], 16), 
-                                 int(self.line_color[5:7], 16)])
+                                int(self.line_color[3:5], 16), 
+                                int(self.line_color[5:7], 16)])
             fade = 0.85 * (1 - ratio**0.3)
             blend = ratio * 0.1
             color = base_color * fade + (255 - base_color) * blend
@@ -255,34 +311,39 @@ class InkPainter:
         )
         line_group.append(main_line)
         
-        self.active_lines.extend(line_group)
+        return line_group
 
     def finish_drawing(self):
         """结束并处理当前笔画"""
         log(self.file_name, "结束当前笔画")
         self.drawing = False
         
+        # 合并所有轨迹点（包括触发前的缓存）
+        full_stroke = self.current_stroke.copy()
+        
         # 触发渐隐动画
         if self.active_lines:
             log(self.file_name, f"触发渐隐动画，线条数: {len(self.active_lines)}")
             self.fade_animations.append({
-                'lines': self.active_lines,
+                'lines': self.active_lines.copy(),  # 包含历史和实时线条
                 'start_time': time.time(),
-                'base_color': "#00BFFF"
+                'base_color': self.line_color
             })
             self.active_lines = []
             self.process_fade_animation()
         
-        # 手势识别
-        if len(self.current_stroke) >= 5:
-            log(self.file_name, f"开始手势识别，轨迹点数: {len(self.current_stroke)}")
-            trail_points = [(x, y) for x, y, *_ in self.current_stroke]
+        # 手势识别（使用完整轨迹）
+        if len(full_stroke) >= 5:
+            log(self.file_name, f"开始手势识别，轨迹点数: {len(full_stroke)}")
+            trail_points = [(x, y) for x, y, *_ in full_stroke]
             parser = GestureParser(trail_points, config_path=self.get_settings_path())
             if operation := parser.parse():
                 log(self.file_name, f"识别到手势，执行操作: {operation}")
                 self.execute_operation(operation)
         
+        # 清空数据
         self.current_stroke = []
+        self.pending_points = []
 
     def process_fade_animation(self):
         """处理渐隐动画帧"""
