@@ -10,8 +10,7 @@
         "line_color": "#00BFFF",
         "max_stroke_points": 200,
         "max_stroke_duration": 5,
-        "enable_advanced_brush": true,
-        "fade_color": "#0000FF",
+        "enable_advanced_brush": false,
         "force_topmost": true
     },
     "gestures": {

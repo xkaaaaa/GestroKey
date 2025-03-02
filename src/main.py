@@ -3,22 +3,21 @@ from tkinter import messagebox
 from app.ink_painter import InkPainter
 
 # 设置外观模式和颜色主题
-ctk.set_appearance_mode("System")  # 可选值: "System", "Dark", "Light"
-ctk.set_default_color_theme("blue")  # 可选值: "blue", "green", "dark-blue"
+ctk.set_appearance_mode("System")
+ctk.set_default_color_theme("blue")
 
 class MainApp:
     def __init__(self):
         # 创建主窗口
         self.window = ctk.CTk()
         self.window.title("隐绘助手")
-        self.window.geometry("300x200")  # 设置窗口尺寸
+        self.window.geometry("300x200")           # 设置窗口尺寸
         self.window.attributes("-topmost", True)  # 保持在顶层
         
         # 状态控制
         self.painter = None
         self.painting = False
 
-        # 添加标签
         self.label = ctk.CTkLabel(
             self.window,
             text="点击按钮开始或停止绘画",
@@ -27,20 +26,18 @@ class MainApp:
         )
         self.label.pack(pady=20)
 
-        # 添加“开始/停止”按钮
         self.toggle_button = ctk.CTkButton(
             self.window,
             text="开始绘画",
             command=self.toggle_painting,
             width=120,
             height=40,
-            corner_radius=10,  # 圆角半径
-            fg_color="#1F6AA5",  # 按钮背景颜色
+            corner_radius=10,      # 圆角半径
+            fg_color="#1F6AA5",    # 按钮背景颜色
             hover_color="#144870"  # 鼠标悬停时的颜色
         )
         self.toggle_button.pack(pady=10)
 
-        # 添加“退出”按钮
         self.exit_button = ctk.CTkButton(
             self.window,
             text="退出",
@@ -48,7 +45,7 @@ class MainApp:
             width=120,
             height=40,
             corner_radius=10,
-            fg_color="#D32F2F",  # 按钮背景颜色
+            fg_color="#D32F2F",    # 按钮背景颜色
             hover_color="#9A0000"  # 鼠标悬停时的颜色
         )
         self.exit_button.pack(pady=10)
@@ -77,7 +74,7 @@ class MainApp:
         """启动绘画功能"""
         self.painter = InkPainter()
         self.painting = True
-        self.toggle_button.configure(text="停止绘画")  # 更新按钮文本
+        self.toggle_button.configure(text="停止绘画")
         self.label.configure(text="绘画已启动")
 
     def stop_painting(self):
@@ -91,7 +88,7 @@ class MainApp:
                 self.painter = None
                 
         self.painting = False
-        self.toggle_button.configure(text="开始绘画")  # 更新按钮文本
+        self.toggle_button.configure(text="开始绘画")
         self.label.configure(text="绘画已停止")
 
     def on_close(self):
@@ -106,4 +103,4 @@ class MainApp:
 
 if __name__ == "__main__":
     app = MainApp()
-    app.window.mainloop()  # 启动 Tkinter 主循环
+    app.window.mainloop()

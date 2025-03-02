@@ -208,17 +208,20 @@ class InkPainter:
                 current_width = base_width
             else:
                 # 计算动态线宽（与实时绘制相同逻辑）
-                prev_x, prev_y, prev_t = self.pending_points[i-1]
-                dx = x - prev_x
-                dy = y - prev_y
-                dt = t - prev_t
-                speed = math.hypot(dx, dy) / dt if dt > 0 else 0
-                target_width = base_width / (1 + self.speed_factor * speed**0.7) if self.enable_advanced_brush else base_width
-                target_width = max(self.min_width, min(self.max_width, target_width))
-                
-                # 平滑过渡到目标宽度
-                smooth_factor = 0.3  # 与实时绘制一致
-                current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+                if self.enable_advanced_brush:
+                    prev_x, prev_y, prev_t = self.pending_points[i-1]
+                    dx = x - prev_x
+                    dy = y - prev_y
+                    dt = t - prev_t
+                    speed = math.hypot(dx, dy) / dt if dt > 0 else 0
+                    target_width = base_width / (1 + self.speed_factor * speed**0.7) if self.enable_advanced_brush else base_width
+                    target_width = max(self.min_width, min(self.max_width, target_width))
+                    
+                    # 平滑过渡到目标宽度
+                    smooth_factor = 0.3  # 与实时绘制一致
+                    current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+                else:
+                    current_width = base_width
             
             self.current_stroke.append((x, y, t, current_width))
             prev_width = current_width  # 记录当前线宽
@@ -256,26 +259,29 @@ class InkPainter:
         prev_x, prev_y, prev_time, prev_width = self.current_stroke[-1]
         
         # 计算动态线宽
-        dx = x - prev_x
-        dy = y - prev_y
-        distance = math.hypot(dx, dy)
-        delta_time = current_time - prev_time
-        if delta_time > 0.001:
-            speed = distance / delta_time
+        if self.enable_advanced_brush:
+            dx = x - prev_x
+            dy = y - prev_y
+            distance = math.hypot(dx, dy)
+            delta_time = current_time - prev_time
+            if delta_time > 0.001:
+                speed = distance / delta_time
+            else:
+                speed = 0
+            
+            # 计算目标宽度
+            target_width = self.base_width / (1 + self.speed_factor * speed**0.7)
+            target_width = max(self.min_width, min(self.max_width, target_width))
+            
+            # 平滑过渡到目标宽度
+            if len(self.current_stroke) > 1:
+                # 使用加权平均实现平滑过渡
+                smooth_factor = 0.3  # 调整这个值可以控制过渡速度
+                current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+            else:
+                current_width = target_width
         else:
-            speed = 0
-        
-        # 计算目标宽度
-        target_width = self.base_width / (1 + self.speed_factor * speed**0.7)
-        target_width = max(self.min_width, min(self.max_width, target_width))
-        
-        # 平滑过渡到目标宽度
-        if len(self.current_stroke) > 1:
-            # 使用加权平均实现平滑过渡
-            smooth_factor = 0.3  # 调整这个值可以控制过渡速度
-            current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
-        else:
-            current_width = target_width
+            current_width = self.base_width
         
         # 记录轨迹点
         self.current_stroke.append((x, y, current_time, current_width))
