@@ -22,6 +22,7 @@ import win32api
 import win32con
 import os
 import sys
+import colorsys
 from .gesture_parser import GestureParser
 from .log import log
 
@@ -96,16 +97,19 @@ class InkPainter:
                 config = json.load(f)
             
             drawing_settings = config['drawing_settings']
-            self.base_width = drawing_settings['base_width']                  # 基础线宽
-            self.min_width = drawing_settings['min_width']                    # 最小线宽
-            self.max_width = drawing_settings['max_width']                    # 最大线宽
-            self.speed_factor = drawing_settings['speed_factor']              # 速度敏感度
-            self.fade_duration = drawing_settings['fade_duration']            # 渐隐时长
-            self.antialias_layers = drawing_settings['antialias_layers']      # 抗锯齿层数
-            self.min_distance = drawing_settings['min_distance']              # 最小触发距离
-            self.line_color = drawing_settings['line_color']                  # 线条颜色
-            self.max_stroke_points = drawing_settings['max_stroke_points']    # 最绘制大节点数
-            self.max_stroke_duration = drawing_settings['max_stroke_duration']# 最大绘制时长（秒）
+            self.base_width = drawing_settings['base_width']                                  # 基础线宽
+            self.min_width = drawing_settings['min_width']                                    # 最小线宽
+            self.max_width = drawing_settings['max_width']                                    # 最大线宽
+            self.speed_factor = drawing_settings['speed_factor']                              # 速度敏感度
+            self.fade_duration = drawing_settings['fade_duration']                            # 渐隐时长
+            self.antialias_layers = drawing_settings['antialias_layers']                      # 抗锯齿层数
+            self.min_distance = drawing_settings['min_distance']                              # 最小触发距离
+            self.line_color = drawing_settings['line_color']                                  # 线条颜色
+            self.max_stroke_points = drawing_settings['max_stroke_points']                    # 最绘制大节点数
+            self.max_stroke_duration = drawing_settings['max_stroke_duration']                # 最大绘制时长（秒）
+            self.enable_advanced_brush = drawing_settings.get('enable_advanced_brush', True)  # 高级画笔开关
+            self.fade_color = drawing_settings.get('fade_color', '#0000FF')                   # 渐隐动画颜色
+            self.force_topmost = drawing_settings.get('force_topmost', True)                  # 强制置顶开关
             log(self.file_name, f"成功加载绘画参数: {drawing_settings}")
         except Exception as e:
             log(self.file_name, f"加载绘画参数失败: {str(e)}", level='error')
@@ -140,7 +144,14 @@ class InkPainter:
         """核心监听逻辑"""
         if not self.running:
             return
-                
+        
+        # 强制置顶
+        if self.force_topmost:
+            try:
+                self.root.attributes("-topmost", True)
+            except tk.TclError:
+                log(self.file_name, "强制置顶失败", level='error')
+        
         right_pressed = win32api.GetAsyncKeyState(win32con.VK_RBUTTON) < 0
         x, y = pyautogui.position()
         
@@ -202,11 +213,15 @@ class InkPainter:
                 dy = y - prev_y
                 dt = t - prev_t
                 speed = math.hypot(dx, dy) / dt if dt > 0 else 0
-                target_width = base_width / (1 + self.speed_factor * speed**0.7)
+                target_width = base_width / (1 + self.speed_factor * speed**0.7) if self.enable_advanced_brush else base_width
                 target_width = max(self.min_width, min(self.max_width, target_width))
-                current_width = target_width
+                
+                # 平滑过渡到目标宽度
+                smooth_factor = 0.3  # 与实时绘制一致
+                current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
             
             self.current_stroke.append((x, y, t, current_width))
+            prev_width = current_width  # 记录当前线宽
             
             # 绘制线段
             if i > 0:
@@ -217,7 +232,6 @@ class InkPainter:
         # 将历史轨迹线条加入动画队列
         self.active_lines.extend(active_lines)
         
-        self.active_lines.extend(active_lines)
         # 清空缓存
         self.pending_points = []
         self.drawing = True
@@ -354,11 +368,10 @@ class InkPainter:
             elapsed = current_time - anim['start_time']
             progress = min(elapsed / self.fade_duration, 1.0)
             
-            # 计算渐变颜色
-            fade_factor = int(255 * (1 - progress))
-            fade_color = f"#{fade_factor:02X}{fade_factor:02X}FF"
+            # 动态计算颜色
+            fade_color = self.calculate_fade_color(anim['base_color'], progress)
             
-            # 更新线条颜色
+            # 更新颜色
             for line_id in anim['lines']:
                 try:
                     self.canvas.itemconfig(line_id, fill=fade_color)
@@ -367,19 +380,34 @@ class InkPainter:
             
             if progress >= 1.0:
                 for line_id in anim['lines']:
-                    try:
-                        self.canvas.delete(line_id)
-                    except tk.TclError:
-                        pass
+                    self.canvas.delete(line_id)
                 removals.append(anim)
+            
+            # 清理并保持循环
+            for anim in removals:
+                self.fade_animations.remove(anim)
+            
+            if self.fade_animations:
+                self.root.after(10, self.process_fade_animation)
+
+    def calculate_fade_color(self, base_color, progress):
+        """根据进度计算渐隐颜色（HSV明度调整）"""
+        # 将HEX转RGB
+        r = int(base_color[1:3], 16)
+        g = int(base_color[3:5], 16)
+        b = int(base_color[5:7], 16)
         
-        # 清理完成动画
-        for anim in removals:
-            self.fade_animations.remove(anim)
+        # 转HSV并调整明度
+        h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)
+        v = v * (1 - progress)  # 明度随进度降低
+        r_new, g_new, b_new = colorsys.hsv_to_rgb(h, s, v)
         
-        # 继续动画循环
-        if self.fade_animations:
-            self.root.after(25, self.process_fade_animation)
+        # 转回HEX
+        return "#{:02X}{:02X}{:02X}".format(
+            int(r_new*255), 
+            int(g_new*255), 
+            int(b_new*255)
+        )
 
     def execute_operation(self, encoded_cmd):
         """执行Base64编码的操作指令"""
