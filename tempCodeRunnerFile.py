@@ -1,2 +1,0 @@
-
-        self.root.geometry("800x600")

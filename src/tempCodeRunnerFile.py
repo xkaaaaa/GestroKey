@@ -1,1 +1,0 @@
-os.path.dirname(os.path.abspath(__file__)) + "/img/icon/icon.ico"
