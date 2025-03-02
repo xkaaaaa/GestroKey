@@ -20,6 +20,8 @@ import tkinter as tk
 import pyautogui
 import win32api
 import win32con
+import os
+import sys
 from .gesture_parser import GestureParser
 from .log import log
 
@@ -61,6 +63,16 @@ class InkPainter:
         self.init_canvas()                 # 创建GUI界面
         self.start_listening()             # 启动监听循环
 
+    def get_settings_path(self):
+        """获取项目根目录的通用方法"""
+        if getattr(sys, 'frozen', False):
+            # 打包后使用exe所在目录的上二级目录
+            return os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'settings.json')
+        else:
+            # 开发时使用当前文件的上三级目录（src/app → 根目录）
+            return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'settings.json')
+
+
     def init_canvas(self):
         """创建全屏透明画布窗口"""
         log(self.file_name, "开始初始化画布窗口")
@@ -79,7 +91,7 @@ class InkPainter:
         """从settings.json加载绘画参数"""
         log(self.file_name, "开始加载绘画参数")
         try:
-            with open('settings.json', 'r', encoding='utf-8') as f:
+            with open(self.get_settings_path(), 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
             drawing_settings = config['drawing_settings']
@@ -100,7 +112,7 @@ class InkPainter:
         """从settings.json加载手势配置"""
         log(self.file_name, "开始加载手势配置")
         try:
-            with open('settings.json', 'r', encoding='utf-8') as f:
+            with open(self.get_settings_path(), 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
             self.gesture_lib = []
@@ -255,7 +267,7 @@ class InkPainter:
         if len(self.current_stroke) >= 5:
             log(self.file_name, f"开始手势识别，轨迹点数: {len(self.current_stroke)}")
             trail_points = [(x, y) for x, y, *_ in self.current_stroke]
-            parser = GestureParser(trail_points)
+            parser = GestureParser(trail_points, config_path=self.get_settings_path())
             if operation := parser.parse():
                 log(self.file_name, f"识别到手势，执行操作: {operation}")
                 self.execute_operation(operation)

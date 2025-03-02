@@ -2,7 +2,7 @@
     "drawing_settings": {
         "base_width": 5,
         "min_width": 2,
-        "max_width": 15,
+        "max_width": 10,
         "speed_factor": 2.2,
         "fade_duration": 0.4,
         "antialias_layers": 6,

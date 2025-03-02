@@ -19,6 +19,7 @@ import math
 import json
 import numpy as np
 import time
+import os
 from typing import List, Dict, Optional
 from .log import log
 
@@ -26,7 +27,7 @@ class GestureParser:
     DIRECTION_MAP = ["右", "右上", "上", "左上", 
                     "左", "左下", "下", "右下"]
     
-    def __init__(self, trail_points: List[tuple], config_path: str = 'settings.json'):
+    def __init__(self, trail_points: List[tuple], config_path: str = os.path.dirname(os.path.abspath(__file__)) + f'\..\settings.json'):
         """
         初始化手势解析器
         :param trail_points: 轨迹点序列 [(x,y), ...]
