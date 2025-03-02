@@ -103,6 +103,8 @@ class InkPainter:
             self.antialias_layers = drawing_settings['antialias_layers']      # 抗锯齿层数
             self.min_distance = drawing_settings['min_distance']              # 最小触发距离
             self.line_color = drawing_settings['line_color']                  # 线条颜色
+            self.max_stroke_points = drawing_settings['max_stroke_points']    # 最绘制大节点数
+            self.max_stroke_duration = drawing_settings['max_stroke_duration']# 最大绘制时长（秒）
             log(self.file_name, f"成功加载绘画参数: {drawing_settings}")
         except Exception as e:
             log(self.file_name, f"加载绘画参数失败: {str(e)}", level='error')
@@ -166,14 +168,22 @@ class InkPainter:
         self.drawing = True
         self.current_stroke = [(x, y, time.time(), self.base_width)]
         self.active_lines = []
+        self.stroke_start_time = time.time()
 
     def update_drawing(self, x, y):
         """更新绘画轨迹"""
         log(self.file_name, f"更新绘画轨迹，当前点: ({x}, {y})", level='debug')
         
-        if len(self.current_stroke) > 100:  # 限制最大轨迹点数
-            self.current_stroke.pop(0)
-
+        # 检查是否超出最大节点数或最大绘制时长
+        current_time = time.time()
+        if (len(self.current_stroke) >= self.max_stroke_points or 
+            current_time - self.stroke_start_time >= self.max_stroke_duration):
+            log(self.file_name, "触发自动清理机制")
+            self.finish_drawing()
+            self.start_drawing(x, y)  # 重新开始绘制
+            return
+        
+        # 原有逻辑
         current_time = time.time()
         prev_x, prev_y, prev_time, prev_width = self.current_stroke[-1]
         
