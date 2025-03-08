@@ -156,21 +156,21 @@ class InkPainter:
                 config = json.load(f)
             
             drawing_settings = config['drawing_settings']
-            self.base_width = drawing_settings['base_width', 5]                                             # 基础线宽
-            self.min_width = drawing_settings['min_width', 2]                                               # 最小线宽
-            self.max_width = drawing_settings['max_width', 10]                                              # 最大线宽
-            self.speed_factor = drawing_settings['speed_factor', 2.2]                                       # 速度敏感度
-            self.fade_duration = drawing_settings['fade_duration', 0.4]                                     # 渐隐时长（动画时间）
-            self.antialias_layers = drawing_settings['antialias_layers', 6]                                 # 抗锯齿层数
-            self.min_distance = drawing_settings['min_distance', 20]                                        # 最小触发距离
-            self.line_color = drawing_settings['line_color', "#00BFFF"]                                     # 线条颜色
-            self.max_stroke_points = drawing_settings['max_stroke_points', 200]                             # 最绘制大节点数
-            self.max_stroke_duration = drawing_settings['max_stroke_duration', 5]                           # 最大绘制时长（秒）
-            self.enable_advanced_brush = drawing_settings.get('enable_advanced_brush', True)                # 高级画笔开关
-            self.force_topmost = drawing_settings.get('force_topmost', True)                                # 强制置顶开关
-            self.enable_auto_smoothing = drawing_settings.get('enable_auto_smoothing', True)                # 是否启用自动平滑（True/False）
-            self.smoothing_factor = drawing_settings.get('smoothing_factor', 0.3)                           # 自动平滑系数，控制平滑力度
-            self.enable_hardware_acceleration = drawing_settings.get('enable_hardware_acceleration', True)  # 是否启用硬件加速（True/False）
+            self.base_width = drawing_settings['base_width']                                                # 基础线宽
+            self.min_width = drawing_settings['min_width']                                                  # 最小线宽
+            self.max_width = drawing_settings['max_width']                                                  # 最大线宽
+            self.speed_factor = drawing_settings['speed_factor']                                            # 速度敏感度
+            self.fade_duration = drawing_settings['fade_duration']                                          # 渐隐时长（动画时间）
+            self.antialias_layers = drawing_settings['antialias_layers']                                    # 抗锯齿层数
+            self.min_distance = drawing_settings['min_distance']                                            # 最小触发距离
+            self.line_color = drawing_settings['line_color']                                                # 线条颜色
+            self.max_stroke_points = drawing_settings['max_stroke_points']                                  # 最绘制大节点数
+            self.max_stroke_duration = drawing_settings['max_stroke_duration']                              # 最大绘制时长（秒）
+            self.enable_advanced_brush = drawing_settings.get('enable_advanced_brush')                      # 高级画笔开关
+            self.force_topmost = drawing_settings.get('force_topmost')                                      # 强制置顶开关
+            self.enable_auto_smoothing = drawing_settings.get('enable_auto_smoothing')                      # 是否启用自动平滑（True/False）
+            self.smoothing_factor = drawing_settings.get('smoothing_factor')                                # 自动平滑系数，控制平滑力度
+            self.enable_hardware_acceleration = drawing_settings.get('enable_hardware_acceleration')        # 是否启用硬件加速（True/False）
             log(self.file_name, f"成功加载绘画参数: {drawing_settings}")
         except Exception as e:
             log(self.file_name, f"加载绘画参数失败: {str(e)}", level='error')
