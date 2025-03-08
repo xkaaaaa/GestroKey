@@ -21,7 +21,11 @@ import numpy as np
 import time
 import os
 from typing import List, Dict, Optional
-from .log import log
+
+try:
+    from .log import log
+except ImportError:
+    from log import log
 
 class GestureParser:
     DIRECTION_MAP = ["右", "右上", "上", "左上", 
@@ -314,5 +318,4 @@ class GestureParser:
         return min(abs(idx1 - idx2), 8 - abs(idx1 - idx2)) * 45
 
 if __name__ == "__main__":
-    print("你点我干嘛~哎呦喂~~~~~~")
-    time.sleep(114514)
+    print("请通过主程序运行。")

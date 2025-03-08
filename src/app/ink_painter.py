@@ -2,7 +2,7 @@
 绘画模块
 调用说明：
 1. 初始化：painter = InkPainter()
-   - 创建全屏透明画布
+   - 创建全屏透明画布（窗口尺寸为全屏尺寸减1，不显示在任务栏）
    - 自动加载手势配置
    - 启动鼠标监听线程
 
@@ -16,15 +16,61 @@ import math
 import base64
 import json
 import numpy as np
-import tkinter as tk
 import pyautogui
 import win32api
 import win32con
 import os
 import sys
-import colorsys
-from .gesture_parser import GestureParser
-from .log import log
+from PyQt5.QtWidgets import QApplication, QWidget
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QPainter, QPen, QColor
+
+try:
+    from .gesture_parser import GestureParser
+    from .log import log
+except ImportError:
+    from gesture_parser import GestureParser
+    from log import log
+
+class Canvas(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.lines = []
+        # 设置为透明背景
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+        # 新增：硬件加速开关（由设置控制）
+        self.enable_hardware_acceleration = True
+
+    def create_line(self, x1, y1, x2, y2, width, fill, capstyle, smooth, joinstyle):
+        line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': fill}
+        self.lines.append(line)
+        self.update()
+        return line
+
+    def itemconfig(self, line, fill):
+        line['color'] = fill
+        self.update()
+
+    def delete(self, line):
+        try:
+            self.lines.remove(line)
+        except ValueError:
+            pass
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        if self.enable_hardware_acceleration:
+            painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
+        for line in self.lines:
+            pen = QPen(QColor(line['color']))
+            pen.setWidthF(line['width'])
+            pen.setCapStyle(Qt.RoundCap)
+            painter.setPen(pen)
+            # 将坐标转换为整数，避免类型错误
+            painter.drawLine(int(line['x1']), int(line['y1']), int(line['x2']), int(line['y2']))
 
 class InkPainter:
     def __init__(self):
@@ -40,30 +86,37 @@ class InkPainter:
         # 抗锯齿预计算
         log(self.file_name, "开始抗锯齿颜色预计算")
         self.antialias_colors = []
-        base_color = np.array([int(self.line_color[1:3], 16), 
-                              int(self.line_color[3:5], 16), 
-                              int(self.line_color[5:7], 16)])
+        base_color = np.array([
+            int(self.line_color[1:3], 16), 
+            int(self.line_color[3:5], 16), 
+            int(self.line_color[5:7], 16)
+        ])
+        # 修改：提高混合比例使抗锯齿边缘颜色与主线条颜色不同
         for i in range(self.antialias_layers):
             ratio = i / self.antialias_layers
             fade = 0.8 * (1 - ratio**0.3)
-            blend = ratio * 0.1
+            blend = ratio * 0.3  # 原来为0.1，现调整为0.3
             color = base_color * fade + (255 - base_color) * blend
-            self.antialias_colors.append("#{:02X}{:02X}{:02X}".format(*np.clip(color, 0, 255).astype(int)))
+            self.antialias_colors.append("#{:02X}{:02X}{:02X}".format(
+                *np.clip(color, 0, 255).astype(int)
+            ))
         log(self.file_name, f"完成抗锯齿颜色预计算，共生成{len(self.antialias_colors)}种颜色")
             
         # 状态控制
         self.drawing = False               # 绘画状态标志
         self.running = True                # 运行状态标志
-        self.current_stroke = []           # 当前笔画数据
+        self.current_stroke = []           # 当前笔画数据（原始数据，用于手势识别）
+        self.smoothed_stroke = []          # 平滑后的笔画数据（用于绘图显示）
         self.active_lines = []             # 画布线条对象
         self.fade_animations = []          # 渐隐动画队列
         self.start_point = None            # 记录起始点
         self.pending_points = []           # 存储达到触发条件前的轨迹点
+        self.finished_strokes = []         # 已结束笔画，用于独立的手势识别
         
         # 初始化系统
         self.load_gestures()               # 加载手势配置
         self.init_canvas()                 # 创建GUI界面
-        self.start_listening()             # 启动监听循环
+        self.start_listening()             # 启动鼠标监听循环
 
     def get_settings_path(self):
         """获取项目根目录的通用方法"""
@@ -72,21 +125,27 @@ class InkPainter:
             return os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'settings.json')
         else:
             # 开发时使用当前文件的上三级目录（src/app → 根目录）
-            return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'settings.json')
-
+            return os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                'settings.json'
+            )
 
     def init_canvas(self):
         """创建全屏透明画布窗口"""
         log(self.file_name, "开始初始化画布窗口")
-        self.root = tk.Tk()
-        self.root.overrideredirect(True)
-        self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
-        self.root.attributes("-alpha", 0.85)
-        self.root.attributes("-topmost", True)
-        self.root.attributes("-transparentcolor", "white")
+        self.app = QApplication(sys.argv)
+        self.root = QWidget()
+        # 修改：窗口不在任务栏显示（使用 Qt.Tool），窗口大小设为全屏尺寸-1
+        # 同时设置 WA_ShowWithoutActivating 防止窗口夺取焦点
+        self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.root.setAttribute(Qt.WA_TranslucentBackground)
+        self.root.setAttribute(Qt.WA_ShowWithoutActivating, True)
+        self.root.setGeometry(0, 0, self.screen_width - 1, self.screen_height - 1)
+        self.root.setWindowOpacity(0.85)
         
-        self.canvas = tk.Canvas(self.root, bg='white', highlightthickness=0)
-        self.canvas.pack(fill=tk.BOTH, expand=True)
+        self.canvas = Canvas(self.root)
+        self.canvas.setGeometry(0, 0, self.screen_width - 1, self.screen_height - 1)
+        self.canvas.enable_hardware_acceleration = self.enable_hardware_acceleration
         log(self.file_name, "画布窗口初始化完成")
 
     def load_drawing_settings(self):
@@ -97,19 +156,21 @@ class InkPainter:
                 config = json.load(f)
             
             drawing_settings = config['drawing_settings']
-            self.base_width = drawing_settings['base_width']                                  # 基础线宽
-            self.min_width = drawing_settings['min_width']                                    # 最小线宽
-            self.max_width = drawing_settings['max_width']                                    # 最大线宽
-            self.speed_factor = drawing_settings['speed_factor']                              # 速度敏感度
-            self.fade_duration = drawing_settings['fade_duration']                            # 渐隐时长
-            self.antialias_layers = drawing_settings['antialias_layers']                      # 抗锯齿层数
-            self.min_distance = drawing_settings['min_distance']                              # 最小触发距离
-            self.line_color = drawing_settings['line_color']                                  # 线条颜色
-            self.max_stroke_points = drawing_settings['max_stroke_points']                    # 最绘制大节点数
-            self.max_stroke_duration = drawing_settings['max_stroke_duration']                # 最大绘制时长（秒）
-            self.enable_advanced_brush = drawing_settings.get('enable_advanced_brush', True)  # 高级画笔开关
-            self.fade_color = drawing_settings.get('fade_color', '#0000FF')                   # 渐隐动画颜色
-            self.force_topmost = drawing_settings.get('force_topmost', True)                  # 强制置顶开关
+            self.base_width = drawing_settings['base_width', 5]                                             # 基础线宽
+            self.min_width = drawing_settings['min_width', 2]                                               # 最小线宽
+            self.max_width = drawing_settings['max_width', 10]                                              # 最大线宽
+            self.speed_factor = drawing_settings['speed_factor', 2.2]                                       # 速度敏感度
+            self.fade_duration = drawing_settings['fade_duration', 0.4]                                     # 渐隐时长（动画时间）
+            self.antialias_layers = drawing_settings['antialias_layers', 6]                                 # 抗锯齿层数
+            self.min_distance = drawing_settings['min_distance', 20]                                        # 最小触发距离
+            self.line_color = drawing_settings['line_color', "#00BFFF"]                                     # 线条颜色
+            self.max_stroke_points = drawing_settings['max_stroke_points', 200]                             # 最绘制大节点数
+            self.max_stroke_duration = drawing_settings['max_stroke_duration', 5]                           # 最大绘制时长（秒）
+            self.enable_advanced_brush = drawing_settings.get('enable_advanced_brush', True)                # 高级画笔开关
+            self.force_topmost = drawing_settings.get('force_topmost', True)                                # 强制置顶开关
+            self.enable_auto_smoothing = drawing_settings.get('enable_auto_smoothing', True)                # 是否启用自动平滑（True/False）
+            self.smoothing_factor = drawing_settings.get('smoothing_factor', 0.3)                           # 自动平滑系数，控制平滑力度
+            self.enable_hardware_acceleration = drawing_settings.get('enable_hardware_acceleration', True)  # 是否启用硬件加速（True/False）
             log(self.file_name, f"成功加载绘画参数: {drawing_settings}")
         except Exception as e:
             log(self.file_name, f"加载绘画参数失败: {str(e)}", level='error')
@@ -138,18 +199,19 @@ class InkPainter:
         """启动鼠标监听循环"""
         log(self.file_name, "启动鼠标监听循环")
         self.last_right_state = False
-        self.root.after(5, self.listen_mouse)
+        QTimer.singleShot(5, self.listen_mouse)
 
     def listen_mouse(self):
         """核心监听逻辑"""
         if not self.running:
             return
         
-        # 强制置顶
+        # 修改：如果强制置顶开关开启，则重复调用raise_()，
+        # 但不调用activateWindow()以免夺取焦点，从而确保窗口始终在顶层且不干扰其他窗口
         if self.force_topmost:
             try:
-                self.root.attributes("-topmost", True)
-            except tk.TclError:
+                self.root.raise_()
+            except Exception as e:
                 log(self.file_name, "强制置顶失败", level='error')
         
         right_pressed = win32api.GetAsyncKeyState(win32con.VK_RBUTTON) < 0
@@ -163,8 +225,7 @@ class InkPainter:
             # 持续缓存轨迹点（即使未达触发距离）
             self.pending_points.append((x, y, time.time()))
             
-            # 检查触发条件
-            # 修复代码：提取元组中的坐标分量
+            # 检查触发条件：提取元组中的坐标分量
             start_x, start_y = self.start_point
             dx = x - start_x
             dy = y - start_y
@@ -179,7 +240,7 @@ class InkPainter:
                 for line in self.active_lines:
                     try:
                         self.canvas.delete(line)
-                    except tk.TclError:
+                    except Exception:
                         pass
                 self.active_lines = []
                 self.pending_points = []
@@ -187,7 +248,7 @@ class InkPainter:
             self.start_point = None
         
         self.last_right_state = right_pressed
-        self.root.after(5, self.listen_mouse)
+        QTimer.singleShot(5, self.listen_mouse)
 
     def start_drawing(self):
         """从缓存点开始初始化笔画"""
@@ -198,39 +259,68 @@ class InkPainter:
         
         # 转换缓存点并记录线条
         self.current_stroke = []
+        if self.enable_auto_smoothing:
+            self.smoothed_stroke = []
         active_lines = []  # 临时存储历史轨迹线条
         
         # 生成初始线宽
         base_width = self.base_width
+        prev_width = base_width
         for i in range(len(self.pending_points)):
             x, y, t = self.pending_points[i]
             if i == 0:
                 current_width = base_width
+                self.current_stroke.append((x, y, t, current_width))
+                if self.enable_auto_smoothing:
+                    self.smoothed_stroke.append((x, y, t, current_width))
             else:
                 # 计算动态线宽（与实时绘制相同逻辑）
                 if self.enable_advanced_brush:
-                    prev_x, prev_y, prev_t = self.pending_points[i-1]
+                    if self.enable_auto_smoothing:
+                        prev_smoothed = self.smoothed_stroke[-1]
+                        new_x = self.smoothing_factor * x + (1 - self.smoothing_factor) * prev_smoothed[0]
+                        new_y = self.smoothing_factor * y + (1 - self.smoothing_factor) * prev_smoothed[1]
+                        prev_x, prev_y, prev_t, _ = self.current_stroke[-1]
+                        dt = t - prev_t
+                        dx = x - prev_x
+                        dy = y - prev_y
+                        speed = math.hypot(dx, dy) / dt if dt > 0 else 0
+                        target_width = base_width / (1 + self.speed_factor * speed**0.7)
+                        target_width = max(self.min_width, min(self.max_width, target_width))
+                        smooth_factor = 0.3  # 与实时绘制一致
+                        current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+                        self.current_stroke.append((x, y, t, current_width))
+                        new_width = self.smoothing_factor * current_width + (1 - self.smoothing_factor) * prev_smoothed[3]
+                        smoothed_point = (new_x, new_y, t, new_width)
+                        self.smoothed_stroke.append(smoothed_point)
+                        lines = self.draw_antialiased_line(prev_smoothed[0], prev_smoothed[1], new_x, new_y, prev_smoothed[3], new_width)
+                        active_lines.extend(lines)
+                        prev_width = current_width
+                    else:
+                        prev_x, prev_y, prev_t, _ = self.current_stroke[-1]
+                        dt = t - prev_t
+                        dx = x - prev_x
+                        dy = y - prev_y
+                        speed = math.hypot(dx, dy) / dt if dt > 0 else 0
+                        target_width = base_width / (1 + self.speed_factor * speed**0.7)
+                        target_width = max(self.min_width, min(self.max_width, target_width))
+                        smooth_factor = 0.3
+                        current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+                        self.current_stroke.append((x, y, t, current_width))
+                        lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
+                        active_lines.extend(lines)
+                        prev_width = current_width
+                else:
+                    prev_x, prev_y, prev_t, _ = self.current_stroke[-1]
+                    dt = t - prev_t
                     dx = x - prev_x
                     dy = y - prev_y
-                    dt = t - prev_t
                     speed = math.hypot(dx, dy) / dt if dt > 0 else 0
-                    target_width = base_width / (1 + self.speed_factor * speed**0.7) if self.enable_advanced_brush else base_width
-                    target_width = max(self.min_width, min(self.max_width, target_width))
-                    
-                    # 平滑过渡到目标宽度
-                    smooth_factor = 0.3  # 与实时绘制一致
-                    current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
-                else:
                     current_width = base_width
-            
-            self.current_stroke.append((x, y, t, current_width))
-            prev_width = current_width  # 记录当前线宽
-            
-            # 绘制线段
-            if i > 0:
-                prev_x, prev_y, prev_t, prev_width = self.current_stroke[i-1]
-                lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
-                active_lines.extend(lines)
+                    self.current_stroke.append((x, y, t, current_width))
+                    lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
+                    active_lines.extend(lines)
+                    prev_width = current_width
         
         # 将历史轨迹线条加入动画队列
         self.active_lines.extend(active_lines)
@@ -287,9 +377,18 @@ class InkPainter:
         self.current_stroke.append((x, y, current_time, current_width))
         
         # 抗锯齿绘制
-        lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
-        self.active_lines.extend(lines)
-
+        if self.enable_auto_smoothing:
+            last_smoothed = self.smoothed_stroke[-1]
+            new_x = self.smoothing_factor * x + (1 - self.smoothing_factor) * last_smoothed[0]
+            new_y = self.smoothing_factor * y + (1 - self.smoothing_factor) * last_smoothed[1]
+            new_width = self.smoothing_factor * current_width + (1 - self.smoothing_factor) * last_smoothed[3]
+            smoothed_point = (new_x, new_y, current_time, new_width)
+            self.smoothed_stroke.append(smoothed_point)
+            lines = self.draw_antialiased_line(last_smoothed[0], last_smoothed[1], new_x, new_y, last_smoothed[3], new_width)
+            self.active_lines.extend(lines)
+        else:
+            lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
+            self.active_lines.extend(lines)
 
     def draw_antialiased_line(self, x1, y1, x2, y2, w1, w2):
         """生成抗锯齿线条，并返回线条对象列表"""
@@ -302,9 +401,11 @@ class InkPainter:
             expand = 1 + 1.0 * (1 - ratio**0.5)
             
             # 计算抗锯齿颜色
-            base_color = np.array([int(self.line_color[1:3], 16), 
-                                int(self.line_color[3:5], 16), 
-                                int(self.line_color[5:7], 16)])
+            base_color = np.array([
+                int(self.line_color[1:3], 16), 
+                int(self.line_color[3:5], 16), 
+                int(self.line_color[5:7], 16)
+            ])
             fade = 0.85 * (1 - ratio**0.3)
             blend = ratio * 0.1
             color = base_color * fade + (255 - base_color) * blend
@@ -314,9 +415,9 @@ class InkPainter:
                 x1, y1, x2, y2,
                 width=width * expand,
                 fill=antialias_color,
-                capstyle=tk.ROUND,
+                capstyle=Qt.RoundCap,
                 smooth=True,
-                joinstyle=tk.ROUND
+                joinstyle=Qt.RoundJoin
             )
             line_group.append(layer)
         
@@ -325,9 +426,9 @@ class InkPainter:
             x1, y1, x2, y2,
             width=w2,
             fill=self.line_color,
-            capstyle=tk.ROUND,
+            capstyle=Qt.RoundCap,
             smooth=True,
-            joinstyle=tk.ROUND
+            joinstyle=Qt.RoundJoin
         )
         line_group.append(main_line)
         
@@ -340,8 +441,10 @@ class InkPainter:
         
         # 合并所有轨迹点（包括触发前的缓存）
         full_stroke = self.current_stroke.copy()
+        # 保存已结束的笔画，用于独立的手势识别（不影响其他笔画的识别）
+        self.finished_strokes.append(full_stroke)
         
-        # 触发渐隐动画
+        # 触发渐隐动画：线条逐渐变透明（逐渐减小笔画的不透明度）
         if self.active_lines:
             log(self.file_name, f"触发渐隐动画，线条数: {len(self.active_lines)}")
             self.fade_animations.append({
@@ -352,7 +455,7 @@ class InkPainter:
             self.active_lines = []
             self.process_fade_animation()
         
-        # 手势识别（使用完整轨迹）
+        # 手势识别（使用完整轨迹），异步处理，不影响新笔画
         if len(full_stroke) >= 5:
             log(self.file_name, f"开始手势识别，轨迹点数: {len(full_stroke)}")
             trail_points = [(x, y) for x, y, *_ in full_stroke]
@@ -363,6 +466,8 @@ class InkPainter:
         
         # 清空数据
         self.current_stroke = []
+        if self.enable_auto_smoothing:
+            self.smoothed_stroke = []
         self.pending_points = []
 
     def process_fade_animation(self):
@@ -374,46 +479,39 @@ class InkPainter:
             elapsed = current_time - anim['start_time']
             progress = min(elapsed / self.fade_duration, 1.0)
             
-            # 动态计算颜色
+            # 动态计算颜色：保持原RGB，仅降低不透明度（alpha值）
             fade_color = self.calculate_fade_color(anim['base_color'], progress)
             
             # 更新颜色
             for line_id in anim['lines']:
                 try:
                     self.canvas.itemconfig(line_id, fill=fade_color)
-                except tk.TclError:
+                except Exception:
                     pass
             
             if progress >= 1.0:
                 for line_id in anim['lines']:
                     self.canvas.delete(line_id)
                 removals.append(anim)
-            
-            # 清理并保持循环
-            for anim in removals:
-                self.fade_animations.remove(anim)
-            
-            if self.fade_animations:
-                self.root.after(10, self.process_fade_animation)
+        
+        # 清理已完成的渐隐动画
+        for anim in removals:
+            self.fade_animations.remove(anim)
+        
+        if self.fade_animations:
+            QTimer.singleShot(10, self.process_fade_animation)
 
     def calculate_fade_color(self, base_color, progress):
-        """根据进度计算渐隐颜色（HSV明度调整）"""
+        """根据进度计算渐隐颜色（线条逐渐变透明），返回格式为 #AARRGGBB
+        说明：随着 progress 增大（0~1），alpha值逐渐减小，从而实现渐隐效果。
+        """
         # 将HEX转RGB
         r = int(base_color[1:3], 16)
         g = int(base_color[3:5], 16)
         b = int(base_color[5:7], 16)
-        
-        # 转HSV并调整明度
-        h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)
-        v = v * (1 - progress)  # 明度随进度降低
-        r_new, g_new, b_new = colorsys.hsv_to_rgb(h, s, v)
-        
-        # 转回HEX
-        return "#{:02X}{:02X}{:02X}".format(
-            int(r_new*255), 
-            int(g_new*255), 
-            int(b_new*255)
-        )
+        a = int(255 * (1 - progress))
+        # 返回包含透明度信息的颜色，格式调整为 #AARRGGBB
+        return "#{:02X}{:02X}{:02X}{:02X}".format(a, r, g, b)
 
     def execute_operation(self, encoded_cmd):
         """执行Base64编码的操作指令"""
@@ -428,13 +526,13 @@ class InkPainter:
         """安全关闭资源"""
         log(self.file_name, "正在关闭绘画模块...")
         self.running = False
-        self.root.destroy()
+        self.root.close()
         self.canvas = None
         log(self.file_name, "绘画模块已关闭")
 
 if __name__ == "__main__":
-    print("额，非常不建议您这么启动")
-    print("不过也不是不行，就是会报错《而已》。你只需要修改一下开头即可")
+    print("建议通过主程序运行。")
     time.sleep(1)
     test_painter = InkPainter()
-    test_painter.root.mainloop()
+    test_painter.root.show()
+    sys.exit(test_painter.app.exec_())
