@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-page">
+    <div class="page-header">
+        <h2>设置</h2>
+        <p>配置绘画参数和系统选项</p>
+    </div>
+    
+    <form id="settings-form" class="settings-form">
+        <div class="settings-section">
+            <h3>绘画设置</h3>
+            
+            <div class="form-group">
+                <label for="base_width">基础线宽</label>
+                <div class="range-control">
+                    <input type="range" id="base_width" name="base_width" 
+                           min="1" max="15" value="{{ settings.base_width }}" class="slider">
+                    <span class="range-value">{{ settings.base_width }}</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="min_width">最小线宽</label>
+                <div class="range-control">
+                    <input type="range" id="min_width" name="min_width" 
+                           min="1" max="10" value="{{ settings.min_width }}" class="slider">
+                    <span class="range-value">{{ settings.min_width }}</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="max_width">最大线宽</label>
+                <div class="range-control">
+                    <input type="range" id="max_width" name="max_width" 
+                           min="5" max="30" value="{{ settings.max_width }}" class="slider">
+                    <span class="range-value">{{ settings.max_width }}</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="speed_factor">速度敏感度</label>
+                <div class="range-control">
+                    <input type="range" id="speed_factor" name="speed_factor" 
+                           min="0.5" max="3" step="0.1" value="{{ settings.speed_factor }}" class="slider">
+                    <span class="range-value">{{ settings.speed_factor }}</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="line_color">线条颜色</label>
+                <input type="color" id="line_color" name="line_color" value="{{ settings.line_color }}">
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="enable_advanced_brush" name="enable_advanced_brush" 
+                       {% if settings.enable_advanced_brush %}checked{% endif %}>
+                <label for="enable_advanced_brush">启用高级画笔</label>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="enable_auto_smoothing" name="enable_auto_smoothing" 
+                       {% if settings.enable_auto_smoothing %}checked{% endif %}>
+                <label for="enable_auto_smoothing">启用自动平滑</label>
+            </div>
+        </div>
+        
+        <div class="settings-section">
+            <h3>系统设置</h3>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="force_topmost" name="force_topmost" 
+                       {% if settings.force_topmost %}checked{% endif %}>
+                <label for="force_topmost">强制置顶</label>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="enable_hardware_acceleration" name="enable_hardware_acceleration" 
+                       {% if settings.enable_hardware_acceleration %}checked{% endif %}>
+                <label for="enable_hardware_acceleration">启用硬件加速</label>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="start_with_system" name="start_with_system" 
+                       {% if settings.start_with_system %}checked{% endif %}>
+                <label for="start_with_system">开机自启动</label>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn primary-btn">保存设置</button>
+            <button type="button" id="reset-btn" class="btn secondary-btn">恢复默认</button>
+        </div>
+    </form>
+</div>
+{% endblock %} 

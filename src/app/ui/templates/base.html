@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GestroKey 隐绘助手</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="logo">
+                <img src="/static/img/logo.svg" alt="GestroKey Logo">
+                <h1>GestroKey</h1>
+            </div>
+            <nav class="nav-menu">
+                <a href="/console" class="nav-item" data-page="console">
+                    <span class="icon">⚙️</span>
+                    <span class="text">控制台</span>
+                </a>
+                <a href="/settings" class="nav-item" data-page="settings">
+                    <span class="icon">🔧</span>
+                    <span class="text">设置</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>版本: 1.0.0</p>
+            </div>
+        </div>
+        
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <div id="content-container">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/main.js"></script>
+</body>
+</html> 

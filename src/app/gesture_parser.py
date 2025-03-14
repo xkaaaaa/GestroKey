@@ -31,21 +31,30 @@ class GestureParser:
     DIRECTION_MAP = ["右", "右上", "上", "左上", 
                     "左", "左下", "下", "右下"]
     
-    def __init__(self, trail_points: List[tuple], config_path: str = os.path.dirname(os.path.abspath(__file__)) + f'\..\settings.json'):
+    def __init__(self, trail_points: List[tuple], config_path: str = None):
         """
         初始化手势解析器
         :param trail_points: 轨迹点序列 [(x,y), ...]
         :param config_path: 手势配置文件路径
         """
         self.trail = trail_points
-        self.config_path = config_path
+        # 如果没有提供配置路径，使用项目根目录的settings.json
+        if config_path is None:
+            # 获取项目根目录
+            current_dir = os.path.abspath(os.path.dirname(__file__))
+            # 从当前目录向上两级找到项目根目录
+            project_root = os.path.dirname(os.path.dirname(current_dir))
+            self.config_path = os.path.join(project_root, 'settings.json')
+        else:
+            self.config_path = config_path
+            
         self.min_points = 5           # 最小识别点数
         self.step_base = 3            # 动态步长基数
         self.merge_threshold = 25     # 合并阈值(px)
         self.noise_threshold = 15     # 噪音阈值(px)
         self.file_name = 'gesture_parser'
 
-        log(self.file_name, f"初始化解析器，轨迹点数: {len(trail_points)}，配置文件: {config_path}")
+        log(self.file_name, f"初始化解析器，轨迹点数: {len(trail_points)}，配置文件: {self.config_path}")
         # 加载手势库
         self.gesture_lib = self._load_gesture_lib()
 

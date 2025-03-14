@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="console-page">
+    <div class="page-header">
+        <h2>控制台</h2>
+        <p>管理绘画功能和系统状态</p>
+    </div>
+    
+    <div class="control-panel">
+        <div class="status-card">
+            <div class="status-indicator {% if is_running %}active{% endif %}"></div>
+            <div class="status-info">
+                <h3>绘画状态</h3>
+                <p id="status-text">{% if is_running %}运行中{% else %}已停止{% endif %}</p>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="toggle-btn" class="btn primary-btn">
+                {% if is_running %}停止绘画{% else %}开始绘画{% endif %}
+            </button>
+            <button id="minimize-btn" class="btn secondary-btn">最小化到托盘</button>
+            <button id="exit-btn" class="btn danger-btn">退出程序</button>
+        </div>
+    </div>
+    
+    <div class="system-info">
+        <h3>系统信息</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="label">系统版本:</span>
+                <span class="value">{{ system_info.version }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">运行时间:</span>
+                <span class="value" id="runtime">{{ system_info.runtime }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">内存使用:</span>
+                <span class="value" id="memory-usage">{{ system_info.memory_usage }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
