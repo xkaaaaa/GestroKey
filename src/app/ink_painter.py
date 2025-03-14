@@ -39,38 +39,71 @@ class Canvas(QWidget):
         # 设置为透明背景
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
-        # 新增：硬件加速开关（由设置控制）
+        # 硬件加速开关（由设置控制）
         self.enable_hardware_acceleration = True
+        # 减少不必要的重绘
+        self.update_scheduled = False
+        # 批量绘制队列
+        self.batch_updates = []
 
     def create_line(self, x1, y1, x2, y2, width, fill, capstyle, smooth, joinstyle):
         line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': fill}
         self.lines.append(line)
-        self.update()
+        # 不立即更新，而是加入批量队列
+        self.batch_updates.append(line)
+        self.schedule_update()
         return line
 
     def itemconfig(self, line, fill):
         line['color'] = fill
-        self.update()
+        self.schedule_update()
 
     def delete(self, line):
         try:
             self.lines.remove(line)
         except ValueError:
             pass
+        self.schedule_update()
+    
+    def schedule_update(self):
+        """智能调度更新，避免频繁重绘"""
+        if not self.update_scheduled:
+            self.update_scheduled = True
+            QTimer.singleShot(10, self.do_update)  # 10ms延迟，合并多次更新
+    
+    def do_update(self):
+        """执行实际更新"""
+        self.update_scheduled = False
+        self.batch_updates.clear()
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        # 开启抗锯齿
         painter.setRenderHint(QPainter.Antialiasing)
         if self.enable_hardware_acceleration:
             painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
+            # 提高绘制性能
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        
+        # 仅绘制可见区域内的线条
+        visible_rect = event.rect()
+        
         for line in self.lines:
             pen = QPen(QColor(line['color']))
             pen.setWidthF(line['width'])
             pen.setCapStyle(Qt.RoundCap)
-            painter.setPen(pen)
             # 将坐标转换为整数，避免类型错误
-            painter.drawLine(int(line['x1']), int(line['y1']), int(line['x2']), int(line['y2']))
+            x1, y1 = int(line['x1']), int(line['y1'])
+            x2, y2 = int(line['x2']), int(line['y2'])
+            
+            # 粗略判断线条是否在可见区域内（边界框检测）
+            if (max(x1, x2) < visible_rect.left() or min(x1, x2) > visible_rect.right() or
+                max(y1, y2) < visible_rect.top() or min(y1, y2) > visible_rect.bottom()):
+                continue  # 不在可见区域内，跳过绘制
+                
+            painter.setPen(pen)
+            painter.drawLine(x1, y1, x2, y2)
 
 class InkPainter:
     def __init__(self):
@@ -91,16 +124,24 @@ class InkPainter:
             int(self.line_color[3:5], 16), 
             int(self.line_color[5:7], 16)
         ])
-        # 修改：提高混合比例使抗锯齿边缘颜色与主线条颜色不同
+        
+        # 提前计算所有可能的抗锯齿颜色
         for i in range(self.antialias_layers):
             ratio = i / self.antialias_layers
             fade = 0.8 * (1 - ratio**0.3)
-            blend = ratio * 0.3  # 原来为0.1，现调整为0.3
+            blend = ratio * 0.3  # 原来为0.1，现调整为0.3，提高边缘可见度
             color = base_color * fade + (255 - base_color) * blend
             self.antialias_colors.append("#{:02X}{:02X}{:02X}".format(
                 *np.clip(color, 0, 255).astype(int)
             ))
         log(self.file_name, f"完成抗锯齿颜色预计算，共生成{len(self.antialias_colors)}种颜色")
+        
+        # 预计算扩展比例
+        self.width_expansion_ratios = []
+        for i in range(self.antialias_layers):
+            ratio = i / self.antialias_layers
+            expand = 1 + 1.0 * (1 - ratio**0.5)
+            self.width_expansion_ratios.append(expand)
             
         # 状态控制
         self.drawing = False               # 绘画状态标志
@@ -135,7 +176,7 @@ class InkPainter:
         log(self.file_name, "开始初始化画布窗口")
         self.app = QApplication(sys.argv)
         self.root = QWidget()
-        # 修改：窗口不在任务栏显示（使用 Qt.Tool），窗口大小设为全屏尺寸-1
+        # 窗口不在任务栏显示（使用 Qt.Tool），窗口大小设为全屏尺寸-1
         # 同时设置 WA_ShowWithoutActivating 防止窗口夺取焦点
         self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.root.setAttribute(Qt.WA_TranslucentBackground)
@@ -206,7 +247,7 @@ class InkPainter:
         if not self.running:
             return
         
-        # 修改：如果强制置顶开关开启，则重复调用raise_()，
+        # 如果强制置顶开关开启，则重复调用raise_()，
         # 但不调用activateWindow()以免夺取焦点，从而确保窗口始终在顶层且不干扰其他窗口
         if self.force_topmost:
             try:
@@ -217,6 +258,20 @@ class InkPainter:
         right_pressed = win32api.GetAsyncKeyState(win32con.VK_RBUTTON) < 0
         x, y = pyautogui.position()
         
+        # 引入节流算法，减少点采样频率
+        current_time = time.time()
+        is_throttled = False
+        
+        if self.drawing and self.current_stroke:
+            prev_x, prev_y, prev_time, _ = self.current_stroke[-1]
+            # 如果距离上次记录点时间太短，且移动距离很小，则跳过本次更新
+            dt = current_time - prev_time
+            dist = math.hypot(x - prev_x, y - prev_y)
+            
+            # 最小更新间隔调整为3ms，最小距离为2像素
+            if dt < 0.003 and dist < 2:
+                is_throttled = True
+                
         # 状态切换处理
         if right_pressed and not self.last_right_state:
             self.start_point = (x, y)  # 记录起始点
@@ -231,7 +286,7 @@ class InkPainter:
             dy = y - start_y
             if math.hypot(dx, dy) >= self.min_distance:
                 self.start_drawing()  # 触发后开始绘制历史轨迹
-        elif right_pressed and self.drawing:
+        elif right_pressed and self.drawing and not is_throttled:
             self.update_drawing(x, y)
         elif not right_pressed and self.last_right_state:
             # 松开右键时清理
@@ -248,7 +303,10 @@ class InkPainter:
             self.start_point = None
         
         self.last_right_state = right_pressed
-        QTimer.singleShot(5, self.listen_mouse)
+        
+        # 动态调整监听间隔
+        next_interval = 3 if self.drawing else 5  # 绘制时用3ms，否则用5ms
+        QTimer.singleShot(next_interval, self.listen_mouse)
 
     def start_drawing(self):
         """从缓存点开始初始化笔画"""
@@ -341,11 +399,10 @@ class InkPainter:
             current_time - self.stroke_start_time >= self.max_stroke_duration):
             log(self.file_name, "触发自动清理机制")
             self.finish_drawing()
-            self.start_drawing()  # 移除非法的坐标参数
+            self.start_drawing()
             return
         
-        # 原有逻辑
-        current_time = time.time()
+        # 获取上一个点的信息
         prev_x, prev_y, prev_time, prev_width = self.current_stroke[-1]
         
         # 计算动态线宽
@@ -363,13 +420,9 @@ class InkPainter:
             target_width = self.base_width / (1 + self.speed_factor * speed**0.7)
             target_width = max(self.min_width, min(self.max_width, target_width))
             
-            # 平滑过渡到目标宽度
-            if len(self.current_stroke) > 1:
-                # 使用加权平均实现平滑过渡
-                smooth_factor = 0.3  # 调整这个值可以控制过渡速度
-                current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
-            else:
-                current_width = target_width
+            # 更平滑的宽度变化，避免突变
+            smooth_factor = 0.4  # 提高平滑系数，减少宽度突变
+            current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
         else:
             current_width = self.base_width
         
@@ -379,14 +432,38 @@ class InkPainter:
         # 抗锯齿绘制
         if self.enable_auto_smoothing:
             last_smoothed = self.smoothed_stroke[-1]
-            new_x = self.smoothing_factor * x + (1 - self.smoothing_factor) * last_smoothed[0]
-            new_y = self.smoothing_factor * y + (1 - self.smoothing_factor) * last_smoothed[1]
-            new_width = self.smoothing_factor * current_width + (1 - self.smoothing_factor) * last_smoothed[3]
+            
+            # 位置平滑因子增强，防止线条断裂
+            position_factor = min(0.7, self.smoothing_factor + 0.1)  
+            
+            new_x = position_factor * x + (1 - position_factor) * last_smoothed[0]
+            new_y = position_factor * y + (1 - position_factor) * last_smoothed[1]
+            
+            # 宽度平滑因子增强，防止宽度突变
+            width_factor = min(0.6, self.smoothing_factor + 0.1)
+            new_width = width_factor * current_width + (1 - width_factor) * last_smoothed[3]
+            
+            # 限制最小宽度，防止线条消失
+            new_width = max(0.5, new_width)
+            
             smoothed_point = (new_x, new_y, current_time, new_width)
             self.smoothed_stroke.append(smoothed_point)
+            
+            # 如果线段长度太短，可能导致断裂，适当延长线段
+            segment_length = math.hypot(new_x - last_smoothed[0], new_y - last_smoothed[1])
+            if segment_length < 1.0 and len(self.smoothed_stroke) > 2:
+                # 跳过过短的线段，减少绘制次数
+                return
+                
             lines = self.draw_antialiased_line(last_smoothed[0], last_smoothed[1], new_x, new_y, last_smoothed[3], new_width)
             self.active_lines.extend(lines)
         else:
+            # 直接绘制模式也做基本平滑处理，避免断裂
+            segment_length = math.hypot(x - prev_x, y - prev_y)
+            if segment_length < 1.0 and len(self.current_stroke) > 2:
+                # 跳过过短的线段，减少绘制次数
+                return
+                
             lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
             self.active_lines.extend(lines)
 
@@ -394,22 +471,36 @@ class InkPainter:
         """生成抗锯齿线条，并返回线条对象列表"""
         line_group = []
         
-        # 先绘制最外层的抗锯齿层
-        for i in reversed(range(self.antialias_layers)):
-            ratio = i / self.antialias_layers
+        # 降低抗锯齿层级，减少计算量
+        reduced_layers = min(3, self.antialias_layers)  # 使用3层抗锯齿，提高一致性
+        
+        # 确保线宽值有效，避免线条断裂
+        w1 = max(0.5, w1)
+        w2 = max(0.5, w2)
+        
+        # 先绘制主线条
+        main_line = self.canvas.create_line(
+            x1, y1, x2, y2,
+            width=w2,
+            fill=self.line_color,
+            capstyle=Qt.RoundCap,
+            smooth=True,
+            joinstyle=Qt.RoundJoin
+        )
+        line_group.append(main_line)
+        
+        # 再绘制抗锯齿层（顺序调整，确保主线条在最前面）
+        for i in range(reduced_layers):
+            # 按预计算的比例计算宽度和颜色
+            idx = i * self.antialias_layers // reduced_layers  # 映射到原始索引
+            ratio = i / reduced_layers
             width = w1 * (1 - ratio) + w2 * ratio
-            expand = 1 + 1.0 * (1 - ratio**0.5)
             
-            # 计算抗锯齿颜色
-            base_color = np.array([
-                int(self.line_color[1:3], 16), 
-                int(self.line_color[3:5], 16), 
-                int(self.line_color[5:7], 16)
-            ])
-            fade = 0.85 * (1 - ratio**0.3)
-            blend = ratio * 0.1
-            color = base_color * fade + (255 - base_color) * blend
-            antialias_color = "#{:02X}{:02X}{:02X}".format(*np.clip(color, 0, 255).astype(int))
+            # 使用预计算的扩展比例
+            expand = self.width_expansion_ratios[idx]
+            
+            # 使用预计算的颜色
+            antialias_color = self.antialias_colors[idx]
             
             layer = self.canvas.create_line(
                 x1, y1, x2, y2,
@@ -420,17 +511,6 @@ class InkPainter:
                 joinstyle=Qt.RoundJoin
             )
             line_group.append(layer)
-        
-        # 最后绘制主线条
-        main_line = self.canvas.create_line(
-            x1, y1, x2, y2,
-            width=w2,
-            fill=self.line_color,
-            capstyle=Qt.RoundCap,
-            smooth=True,
-            joinstyle=Qt.RoundJoin
-        )
-        line_group.append(main_line)
         
         return line_group
 
@@ -475,6 +555,20 @@ class InkPainter:
         current_time = time.time()
         removals = []
         
+        # 每秒最多30帧动画更新
+        min_interval = 1/30
+        if hasattr(self, 'last_animation_time'):
+            if current_time - self.last_animation_time < min_interval:
+                # 如果距离上次更新不足1/30秒，跳过本次更新
+                QTimer.singleShot(int((min_interval - (current_time - self.last_animation_time)) * 1000), 
+                                 self.process_fade_animation)
+                return
+                
+        self.last_animation_time = current_time
+        
+        # 批量处理动画
+        batch_updates = []
+        
         for anim in self.fade_animations:
             elapsed = current_time - anim['start_time']
             progress = min(elapsed / self.fade_duration, 1.0)
@@ -482,24 +576,29 @@ class InkPainter:
             # 动态计算颜色：保持原RGB，仅降低不透明度（alpha值）
             fade_color = self.calculate_fade_color(anim['base_color'], progress)
             
-            # 更新颜色
+            # 批量收集更新
             for line_id in anim['lines']:
-                try:
-                    self.canvas.itemconfig(line_id, fill=fade_color)
-                except Exception:
-                    pass
+                batch_updates.append((line_id, fade_color))
             
             if progress >= 1.0:
                 for line_id in anim['lines']:
                     self.canvas.delete(line_id)
                 removals.append(anim)
         
+        # 批量执行更新
+        for line_id, color in batch_updates:
+            try:
+                self.canvas.itemconfig(line_id, fill=color)
+            except Exception:
+                pass
+                
         # 清理已完成的渐隐动画
         for anim in removals:
             self.fade_animations.remove(anim)
         
+        # 如果还有动画在运行，继续调度下一帧
         if self.fade_animations:
-            QTimer.singleShot(10, self.process_fade_animation)
+            QTimer.singleShot(max(1, int(min_interval * 1000)), self.process_fade_animation)
 
     def calculate_fade_color(self, base_color, progress):
         """根据进度计算渐隐颜色（线条逐渐变透明），返回格式为 #AARRGGBB
@@ -532,7 +631,6 @@ class InkPainter:
 
 if __name__ == "__main__":
     print("建议通过主程序运行。")
-    time.sleep(1)
     test_painter = InkPainter()
     test_painter.root.show()
     sys.exit(test_painter.app.exec_())
