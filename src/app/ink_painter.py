@@ -23,7 +23,7 @@ import os
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPainter, QPen, QColor
+from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath
 
 try:
     from .gesture_parser import GestureParser
@@ -45,6 +45,8 @@ class Canvas(QWidget):
         self.update_scheduled = False
         # 批量绘制队列
         self.batch_updates = []
+        # 线条绘制方式：单线条模式
+        self.single_line_mode = True
 
     def create_line(self, x1, y1, x2, y2, width, fill, capstyle, smooth, joinstyle):
         line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': fill}
@@ -69,7 +71,7 @@ class Canvas(QWidget):
         """智能调度更新，避免频繁重绘"""
         if not self.update_scheduled:
             self.update_scheduled = True
-            QTimer.singleShot(10, self.do_update)  # 10ms延迟，合并多次更新
+            QTimer.singleShot(2, self.do_update)  # 2ms延迟，合并多次更新但保持反应灵敏
     
     def do_update(self):
         """执行实际更新"""
@@ -80,22 +82,26 @@ class Canvas(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         # 开启抗锯齿
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.Antialiasing, True)
         if self.enable_hardware_acceleration:
             painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
-            # 提高绘制性能
             painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
         
         # 仅绘制可见区域内的线条
         visible_rect = event.rect()
         
+        # 使用更适合线条绘制的合成模式
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        
         for line in self.lines:
             pen = QPen(QColor(line['color']))
             pen.setWidthF(line['width'])
             pen.setCapStyle(Qt.RoundCap)
-            # 将坐标转换为整数，避免类型错误
-            x1, y1 = int(line['x1']), int(line['y1'])
-            x2, y2 = int(line['x2']), int(line['y2'])
+            pen.setJoinStyle(Qt.RoundJoin)
+            
+            # 将坐标转换为浮点数以实现更平滑的线条
+            x1, y1 = float(line['x1']), float(line['y1'])
+            x2, y2 = float(line['x2']), float(line['y2'])
             
             # 粗略判断线条是否在可见区域内（边界框检测）
             if (max(x1, x2) < visible_rect.left() or min(x1, x2) > visible_rect.right() or
@@ -103,7 +109,22 @@ class Canvas(QWidget):
                 continue  # 不在可见区域内，跳过绘制
                 
             painter.setPen(pen)
-            painter.drawLine(x1, y1, x2, y2)
+            
+            # 使用路径绘制实现更平滑的线条效果
+            path = QPainterPath()
+            path.moveTo(x1, y1)
+            
+            # 对于较长的线段，添加中间控制点以获得更平滑的曲线
+            dist = math.hypot(x2-x1, y2-y1)
+            if dist > 10:
+                # 添加中间控制点，使线条更平滑
+                mid_x = (x1 + x2) / 2
+                mid_y = (y1 + y2) / 2
+                path.quadTo(mid_x, mid_y, x2, y2)
+            else:
+                path.lineTo(x2, y2)
+                
+            painter.drawPath(path)
 
 class InkPainter:
     def __init__(self):
@@ -116,33 +137,6 @@ class InkPainter:
         # 绘画参数
         self.load_drawing_settings()  # 加载绘画参数
         
-        # 抗锯齿预计算
-        log(self.file_name, "开始抗锯齿颜色预计算")
-        self.antialias_colors = []
-        base_color = np.array([
-            int(self.line_color[1:3], 16), 
-            int(self.line_color[3:5], 16), 
-            int(self.line_color[5:7], 16)
-        ])
-        
-        # 提前计算所有可能的抗锯齿颜色
-        for i in range(self.antialias_layers):
-            ratio = i / self.antialias_layers
-            fade = 0.8 * (1 - ratio**0.3)
-            blend = ratio * 0.3  # 原来为0.1，现调整为0.3，提高边缘可见度
-            color = base_color * fade + (255 - base_color) * blend
-            self.antialias_colors.append("#{:02X}{:02X}{:02X}".format(
-                *np.clip(color, 0, 255).astype(int)
-            ))
-        log(self.file_name, f"完成抗锯齿颜色预计算，共生成{len(self.antialias_colors)}种颜色")
-        
-        # 预计算扩展比例
-        self.width_expansion_ratios = []
-        for i in range(self.antialias_layers):
-            ratio = i / self.antialias_layers
-            expand = 1 + 1.0 * (1 - ratio**0.5)
-            self.width_expansion_ratios.append(expand)
-            
         # 状态控制
         self.drawing = False               # 绘画状态标志
         self.running = True                # 运行状态标志
@@ -268,8 +262,13 @@ class InkPainter:
             dt = current_time - prev_time
             dist = math.hypot(x - prev_x, y - prev_y)
             
-            # 最小更新间隔调整为3ms，最小距离为2像素
-            if dt < 0.003 and dist < 2:
+            # 提高渲染频率：减小间隔时间
+            is_hovering = dist < 2
+            min_interval = 0.001  # 统一使用1ms的最小间隔，提高响应速度
+            # 停留时更敏感，移动时容许更大距离
+            min_distance = 0.5 if is_hovering else 1.0
+            
+            if dt < min_interval and dist < min_distance:
                 is_throttled = True
                 
         # 状态切换处理
@@ -304,8 +303,8 @@ class InkPainter:
         
         self.last_right_state = right_pressed
         
-        # 动态调整监听间隔
-        next_interval = 3 if self.drawing else 5  # 绘制时用3ms，否则用5ms
+        # 减小监听间隔，提高响应速度
+        next_interval = 1 if self.drawing else 5  # 绘制时用1ms以确保最大流畅度
         QTimer.singleShot(next_interval, self.listen_mouse)
 
     def start_drawing(self):
@@ -324,6 +323,7 @@ class InkPainter:
         # 生成初始线宽
         base_width = self.base_width
         prev_width = base_width
+        
         for i in range(len(self.pending_points)):
             x, y, t = self.pending_points[i]
             if i == 0:
@@ -336,48 +336,145 @@ class InkPainter:
                 if self.enable_advanced_brush:
                     if self.enable_auto_smoothing:
                         prev_smoothed = self.smoothed_stroke[-1]
-                        new_x = self.smoothing_factor * x + (1 - self.smoothing_factor) * prev_smoothed[0]
-                        new_y = self.smoothing_factor * y + (1 - self.smoothing_factor) * prev_smoothed[1]
+                        # 位置平滑
+                        position_factor = min(0.7, self.smoothing_factor + 0.1)
+                        new_x = position_factor * x + (1 - position_factor) * prev_smoothed[0]
+                        new_y = position_factor * y + (1 - position_factor) * prev_smoothed[1]
+                        
                         prev_x, prev_y, prev_t, _ = self.current_stroke[-1]
                         dt = t - prev_t
                         dx = x - prev_x
                         dy = y - prev_y
-                        speed = math.hypot(dx, dy) / dt if dt > 0 else 0
-                        target_width = base_width / (1 + self.speed_factor * speed**0.7)
-                        target_width = max(self.min_width, min(self.max_width, target_width))
-                        smooth_factor = 0.3  # 与实时绘制一致
+                        distance = math.hypot(dx, dy)
+                        
+                        # 判断停留状态
+                        is_hovering = distance < 2
+                        
+                        # 基于停留状态确定线宽
+                        if is_hovering:
+                            # 停留状态下线性增长
+                            hover_factor = min(1.0, max(0.1, dt * 5))
+                            target_width = prev_width + hover_factor
+                            if target_width > self.max_width:
+                                target_width = self.max_width
+                        else:
+                            # 移动状态下基于速度计算
+                            if dt > 0.0001:
+                                speed = distance / dt
+                                speed = min(3000, max(10, speed))
+                                speed_log = math.log10(max(1, speed/50)) * self.speed_factor
+                                width_factor = max(0.3, 1.0 - speed_log * 0.3)
+                                target_width = self.base_width * width_factor
+                            else:
+                                target_width = prev_width
+                                
+                            target_width = max(self.min_width, min(self.max_width, target_width))
+                        
+                        # 平滑宽度变化
+                        smooth_factor = 0.3 if is_hovering else 0.1
                         current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+                        
+                        # 限制宽度变化幅度
+                        max_change = 1.0
+                        if abs(current_width - prev_width) > max_change:
+                            if current_width > prev_width:
+                                current_width = prev_width + max_change
+                            else:
+                                current_width = prev_width - max_change
+                        
                         self.current_stroke.append((x, y, t, current_width))
-                        new_width = self.smoothing_factor * current_width + (1 - self.smoothing_factor) * prev_smoothed[3]
+                        
+                        # 宽度平滑
+                        width_factor = min(0.8, self.smoothing_factor + 0.2)
+                        new_width = width_factor * current_width + (1 - width_factor) * prev_smoothed[3]
+                        
+                        # 限制最小宽度
+                        new_width = max(2.5, new_width)
                         smoothed_point = (new_x, new_y, t, new_width)
                         self.smoothed_stroke.append(smoothed_point)
-                        lines = self.draw_antialiased_line(prev_smoothed[0], prev_smoothed[1], new_x, new_y, prev_smoothed[3], new_width)
-                        active_lines.extend(lines)
+                        
+                        # 确定是否需要绘制
+                        segment_length = math.hypot(new_x - prev_smoothed[0], new_y - prev_smoothed[1])
+                        
+                        # 对于停留和短线段的处理
+                        if is_hovering:
+                            force_draw = i % 2 == 0  # 每隔一个点绘制
+                            if force_draw or segment_length >= 0.8:
+                                lines = self.draw_single_line(prev_smoothed[0], prev_smoothed[1], new_x, new_y, new_width)
+                                active_lines.extend(lines)
+                        elif segment_length >= 0.5 or len(self.smoothed_stroke) <= 2:
+                            lines = self.draw_single_line(prev_smoothed[0], prev_smoothed[1], new_x, new_y, new_width)
+                            active_lines.extend(lines)
+                        
                         prev_width = current_width
                     else:
+                        # 无平滑模式的历史轨迹处理
                         prev_x, prev_y, prev_t, _ = self.current_stroke[-1]
                         dt = t - prev_t
                         dx = x - prev_x
                         dy = y - prev_y
-                        speed = math.hypot(dx, dy) / dt if dt > 0 else 0
-                        target_width = base_width / (1 + self.speed_factor * speed**0.7)
-                        target_width = max(self.min_width, min(self.max_width, target_width))
-                        smooth_factor = 0.3
+                        distance = math.hypot(dx, dy)
+                        
+                        is_hovering = distance < 2
+                        
+                        # 基于停留状态确定线宽
+                        if is_hovering:
+                            hover_factor = min(1.0, max(0.1, dt * 5))
+                            target_width = prev_width + hover_factor
+                            if target_width > self.max_width:
+                                target_width = self.max_width
+                        else:
+                            if dt > 0.0001:
+                                speed = distance / dt
+                                speed = min(3000, max(10, speed))
+                                speed_log = math.log10(max(1, speed/50)) * self.speed_factor
+                                width_factor = max(0.3, 1.0 - speed_log * 0.3)
+                                target_width = self.base_width * width_factor
+                            else:
+                                target_width = prev_width
+                                
+                            target_width = max(self.min_width, min(self.max_width, target_width))
+                        
+                        smooth_factor = 0.3 if is_hovering else 0.1
                         current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+                        
+                        max_change = 1.0
+                        if abs(current_width - prev_width) > max_change:
+                            if current_width > prev_width:
+                                current_width = prev_width + max_change
+                            else:
+                                current_width = prev_width - max_change
+                        
                         self.current_stroke.append((x, y, t, current_width))
-                        lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
-                        active_lines.extend(lines)
+                        
+                        segment_length = math.hypot(x - prev_x, y - prev_y)
+                        
+                        if is_hovering:
+                            force_draw = i % 2 == 0
+                            if force_draw or segment_length >= 0.8:
+                                lines = self.draw_single_line(prev_x, prev_y, x, y, current_width)
+                                active_lines.extend(lines)
+                        elif segment_length >= 0.5 or len(self.current_stroke) <= 2:
+                            lines = self.draw_single_line(prev_x, prev_y, x, y, current_width)
+                            active_lines.extend(lines)
+                            
                         prev_width = current_width
                 else:
+                    # 非高级画笔模式
                     prev_x, prev_y, prev_t, _ = self.current_stroke[-1]
                     dt = t - prev_t
                     dx = x - prev_x
                     dy = y - prev_y
-                    speed = math.hypot(dx, dy) / dt if dt > 0 else 0
-                    current_width = base_width
+                    
+                    # 固定宽度
+                    current_width = max(self.min_width, self.base_width)
                     self.current_stroke.append((x, y, t, current_width))
-                    lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
-                    active_lines.extend(lines)
+                    
+                    # 使用单线条绘制
+                    segment_length = math.hypot(x - prev_x, y - prev_y)
+                    if segment_length >= 0.5 or len(self.current_stroke) <= 2:
+                        lines = self.draw_single_line(prev_x, prev_y, x, y, current_width)
+                        active_lines.extend(lines)
                     prev_width = current_width
         
         # 将历史轨迹线条加入动画队列
@@ -411,108 +508,117 @@ class InkPainter:
             dy = y - prev_y
             distance = math.hypot(dx, dy)
             delta_time = current_time - prev_time
-            if delta_time > 0.001:
-                speed = distance / delta_time
+            
+            # 判断是否为停留状态（距离很小视为停留）
+            is_hovering = distance < 2
+            
+            # 基于停留状态确定线宽
+            if is_hovering:
+                # 停留状态下，线宽稳定增加到最大值
+                hover_factor = min(1.0, max(0.1, delta_time * 5))  # 控制增长斜率
+                target_width = prev_width + hover_factor  # 线性增长
+                if target_width > self.max_width:
+                    target_width = self.max_width
             else:
-                speed = 0
+                # 移动状态下，基于速度计算目标线宽，并限制速度影响
+                if delta_time > 0.0001:
+                    speed = distance / delta_time
+                    # 限制速度值范围，避免极端值
+                    speed = min(3000, max(10, speed))
+                    
+                    # 使用对数缩放，减弱速度对宽度的影响
+                    speed_log = math.log10(max(1, speed/50)) * self.speed_factor
+                    
+                    # 速度越快，线宽越细，但设置合理下限
+                    width_factor = max(0.3, 1.0 - speed_log * 0.3)
+                    target_width = self.base_width * width_factor
+                else:
+                    target_width = prev_width  # 保持宽度不变
+                    
+                # 确保宽度在最小值和最大值之间
+                target_width = max(self.min_width, min(self.max_width, target_width))
             
-            # 计算目标宽度
-            target_width = self.base_width / (1 + self.speed_factor * speed**0.7)
-            target_width = max(self.min_width, min(self.max_width, target_width))
-            
-            # 更平滑的宽度变化，避免突变
-            smooth_factor = 0.4  # 提高平滑系数，减少宽度突变
+            # 平滑宽度变化，避免突变
+            # 停留状态时加速粗度变化，移动时保持平滑过渡
+            smooth_factor = 0.3 if is_hovering else 0.1
             current_width = prev_width * (1 - smooth_factor) + target_width * smooth_factor
+            
+            # 确保宽度不会跳跃变化过大
+            max_change = 1.0  # 每次最大变化宽度
+            if abs(current_width - prev_width) > max_change:
+                if current_width > prev_width:
+                    current_width = prev_width + max_change
+                else:
+                    current_width = prev_width - max_change
         else:
             current_width = self.base_width
         
         # 记录轨迹点
         self.current_stroke.append((x, y, current_time, current_width))
         
-        # 抗锯齿绘制
+        # 绘制方式：使用平滑曲线
         if self.enable_auto_smoothing:
             last_smoothed = self.smoothed_stroke[-1]
             
-            # 位置平滑因子增强，防止线条断裂
-            position_factor = min(0.7, self.smoothing_factor + 0.1)  
+            # 位置平滑因子适当调整
+            position_factor = min(0.7, self.smoothing_factor + 0.1)
             
             new_x = position_factor * x + (1 - position_factor) * last_smoothed[0]
             new_y = position_factor * y + (1 - position_factor) * last_smoothed[1]
             
-            # 宽度平滑因子增强，防止宽度突变
-            width_factor = min(0.6, self.smoothing_factor + 0.1)
+            # 宽度也进行平滑
+            width_factor = min(0.8, self.smoothing_factor + 0.2)
             new_width = width_factor * current_width + (1 - width_factor) * last_smoothed[3]
             
-            # 限制最小宽度，防止线条消失
-            new_width = max(0.5, new_width)
+            # 限制最小宽度
+            new_width = max(2.5, new_width)
             
             smoothed_point = (new_x, new_y, current_time, new_width)
             self.smoothed_stroke.append(smoothed_point)
             
-            # 如果线段长度太短，可能导致断裂，适当延长线段
+            # 确定是否需要绘制新线段
             segment_length = math.hypot(new_x - last_smoothed[0], new_y - last_smoothed[1])
-            if segment_length < 1.0 and len(self.smoothed_stroke) > 2:
-                # 跳过过短的线段，减少绘制次数
-                return
-                
-            lines = self.draw_antialiased_line(last_smoothed[0], last_smoothed[1], new_x, new_y, last_smoothed[3], new_width)
-            self.active_lines.extend(lines)
+            
+            # 对于停留点和短线段的处理策略
+            if is_hovering:
+                # 停留状态强制定期绘制，以显示粗细变化
+                force_draw = len(self.smoothed_stroke) % 2 == 0  # 每隔一个点绘制
+                if force_draw or segment_length >= 0.8:
+                    lines = self.draw_single_line(last_smoothed[0], last_smoothed[1], new_x, new_y, new_width)
+                    self.active_lines.extend(lines)
+            elif segment_length >= 0.5 or len(self.smoothed_stroke) <= 2:
+                # 移动状态下，控制最小段距离避免过度绘制
+                lines = self.draw_single_line(last_smoothed[0], last_smoothed[1], new_x, new_y, new_width)
+                self.active_lines.extend(lines)
         else:
-            # 直接绘制模式也做基本平滑处理，避免断裂
+            # 直接绘制模式
             segment_length = math.hypot(x - prev_x, y - prev_y)
-            if segment_length < 1.0 and len(self.current_stroke) > 2:
-                # 跳过过短的线段，减少绘制次数
-                return
-                
-            lines = self.draw_antialiased_line(prev_x, prev_y, x, y, prev_width, current_width)
-            self.active_lines.extend(lines)
+            
+            # 对于停留点和短线段的处理策略
+            if distance < 2:  # 停留状态
+                force_draw = len(self.current_stroke) % 2 == 0  # 每隔一个点绘制
+                if force_draw or segment_length >= 0.8:
+                    lines = self.draw_single_line(prev_x, prev_y, x, y, current_width)
+                    self.active_lines.extend(lines)
+            elif segment_length >= 0.5 or len(self.current_stroke) <= 2:
+                lines = self.draw_single_line(prev_x, prev_y, x, y, current_width)
+                self.active_lines.extend(lines)
 
-    def draw_antialiased_line(self, x1, y1, x2, y2, w1, w2):
-        """生成抗锯齿线条，并返回线条对象列表"""
-        line_group = []
+    def draw_single_line(self, x1, y1, x2, y2, width):
+        """使用单线条模式绘制线段，简化实现，避免重叠描边"""
+        # 确保线宽值不会太小
+        width = max(2.5, width)
         
-        # 降低抗锯齿层级，减少计算量
-        reduced_layers = min(3, self.antialias_layers)  # 使用3层抗锯齿，提高一致性
-        
-        # 确保线宽值有效，避免线条断裂
-        w1 = max(0.5, w1)
-        w2 = max(0.5, w2)
-        
-        # 先绘制主线条
-        main_line = self.canvas.create_line(
-            x1, y1, x2, y2,
-            width=w2,
+        # 简化绘制逻辑，统一使用单个线条，减少绘制开销
+        line = self.canvas.create_line(
+            float(x1), float(y1), float(x2), float(y2),
+            width=width,
             fill=self.line_color,
             capstyle=Qt.RoundCap,
             smooth=True,
             joinstyle=Qt.RoundJoin
         )
-        line_group.append(main_line)
-        
-        # 再绘制抗锯齿层（顺序调整，确保主线条在最前面）
-        for i in range(reduced_layers):
-            # 按预计算的比例计算宽度和颜色
-            idx = i * self.antialias_layers // reduced_layers  # 映射到原始索引
-            ratio = i / reduced_layers
-            width = w1 * (1 - ratio) + w2 * ratio
-            
-            # 使用预计算的扩展比例
-            expand = self.width_expansion_ratios[idx]
-            
-            # 使用预计算的颜色
-            antialias_color = self.antialias_colors[idx]
-            
-            layer = self.canvas.create_line(
-                x1, y1, x2, y2,
-                width=width * expand,
-                fill=antialias_color,
-                capstyle=Qt.RoundCap,
-                smooth=True,
-                joinstyle=Qt.RoundJoin
-            )
-            line_group.append(layer)
-        
-        return line_group
+        return [line]
 
     def finish_drawing(self):
         """结束并处理当前笔画"""
@@ -608,7 +714,7 @@ class InkPainter:
         r = int(base_color[1:3], 16)
         g = int(base_color[3:5], 16)
         b = int(base_color[5:7], 16)
-        a = int(255 * (1 - progress))
+        a = int(255 * (1 - progress**0.8))  # 使用非线性衰减，让开始减淡更慢一些
         # 返回包含透明度信息的颜色，格式调整为 #AARRGGBB
         return "#{:02X}{:02X}{:02X}{:02X}".format(a, r, g, b)
 

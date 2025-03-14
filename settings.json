@@ -1,11 +1,11 @@
 {
     "drawing_settings": {
-        "base_width": 5,
-        "min_width": 2,
-        "max_width": 10,
-        "speed_factor": 2.2,
-        "fade_duration": 0.4,
-        "antialias_layers": 6,
+        "base_width": 6,
+        "min_width": 3,
+        "max_width": 15,
+        "speed_factor": 1.2,
+        "fade_duration": 0.5,
+        "antialias_layers": 2,
         "min_distance": 20,
         "line_color": "#00BFFF",
         "max_stroke_points": 200,
@@ -13,7 +13,7 @@
         "enable_advanced_brush": true,
         "force_topmost": true,
         "enable_auto_smoothing": true,
-        "smoothing_factor": 0.3,
+        "smoothing_factor": 0.6,
         "enable_hardware_acceleration": true
     },
     "gestures": {
