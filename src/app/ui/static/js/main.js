@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化导航菜单
     initNavigation();
     
+    // 初始化侧边栏折叠功能
+    initSidebarCollapse();
+    
     // 初始化控制台页面功能
     if (document.querySelector('.console-page')) {
         initConsole();
@@ -322,6 +325,57 @@ function initNavigation() {
         if (item.getAttribute('href') === currentPath) {
             item.classList.add('active');
         }
+    });
+}
+
+// 初始化侧边栏折叠功能
+function initSidebarCollapse() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleButton = document.getElementById('sidebar-toggle');
+    
+    if (!sidebar || !toggleButton) return;
+    
+    // 从本地存储中读取侧边栏状态
+    const sidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+    
+    // 设置初始状态
+    if (sidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+    }
+    
+    // 添加切换按钮点击事件
+    toggleButton.addEventListener('click', function() {
+        // 切换侧边栏折叠状态
+        sidebar.classList.toggle('collapsed');
+        
+        // 记录状态到本地存储
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebar_collapsed', isCollapsed);
+        
+        // 记录侧边栏状态变化
+        const logMessage = isCollapsed ? '侧边栏已折叠' : '侧边栏已展开';
+        
+        // 发送日志到服务器
+        fetch('/api/log', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: logMessage,
+                level: 'info',
+                module: 'ui'
+            })
+        }).catch(error => {
+            console.error('日志记录失败:', error);
+        });
+    });
+    
+    // 为导航项添加提示工具（当侧边栏折叠时）
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        const text = item.querySelector('.text').textContent;
+        item.setAttribute('title', text);
     });
 }
 

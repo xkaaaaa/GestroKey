@@ -111,6 +111,22 @@ class WebServer(QObject):
             return send_from_directory(self.app.static_folder, filename)
         
         # API端点
+        @self.app.route('/api/log', methods=['POST'])
+        def log_message():
+            """接收前端日志信息"""
+            try:
+                data = request.json
+                message = data.get('message', '')
+                level = data.get('level', 'info')
+                module = data.get('module', 'ui')
+                
+                # 使用log函数记录日志
+                log(module, message, level=level)
+                return jsonify({'success': True})
+            except Exception as e:
+                log(__name__, f"记录前端日志失败: {str(e)}", level="error")
+                return jsonify({'success': False, 'message': str(e)})
+        
         @self.app.route('/api/toggle_painting', methods=['POST'])
         def toggle_painting():
             log(__name__, "API: 切换绘画状态")
