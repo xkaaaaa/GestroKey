@@ -239,7 +239,7 @@ function initGestureForm() {
         
         // 获取表单数据
         const name = document.getElementById('gesture-name').value.trim();
-        const directions = document.getElementById('gesture-directions').value.trim();
+        let directions = document.getElementById('gesture-directions').value.trim();
         const action = document.getElementById('gesture-action').value.trim();
         
         // 验证
@@ -257,6 +257,17 @@ function initGestureForm() {
             showToast('请输入执行动作', 'error');
             return;
         }
+
+        // 确保方向序列格式正确且使用箭头符号
+        directions = directions.split(/\s+/).map(dir => {
+            // 如果输入的是中文方向名称，转换为箭头符号
+            for (const [dirName, arrow] of Object.entries(DIRECTION_MAP)) {
+                if (dir === dirName) {
+                    return arrow;
+                }
+            }
+            return dir;
+        }).join(' ');
         
         // 显示保存中提示
         showToast('正在保存...', 'info');

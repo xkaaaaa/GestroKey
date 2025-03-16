@@ -214,8 +214,8 @@ function showToast(message, type = 'info', duration = 3000) {
     return toast;
 }
 
-// 显示确认对话框
-function showConfirm(message, onConfirm, onCancel) {
+// 显示提示框样式的确认对话框
+function showToastConfirm(message, onConfirm, onCancel) {
     const toastContainer = document.getElementById('toast-container');
     if (!toastContainer) return;
     
@@ -377,6 +377,8 @@ function initConsole() {
     // 退出程序按钮
     if (exitBtn) {
         exitBtn.addEventListener('click', function() {
+            // 使用utils.js中的showConfirm函数，它会创建一个模态对话框而非toast
+            // 这个模态对话框不会自动消失，必须用户手动点击按钮关闭
             showConfirm('确定要退出程序吗？', function() {
                 fetch('/api/exit', {
                     method: 'POST'

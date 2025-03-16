@@ -146,6 +146,23 @@ function showConfirm(message, onConfirm, onCancel = null) {
     document.body.appendChild(overlay);
     document.body.appendChild(modal);
 
+    // 获取按钮元素并设置更大的尺寸
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    
+    // 设置更大的按钮样式
+    const largeButtonStyle = `
+        padding: 10px 25px;
+        font-size: 16px;
+        border-radius: 6px;
+        min-width: 100px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    `;
+    
+    cancelBtn.style.cssText = largeButtonStyle;
+    confirmBtn.style.cssText = largeButtonStyle;
+
     // 显示对话框
     setTimeout(() => {
         overlay.classList.add('active');
@@ -183,8 +200,6 @@ function showConfirm(message, onConfirm, onCancel = null) {
     }
 
     // 绑定事件
-    const confirmBtn = document.getElementById('modal-confirm-btn');
-    const cancelBtn = document.getElementById('modal-cancel-btn');
     const closeBtn = document.getElementById('modal-close-btn');
 
     // 确认按钮事件

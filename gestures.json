@@ -1,9 +1,5 @@
 {
   "gestures": {
-    "上": {
-      "directions": "↑",
-      "action": "cGFzc2FwcC5taW5pbWl6ZV9hbGwoKQ=="
-    },
     "下": {
       "directions": "↓",
       "action": "cGFzc2FwcC5yZXN0b3JlX2FsbCgp"
@@ -16,9 +12,9 @@
       "directions": "→",
       "action": "cGFzc2FwcC5uZXh0X3dpbmRvdygp"
     },
-    "777": {
-      "directions": "↗",
-      "action": "aW1wb3J0IG9zCm9zLnN0YXJ0ZmlsZSgnY2FsYy5leGUnKQ=="
+    "上": {
+      "directions": "↑",
+      "action": "cGFzc2FwcC5taW5pbWl6ZV9hbGwoKQ=="
     }
   }
 }

@@ -15,31 +15,5 @@
         "enable_auto_smoothing": true,
         "smoothing_factor": 0.6,
         "enable_hardware_acceleration": true
-    },
-    "gestures": {
-        "打开开始菜单": {
-            "directions": [
-                "上"
-            ],
-            "action": "aW1wb3J0IHB5YXV0b2d1aTsgcHlhdXRvZ3VpLmhvdGtleSgid2luIik="
-        },
-        "返回桌面": {
-            "directions": [
-                "下"
-            ],
-            "action": "aW1wb3J0IHB5YXV0b2d1aTsgcHlhdXRvZ3VpLmhvdGtleSgid2luIiwgImQiKQ=="
-        },
-        "最小化当前窗口": {
-            "directions": [
-                "左"
-            ],
-            "action": "aW1wb3J0IHB5YXV0b2d1aTsgcHlhdXRvZ3VpLmhvdGtleSgiYWx0IiwgImVzYyIp"
-        },
-        "下一个窗口": {
-            "directions": [
-                "右"
-            ],
-            "action": "aW1wb3J0IHB5YXV0b2d1aTsgcHlhdXRvZ3VpLmhvdGtleSgiYWx0IiwgInRhYiIp"
-        }
     }
 }

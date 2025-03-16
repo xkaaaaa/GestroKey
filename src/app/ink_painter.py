@@ -175,11 +175,10 @@ class InkPainter:
             # 打包后使用exe所在目录的上二级目录
             return os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'gestures.json')
         else:
-            # 开发时使用当前文件的上一级目录（src → 根目录）
-            return os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'gestures.json'
-            )
+            # 开发时使用项目根目录
+            # 从当前文件向上两级找到项目根目录
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            return os.path.join(project_root, 'gestures.json')
 
     def init_canvas(self):
         """初始化Canvas"""
