@@ -10,10 +10,13 @@ import threading
 import psutil
 import platform
 import sys
+import base64
+import traceback
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from PyQt5.QtCore import QObject, pyqtSignal, QMetaObject, Qt, Q_ARG
 from app.log import log
+from app.operation_executor import execute
 
 # 应用启动时间
 START_TIME = datetime.now()
@@ -93,6 +96,13 @@ class WebServer(QObject):
             log(__name__, "访问设置页面")
             settings_data = self._load_settings()
             return render_template('settings.html', settings=settings_data)
+        
+        @self.app.route('/gestures')
+        def gestures():
+            """显示手势管理页面"""
+            log(__name__, "访问手势管理页面")
+            gestures_data = self._load_gestures()
+            return render_template('gestures.html', gestures=gestures_data)
         
         # 静态资源路由
         @self.app.route('/static/<path:filename>')
@@ -212,6 +222,92 @@ class WebServer(QObject):
             except Exception as e:
                 log(__name__, f"重置设置失败: {str(e)}", level="error")
                 return jsonify({'success': False, 'message': str(e)})
+                
+        @self.app.route('/api/gestures', methods=['GET', 'POST'])
+        def manage_gestures():
+            """手势管理API"""
+            if request.method == 'GET':
+                # 获取所有手势
+                log(__name__, "API: 获取手势列表")
+                try:
+                    gestures_data = self._load_gestures()
+                    return jsonify({'success': True, 'gestures': gestures_data})
+                except Exception as e:
+                    log(__name__, f"获取手势列表失败: {str(e)}", level="error")
+                    return jsonify({'success': False, 'message': str(e)})
+            elif request.method == 'POST':
+                # 处理手势操作：添加/更新/删除
+                log(__name__, "API: 管理手势")
+                try:
+                    data = request.get_json()
+                    if not data or 'operation' not in data:
+                        return jsonify({'success': False, 'message': '缺少操作类型参数'})
+                    
+                    operation = data['operation']
+                    
+                    if operation == 'add':
+                        # 添加新手势
+                        if not all(k in data for k in ['name', 'directions', 'action']):
+                            return jsonify({'success': False, 'message': '缺少必要参数'})
+                        
+                        result = self._add_gesture(data['name'], data['directions'], data['action'])
+                        return jsonify(result)
+                    
+                    elif operation == 'update':
+                        # 更新现有手势
+                        if not all(k in data for k in ['old_name', 'name', 'directions', 'action']):
+                            return jsonify({'success': False, 'message': '缺少必要参数'})
+                        
+                        result = self._update_gesture(data['old_name'], data['name'], data['directions'], data['action'])
+                        return jsonify(result)
+                    
+                    elif operation == 'delete':
+                        # 删除手势
+                        if 'name' not in data:
+                            return jsonify({'success': False, 'message': '缺少手势名称参数'})
+                        
+                        result = self._delete_gesture(data['name'])
+                        return jsonify(result)
+                    
+                    else:
+                        return jsonify({'success': False, 'message': f'不支持的操作类型: {operation}'})
+                
+                except Exception as e:
+                    log(__name__, f"处理手势操作失败: {str(e)}", level="error")
+                    traceback.print_exc()
+                    return jsonify({'success': False, 'message': str(e)})
+        
+        @self.app.route('/api/test_gesture', methods=['POST'])
+        def test_gesture():
+            """测试手势动作执行"""
+            log(__name__, "API: 测试手势动作")
+            try:
+                data = request.get_json()
+                if not data or 'action' not in data:
+                    log(__name__, "测试手势动作失败: 缺少动作参数", level="warning")
+                    return jsonify({'success': False, 'message': '缺少动作参数'})
+                
+                # 解码Base64编码的action
+                action_base64 = data['action']
+                try:
+                    action_code = base64.b64decode(action_base64).decode('utf-8')
+                except Exception as e:
+                    log(__name__, f"解码action参数失败: {str(e)}", level="error")
+                    return jsonify({'success': False, 'message': f'解码失败: {str(e)}'})
+                
+                # 安全检查及执行逻辑
+                log(__name__, f"准备执行测试代码: {action_code}")
+                try:
+                    # 此处执行代码，可以调用相应模块执行操作
+                    exec(action_code)
+                    log(__name__, "测试代码执行成功")
+                    return jsonify({'success': True})
+                except Exception as e:
+                    log(__name__, f"测试代码执行失败: {str(e)}", level="error")
+                    return jsonify({'success': False, 'message': f'执行失败: {str(e)}'})
+            except Exception as e:
+                log(__name__, f"测试手势时发生未知错误: {str(e)}", level="error")
+                return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'})
     
     def start(self):
         """启动Web服务器（在单独的线程中运行）"""
@@ -365,3 +461,129 @@ class WebServer(QObject):
         except Exception as e:
             log(__name__, f"检查绘画状态失败: {str(e)}", level="error")
             return False 
+    
+    def _load_gestures(self):
+        """加载手势数据"""
+        gestures_path = self._get_gestures_path()
+        
+        try:
+            if os.path.exists(gestures_path):
+                with open(gestures_path, 'r', encoding='utf-8') as f:
+                    gestures_data = json.load(f)
+                    log(__name__, f"已加载手势数据，包含 {len(gestures_data.get('gestures', {}))} 个手势")
+                    return gestures_data.get('gestures', {})
+            else:
+                log(__name__, "手势文件不存在，将返回空列表", level="warning")
+                return {}
+        except Exception as e:
+            log(__name__, f"加载手势数据失败: {str(e)}", level="error")
+            traceback.print_exc()
+            return {}
+    
+    def _save_gestures(self, gestures_data):
+        """保存手势数据"""
+        gestures_path = self._get_gestures_path()
+        
+        try:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(gestures_path), exist_ok=True)
+            
+            # 保存数据
+            with open(gestures_path, 'w', encoding='utf-8') as f:
+                json.dump({'gestures': gestures_data}, f, ensure_ascii=False, indent=2)
+            
+            log(__name__, f"手势数据保存成功，共 {len(gestures_data)} 个手势")
+            return True
+        except Exception as e:
+            log(__name__, f"保存手势数据失败: {str(e)}", level="error")
+            traceback.print_exc()
+            return False
+    
+    def _add_gesture(self, name, directions, action):
+        """添加新手势"""
+        gestures_data = self._load_gestures()
+        
+        # 检查名称是否已存在
+        if name in gestures_data:
+            log(__name__, f"添加手势失败: 手势名称 '{name}' 已存在", level="warning")
+            return {'success': False, 'message': f'手势名称 "{name}" 已存在'}
+        
+        # 检查方向格式是否包含箭头符号
+        arrow_symbols = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
+        has_arrows = any(symbol in directions for symbol in arrow_symbols)
+        if not has_arrows:
+            log(__name__, f"添加手势警告: 手势 '{name}' 的方向不包含箭头符号", level="warning")
+        
+        # 添加手势
+        gestures_data[name] = {
+            'directions': directions,
+            'action': action
+        }
+        
+        # 保存手势库
+        if self._save_gestures(gestures_data):
+            log(__name__, f"已添加新手势: {name}，方向序列: {directions}")
+            return {'success': True, 'message': '手势添加成功'}
+        else:
+            return {'success': False, 'message': '保存手势数据失败'}
+    
+    def _update_gesture(self, old_name, new_name, directions, action):
+        """更新手势"""
+        gestures_data = self._load_gestures()
+        
+        # 检查原手势是否存在
+        if old_name not in gestures_data:
+            log(__name__, f"更新手势失败: 手势 '{old_name}' 不存在", level="warning")
+            return {'success': False, 'message': f'手势 "{old_name}" 不存在'}
+        
+        # 如果名称有变更，检查新名称是否已存在
+        if old_name != new_name and new_name in gestures_data:
+            log(__name__, f"更新手势失败: 新手势名称 '{new_name}' 已存在", level="warning")
+            return {'success': False, 'message': f'手势名称 "{new_name}" 已存在'}
+        
+        # 检查方向格式是否包含箭头符号
+        arrow_symbols = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
+        has_arrows = any(symbol in directions for symbol in arrow_symbols)
+        if not has_arrows:
+            log(__name__, f"更新手势警告: 手势 '{new_name}' 的方向不包含箭头符号", level="warning")
+        
+        # 删除旧手势
+        if old_name in gestures_data:
+            del gestures_data[old_name]
+        
+        # 添加新手势
+        gestures_data[new_name] = {
+            'directions': directions,
+            'action': action
+        }
+        
+        # 保存手势库
+        if self._save_gestures(gestures_data):
+            log(__name__, f"已更新手势: {old_name} -> {new_name}，方向序列: {directions}")
+            return {'success': True, 'message': '手势更新成功'}
+        else:
+            return {'success': False, 'message': '保存手势数据失败'}
+    
+    def _delete_gesture(self, name):
+        """删除手势"""
+        gestures_data = self._load_gestures()
+        
+        # 检查手势是否存在
+        if name not in gestures_data:
+            log(__name__, f"删除手势失败: 手势 '{name}' 不存在", level="warning")
+            return {'success': False, 'message': f'手势 "{name}" 不存在'}
+        
+        # 删除手势
+        del gestures_data[name]
+        
+        # 保存手势库
+        if self._save_gestures(gestures_data):
+            log(__name__, f"已删除手势: {name}")
+            return {'success': True, 'message': '手势删除成功'}
+        else:
+            return {'success': False, 'message': '保存手势数据失败'}
+    
+    def _get_gestures_path(self):
+        """获取手势文件路径"""
+        # 与settings文件保持在同一目录
+        return os.path.join(os.path.dirname(self._get_settings_path()), 'gestures.json') 

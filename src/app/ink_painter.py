@@ -132,7 +132,7 @@ class InkPainter:
         self.file_name = "ink_painter"
         
         log(__name__, "绘画模块初始化")
-        
+            
         # 状态控制
         self.drawing = False               # 绘画状态标志
         self.running = True                # 运行状态标志
@@ -277,7 +277,7 @@ class InkPainter:
                             
                             # 添加到手势库
                             self.gestures[directions] = {
-                                'name': name,
+                    'name': name,
                                 'action': action
                             }
                             log(self.file_name, f"成功加载手势: {name} - {directions}")
@@ -318,14 +318,14 @@ class InkPainter:
         """核心鼠标监听逻辑"""
         if not self.running:
             return
-            
+        
         # 如果强制置顶开关开启，确保窗口始终在顶层
         if hasattr(self, 'canvas') and self.canvas and self.force_topmost:
             try:
                 self.canvas.raise_()
             except Exception as e:
                 log(self.file_name, f"强制置顶失败: {str(e)}", level="error")
-                
+        
         # 获取鼠标状态和位置
         right_pressed = win32api.GetAsyncKeyState(win32con.VK_RBUTTON) < 0
         x, y = pyautogui.position()
@@ -335,11 +335,13 @@ class InkPainter:
             # 刚按下右键，记录起始点
             if not self.drawing:
                 self.start_point = (x, y)
-                self.pending_points = [(x, y, time.time())]
+                current_time = time.time()
+                self.pending_points = [(x, y, current_time)]
                 log(self.file_name, f"右键按下，记录起始点: ({x}, {y})")
         elif right_pressed and not self.drawing and self.start_point:
-            # 持续按住右键但还未开始绘画，判断是否达到触发距离
-            self.pending_points.append((x, y, time.time()))
+            # 持续按住右键但还未开始绘画，记录轨迹点
+            current_time = time.time()
+            self.pending_points.append((x, y, current_time))
             
             # 检查触发条件
             start_x, start_y = self.start_point
@@ -367,7 +369,7 @@ class InkPainter:
             # 如果正在绘画，结束当前笔画
             if self.drawing:
                 log(self.file_name, "松开右键，结束当前笔画")
-                self.finish_drawing()
+            self.finish_drawing()
         
         # 更新上一次右键状态
         self.last_right_state = right_pressed
@@ -393,9 +395,8 @@ class InkPainter:
         """更新绘画状态"""
         # 添加当前点到笔画数据
         if not self.drawing:
-            # 已修改start_drawing方法，所以这里可以直接返回
             return
-            
+        
         current_time = time.time()
             
         # 检查是否是新笔画的第一个点
@@ -619,7 +620,7 @@ class InkPainter:
             log(__name__, "没有活动线条需要渐隐", level="warning")
             return
             
-        # 如果没有识别为手势，启动渐隐效果
+        # 启动渐隐效果
         if self.fade_duration > 0 and self.active_lines:
             log(__name__, f"启动渐隐效果，线条数量: {len(self.active_lines)}")
             fade_start = time.time()
@@ -654,6 +655,9 @@ class InkPainter:
         self.smoothed_stroke = []
         self.line_width_history = []
         self.point_buffer = []  # 清空点缓冲区
+        # 强制清除最后绘制点记录，避免连线bug
+        if hasattr(self, 'last_drawn_point'):
+            delattr(self, 'last_drawn_point')
         log(__name__, "笔画结束处理完成")
         
     def _process_gesture(self, trail_points):
@@ -720,7 +724,8 @@ class InkPainter:
         
         for anim in self.fade_animations:
             elapsed = current_time - anim['start_time']
-            progress = min(elapsed / self.fade_duration, 1.0)
+            duration = anim['end_time'] - anim['start_time'] if 'end_time' in anim else self.fade_duration
+            progress = min(elapsed / duration, 1.0)
             
             # 动态计算颜色：保持原RGB，仅降低不透明度（alpha值）
             fade_color = self.calculate_fade_color(anim['start_color'], progress)
@@ -778,7 +783,7 @@ class InkPainter:
             # 计算alpha值 - 使用非线性衰减，让开始减淡更慢一些
             a = int(255 * (1 - progress**0.7))  # 降低幂次，使淡出更平滑
             
-            # 返回包含透明度信息的颜色，格式调整为 #AARRGGBB
+        # 返回包含透明度信息的颜色，格式调整为 #AARRGGBB
             return f"#{a:02X}{r:02X}{g:02X}{b:02X}"
         except Exception as e:
             log(__name__, f"计算渐隐颜色失败: {str(e)}", level="error")
@@ -829,6 +834,34 @@ class InkPainter:
             log(__name__, "绘画窗口已显示")
         else:
             log(__name__, "绘画窗口初始化失败", level="error")
+        
+        # 处理积累的轨迹点
+        if self.pending_points and len(self.pending_points) > 0:
+            log(__name__, f"处理之前积累的 {len(self.pending_points)} 个轨迹点")
+            
+            # 初始化笔画状态
+            self.current_stroke = self.pending_points.copy()
+            self.smoothed_stroke = self.current_stroke.copy()
+            self.stroke_start_time = self.pending_points[0][2]  # 使用第一个点的时间
+            self.line_width_history = []
+            self.last_line_width = self.base_width
+            
+            # 绘制累积的轨迹
+            if len(self.pending_points) > 1:
+                # 批量处理点数据，绘制线条
+                for i in range(1, len(self.pending_points)):
+                    prev_x, prev_y, prev_time = self.pending_points[i-1]
+                    curr_x, curr_y, curr_time = self.pending_points[i]
+                    
+                    # 计算线宽
+                    line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
+                    
+                    # 绘制线段
+                    new_lines = self.draw_single_line(prev_x, prev_y, curr_x, curr_y, line_width)
+                    self.active_lines.extend(new_lines)
+            
+            # 清空待处理点列表，因为这些点已被处理
+            self.pending_points = []
         
         log(__name__, "绘画模式已启动")
 

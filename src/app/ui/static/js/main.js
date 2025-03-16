@@ -18,6 +18,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 创建提示框组件
     createToastComponent();
+    
+    // 添加页面过渡动画
+    addPageTransitionEffects();
+    
+    // 添加按钮点击波纹效果
+    addButtonRippleEffect();
 });
 
 // 禁用右键菜单
@@ -38,6 +44,103 @@ function disableRightClick() {
         e.preventDefault();
         return false;
     });
+}
+
+// 添加页面过渡动画
+function addPageTransitionEffects() {
+    // 为内容容器添加初始动画
+    const contentContainer = document.getElementById('content-container');
+    if (contentContainer) {
+        contentContainer.style.opacity = '0';
+        contentContainer.style.transform = 'translateY(20px)';
+        contentContainer.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        
+        // 延迟显示内容，创建淡入效果
+        setTimeout(() => {
+            contentContainer.style.opacity = '1';
+            contentContainer.style.transform = 'translateY(0)';
+        }, 100);
+    }
+    
+    // 为导航链接添加页面过渡效果
+    const navLinks = document.querySelectorAll('.nav-item');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // 只处理同域名下的链接
+            if (this.hostname === window.location.hostname) {
+                e.preventDefault();
+                
+                // 淡出当前页面
+                if (contentContainer) {
+                    contentContainer.style.opacity = '0';
+                    contentContainer.style.transform = 'translateY(20px)';
+                    
+                    // 延迟导航，等待动画完成
+                    setTimeout(() => {
+                        window.location.href = this.href;
+                    }, 300);
+                } else {
+                    window.location.href = this.href;
+                }
+            }
+        });
+    });
+}
+
+// 添加按钮点击波纹效果
+function addButtonRippleEffect() {
+    const buttons = document.querySelectorAll('.btn');
+    
+    buttons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            // 创建波纹元素
+            const ripple = document.createElement('span');
+            ripple.classList.add('ripple-effect');
+            
+            // 设置波纹位置
+            const rect = this.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const x = e.clientX - rect.left - size / 2;
+            const y = e.clientY - rect.top - size / 2;
+            
+            // 设置波纹样式
+            ripple.style.width = ripple.style.height = `${size}px`;
+            ripple.style.left = `${x}px`;
+            ripple.style.top = `${y}px`;
+            
+            // 添加波纹到按钮
+            this.appendChild(ripple);
+            
+            // 移除波纹
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        });
+    });
+    
+    // 添加波纹样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .btn {
+            position: relative;
+            overflow: hidden;
+        }
+        .ripple-effect {
+            position: absolute;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.4);
+            transform: scale(0);
+            animation: ripple 0.6s linear;
+            pointer-events: none;
+        }
+        @keyframes ripple {
+            to {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 // 创建自定义提示框组件
@@ -376,9 +479,9 @@ function initSettings() {
             })
             .catch(error => {
                 console.error('设置开机自启动失败:', error);
-                showToast('设置开机自启动失败，请重试', 'error');
                 // 恢复复选框状态
                 this.checked = !enabled;
+                showToast('设置开机自启动失败', 'error');
             });
         });
     }
@@ -388,33 +491,22 @@ function initSettings() {
         settingsForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
+            // 收集表单数据
             const formData = new FormData(this);
             const settings = {};
             
-            // 转换表单数据为JSON对象
+            // 转换为JSON对象
             for (const [key, value] of formData.entries()) {
                 if (key === 'enable_advanced_brush' || key === 'enable_auto_smoothing' || 
-                    key === 'force_topmost' || key === 'enable_hardware_acceleration' || 
-                    key === 'start_with_system') {
-                    settings[key] = true; // 复选框被选中时才会出现在formData中
-                } else if (key === 'base_width' || key === 'min_width' || key === 'max_width') {
-                    settings[key] = parseInt(value);
-                } else if (key === 'speed_factor') {
+                    key === 'force_topmost' || key === 'enable_hardware_acceleration') {
+                    settings[key] = value === 'on';
+                } else if (key === 'speed_factor' || key === 'base_width' || 
+                           key === 'min_width' || key === 'max_width') {
                     settings[key] = parseFloat(value);
                 } else {
                     settings[key] = value;
                 }
             }
-            
-            // 处理未选中的复选框
-            const checkboxes = ['enable_advanced_brush', 'enable_auto_smoothing', 
-                               'force_topmost', 'enable_hardware_acceleration', 'start_with_system'];
-            
-            checkboxes.forEach(key => {
-                if (!settings.hasOwnProperty(key)) {
-                    settings[key] = false;
-                }
-            });
             
             // 发送到后端
             fetch('/api/save_settings', {
@@ -429,12 +521,12 @@ function initSettings() {
                 if (data.success) {
                     showToast('设置已保存', 'success');
                 } else {
-                    showToast('保存失败: ' + data.message, 'error');
+                    showToast('保存设置失败: ' + data.message, 'error');
                 }
             })
             .catch(error => {
                 console.error('保存设置失败:', error);
-                showToast('保存设置失败，请重试', 'error');
+                showToast('保存设置失败', 'error');
             });
         });
     }
@@ -459,7 +551,7 @@ function initSettings() {
                 })
                 .catch(error => {
                     console.error('恢复默认设置失败:', error);
-                    showToast('恢复默认设置失败，请重试', 'error');
+                    showToast('恢复默认设置失败', 'error');
                 });
             });
         });

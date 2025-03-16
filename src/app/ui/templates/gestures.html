@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="gestures-page">
+    <div class="gesture-panel">
+        <!-- 手势列表容器 -->
+        <div class="gesture-list-container">
+            <div class="panel-header">
+                <h2>手势管理</h2>
+                <button id="add-gesture-btn" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> 添加手势
+                </button>
+            </div>
+            
+            <div class="gesture-list">
+                {% if gestures %}
+                    {% for name, gesture in gestures.items() %}
+                        <div class="gesture-item" data-name="{{ name }}" data-directions="{{ gesture.directions }}" data-action="{{ gesture.action }}">
+                            <div class="gesture-info">
+                                <h3 class="gesture-name">{{ name }}</h3>
+                                <div class="gesture-details">
+                                    <span class="gesture-directions">方向: {{ gesture.directions }}</span>
+                                </div>
+                            </div>
+                            <div class="gesture-actions">
+                                <button class="icon-btn edit-gesture-btn" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="icon-btn delete-gesture-btn" title="删除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-hand-pointer"></i>
+                        <p>暂无手势，点击"添加手势"创建第一个手势</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 手势编辑器容器 -->
+        <div id="gesture-editor-container" class="gesture-editor-container" style="display: none;">
+            <div class="panel-header">
+                <h2 id="editor-title">添加手势</h2>
+            </div>
+            
+            <form id="gesture-form" class="gesture-form">
+                <div class="form-group">
+                    <label for="gesture-name">手势名称</label>
+                    <input type="text" id="gesture-name" name="name" placeholder="例如：上、下、左、右" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gesture-directions">方向序列</label>
+                    <div class="input-with-helper">
+                        <input type="text" id="gesture-directions" name="directions" placeholder="例如：↑ → ↓ ←" required>
+                        <div id="directions-validation" class="validation-message"></div>
+                    </div>
+                    
+                    <div class="directions-helper">
+                        <p>点击添加方向：</p>
+                        <div class="direction-buttons">
+                            <button type="button" class="direction-btn" data-direction="上">↑</button>
+                            <button type="button" class="direction-btn" data-direction="右上">↗</button>
+                            <button type="button" class="direction-btn" data-direction="右">→</button>
+                            <button type="button" class="direction-btn" data-direction="右下">↘</button>
+                            <button type="button" class="direction-btn" data-direction="下">↓</button>
+                            <button type="button" class="direction-btn" data-direction="左下">↙</button>
+                            <button type="button" class="direction-btn" data-direction="左">←</button>
+                            <button type="button" class="direction-btn" data-direction="左上">↖</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gesture-action">执行动作 (Python代码)</label>
+                    <textarea id="gesture-action" name="action" rows="8" placeholder="输入要执行的Python代码" required></textarea>
+                    
+                    <div class="code-helper">
+                        <p>常用动作示例：</p>
+                        <div class="code-examples">
+                            <div class="code-example">
+                                <h4>模拟按键</h4>
+                                <pre>import pyautogui
+pyautogui.press('ctrl')  # 按下Ctrl键</pre>
+                            </div>
+                            <div class="code-example">
+                                <h4>模拟组合键</h4>
+                                <pre>import pyautogui
+pyautogui.hotkey('ctrl', 'c')  # 复制</pre>
+                            </div>
+                            <div class="code-example">
+                                <h4>运行程序</h4>
+                                <pre>import os
+os.startfile('calc.exe')  # 打开计算器</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" id="test-gesture-btn" class="btn btn-secondary">
+                        <i class="fas fa-play"></i> 测试
+                    </button>
+                    <button type="button" id="cancel-btn" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> 取消
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/gestures.js"></script>
+{% endblock %} 
