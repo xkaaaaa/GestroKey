@@ -245,7 +245,7 @@ class WebServer(QObject):
                         directions = data.get('directions')
                         action = data.get('action')
                         
-                        log(__name__, f"添加新手势：{gesture_name}")
+                        log(__name__, f"添加新手势：{gesture_name}，方向序列：{directions}")
                         log(__name__, f"收到添加手势请求数据: {data}")
                         
                         # 验证输入数据
@@ -267,7 +267,7 @@ class WebServer(QObject):
                         directions = data.get('directions')
                         action = data.get('action')
                         
-                        log(__name__, f"更新手势：{old_name} -> {new_name}")
+                        log(__name__, f"更新手势：{old_name} -> {new_name}，方向序列：{directions}")
                         log(__name__, f"收到更新手势请求数据: {data}")
                         
                         # 验证输入数据

@@ -1,9 +1,5 @@
 {
   "gestures": {
-    "下": {
-      "directions": "↓",
-      "action": "cGFzc2FwcC5yZXN0b3JlX2FsbCgp"
-    },
     "右": {
       "directions": "→",
       "action": "cGFzc2FwcC5uZXh0X3dpbmRvdygp"
@@ -15,6 +11,10 @@
     "左": {
       "directions": "←",
       "action": "cGFzc2FwcC5wcmV2X3dpbmRvdygp"
+    },
+    "下": {
+      "directions": "↓",
+      "action": "cGFzc2FwcC5yZXN0b3JlX2FsbCgp"
     }
   }
 }
