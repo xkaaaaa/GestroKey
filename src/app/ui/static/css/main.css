@@ -1037,4 +1037,119 @@ input[type="color"]::-webkit-color-swatch {
 .modal-close-btn:hover {
     color: #333;
     background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 输入框组件 */
+.input-container {
+    position: relative;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+.input-field {
+    width: 100%;
+    padding: 12px 15px;
+    font-size: 16px;
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 2px solid #e0e0e0;
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+    color: var(--dark-color);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 191, 255, 0.2);
+}
+
+.input-label {
+    position: absolute;
+    left: 16px;
+    top: 14px;
+    color: var(--secondary-color);
+    pointer-events: none;
+    transition: var(--transition);
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.input-field:focus ~ .input-label,
+.input-field:not(:placeholder-shown) ~ .input-label {
+    top: -10px;
+    left: 10px;
+    font-size: 12px;
+    background-color: white;
+    padding: 0 5px;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.input-field::placeholder {
+    color: transparent;
+}
+
+.input-field:focus::placeholder {
+    color: #bbb;
+}
+
+.input-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-color);
+    transition: var(--transition);
+}
+
+.input-field:focus ~ .input-icon {
+    color: var(--primary-color);
+}
+
+.input-hint {
+    font-size: 12px;
+    color: var(--secondary-color);
+    margin-top: 6px;
+    margin-left: 5px;
+}
+
+.input-error {
+    font-size: 12px;
+    color: var(--danger-color);
+    margin-top: 6px;
+    margin-left: 5px;
+    display: none;
+}
+
+.input-field.error {
+    border-color: var(--danger-color);
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.input-field.error ~ .input-label {
+    color: var(--danger-color);
+}
+
+.input-field.error ~ .input-error {
+    display: block;
+}
+
+.input-field.success {
+    border-color: var(--success-color);
+}
+
+.input-field.success ~ .input-label {
+    color: var(--success-color);
+}
+
+/* 动画效果 */
+@keyframes inputFocus {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+.input-field:focus {
+    animation: inputFocus 0.3s ease;
 } 

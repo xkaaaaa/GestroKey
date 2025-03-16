@@ -60,7 +60,7 @@ function initGestureEditor() {
     }
     
     // 取消按钮
-    const cancelBtn = document.getElementById('cancel-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
     if (cancelBtn) {
         cancelBtn.addEventListener('click', hideGestureEditor);
     }
@@ -98,47 +98,125 @@ function showGestureEditor(mode, gestureName = null) {
     if (mode === EDIT_MODE.CREATE) {
         editorTitle.textContent = '添加手势';
         form.reset(); // 清空表单
+        
+        // 初始化名称输入框
+        initGestureNameInput();
+        // 初始化方向序列输入框
+        initGestureDirectionsInput();
     } else {
         editorTitle.textContent = '编辑手势';
         
-        // 填充表单数据
+        // 查找并加载手势数据
         const gestureItem = document.querySelector(`.gesture-item[data-name="${gestureName}"]`);
         if (gestureItem) {
-            document.getElementById('gesture-name').value = gestureName;
-            document.getElementById('gesture-directions').value = gestureItem.getAttribute('data-directions');
-            
-            // 解码 Base64 编码的操作
+            const directions = gestureItem.getAttribute('data-directions');
             const action = gestureItem.getAttribute('data-action');
-            try {
-                const decodedAction = atob(action);
-                document.getElementById('gesture-action').value = decodedAction;
-            } catch (e) {
-                console.error('无法解码动作:', e);
-                document.getElementById('gesture-action').value = '';
-            }
-        }
-    }
-    
-    // 高亮选中的手势项
-    if (mode === EDIT_MODE.EDIT) {
-        document.querySelectorAll('.gesture-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        const activeItem = document.querySelector(`.gesture-item[data-name="${gestureName}"]`);
-        if (activeItem) {
-            activeItem.classList.add('active');
+            
+            // 初始化名称输入框
+            initGestureNameInput(gestureName);
+            // 初始化方向序列输入框
+            initGestureDirectionsInput(directions);
+            
+            // 设置动作字段值
+            document.getElementById('gesture-action').value = atob(action); // 解码base64
         }
     }
     
     // 显示编辑器
     editorContainer.style.display = 'block';
-    editorContainer.style.opacity = '0';
     
-    // 添加渐入动画
+    // 聚焦第一个输入框
     setTimeout(() => {
-        editorContainer.style.opacity = '1';
-        editorContainer.style.transform = 'translateY(0)';
-    }, 10);
+        const gestureName = document.getElementById('gesture-name');
+        if (gestureName) {
+            gestureName.focus();
+        }
+    }, 100);
+}
+
+// 初始化手势名称输入框
+function initGestureNameInput(initialValue = '') {
+    const container = document.getElementById('gesture-name-container');
+    if (!container) return;
+    
+    // 清空容器
+    container.innerHTML = '';
+    
+    // 创建输入框组件
+    const inputContainer = createInputField('gesture-name', '手势名称', {
+        icon: 'fas fa-signature',
+        placeholder: '请输入手势名称',
+        hint: '',
+        validator: function(value) {
+            if (!value || value.trim() === '') {
+                return { valid: false, message: '手势名称不能为空' };
+            }
+            
+            // 检查名称长度
+            if (value.length > 20) {
+                return { valid: false, message: '手势名称不能超过20个字符' };
+            }
+            
+            // 检查是否存在重名（仅在创建新手势时）
+            if (currentMode === EDIT_MODE.CREATE) {
+                const existingGesture = document.querySelector(`.gesture-item[data-name="${value}"]`);
+                if (existingGesture) {
+                    return { valid: false, message: '此手势名称已存在' };
+                }
+            } else if (currentMode === EDIT_MODE.EDIT && value !== currentGestureName) {
+                // 编辑模式下，如果更改了名称，也要检查重名
+                const existingGesture = document.querySelector(`.gesture-item[data-name="${value}"]`);
+                if (existingGesture) {
+                    return { valid: false, message: '此手势名称已存在' };
+                }
+            }
+            
+            return { valid: true, success: true };
+        }
+    });
+    
+    // 添加到容器
+    container.appendChild(inputContainer);
+    
+    // 设置初始值（如果有）
+    if (initialValue) {
+        setInputValue('gesture-name', initialValue);
+    }
+}
+
+// 初始化方向序列输入框
+function initGestureDirectionsInput(initialValue = '') {
+    const container = document.getElementById('gesture-directions-container');
+    if (!container) return;
+    
+    // 清空容器
+    container.innerHTML = '';
+    
+    // 创建输入框组件
+    const inputContainer = createInputField('gesture-directions', '方向序列', {
+        icon: 'fas fa-arrows-alt',
+        placeholder: '请输入方向序列',
+        validator: function(value) {
+            if (!value || value.trim() === '') {
+                return { valid: false, message: '方向序列不能为空' };
+            }
+            
+            // 使用validateDirections函数进行验证
+            if (!validateDirections(value)) {
+                return { valid: false, message: '无效的方向序列，请使用箭头符号' };
+            }
+            
+            return { valid: true, success: true };
+        }
+    });
+    
+    // 添加到容器
+    container.appendChild(inputContainer);
+    
+    // 设置初始值（如果有）
+    if (initialValue) {
+        setInputValue('gesture-directions', initialValue);
+    }
 }
 
 // 隐藏手势编辑器
@@ -163,16 +241,42 @@ function hideGestureEditor() {
     }, 300);
 }
 
+// 验证方向输入
+function validateDirections(directions) {
+    const validArrows = Object.values(DIRECTION_MAP);
+    
+    if (!directions || directions.trim() === '') {
+        return false;
+    }
+    
+    // 分割输入的方向
+    const dirArray = directions.trim().split(/\s+/);
+    
+    // 检查每个方向是否有效
+    for (const dir of dirArray) {
+        if (!validArrows.includes(dir)) {
+            return false;
+        }
+    }
+    
+    // 检查至少有一个方向
+    if (dirArray.length === 0) {
+        return false;
+    }
+    
+    return true;
+}
+
 // 初始化方向按钮
 function initDirectionButtons() {
     const dirButtons = document.querySelectorAll('.direction-btn');
-    const directionsInput = document.getElementById('gesture-directions');
     
     dirButtons.forEach(button => {
         button.addEventListener('click', () => {
             const direction = button.getAttribute('data-direction');
             const arrowDirection = DIRECTION_MAP[direction] || direction;
             
+            const directionsInput = document.getElementById('gesture-directions');
             if (directionsInput) {
                 const currentVal = directionsInput.value;
                 
@@ -184,49 +288,11 @@ function initDirectionButtons() {
                     newVal = currentVal + arrowDirection;
                 }
                 
-                directionsInput.value = newVal;
-                validateDirections(newVal);
+                // 设置新值并触发验证
+                setInputValue('gesture-directions', newVal);
             }
         });
     });
-    
-    // 验证输入的方向
-    if (directionsInput) {
-        directionsInput.addEventListener('input', function() {
-            validateDirections(this.value);
-        });
-    }
-}
-
-// 验证方向输入
-function validateDirections(directions) {
-    const validArrows = Object.values(DIRECTION_MAP);
-    const validation = document.getElementById('directions-validation');
-    
-    if (!directions || directions.trim() === '') {
-        validation.textContent = '';
-        return true;
-    }
-    
-    // 分割输入的方向
-    const dirArray = directions.trim().split(/\s+/);
-    
-    // 检查每个方向是否有效
-    for (const dir of dirArray) {
-        if (!validArrows.includes(dir)) {
-            validation.textContent = `无效的方向: ${dir}。请使用有效箭头符号。`;
-            return false;
-        }
-    }
-    
-    // 检查至少有一个方向
-    if (dirArray.length === 0) {
-        validation.textContent = '请至少输入一个方向。';
-        return false;
-    }
-    
-    validation.textContent = '';
-    return true;
 }
 
 // 初始化表单提交
@@ -238,8 +304,8 @@ function initGestureForm() {
         e.preventDefault();
         
         // 获取表单数据
-        const name = document.getElementById('gesture-name').value.trim();
-        let directions = document.getElementById('gesture-directions').value.trim();
+        const name = getInputValue('gesture-name').trim();
+        let directions = getInputValue('gesture-directions').trim();
         const action = document.getElementById('gesture-action').value.trim();
         
         // 验证
@@ -278,19 +344,30 @@ function initGestureForm() {
         // 确定操作类型：添加或更新
         const operationType = currentMode === EDIT_MODE.CREATE ? 'add' : 'update';
         
+        // 构建请求数据
+        let requestData = {
+            operation: operationType,
+            directions: directions,
+            action: actionBase64
+        };
+        
+        // 根据操作类型添加不同的参数
+        if (operationType === 'add') {
+            requestData.name = name;
+            console.log('添加手势', requestData);
+        } else {
+            requestData.old_name = currentGestureName;
+            requestData.new_name = name; // 修改操作使用new_name而不是name
+            console.log('修改手势', requestData);
+        }
+        
         // 发送到服务器
         fetch('/api/gestures', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                operation: operationType,
-                old_name: currentGestureName,
-                name: name,
-                directions: directions,
-                action: actionBase64
-            })
+            body: JSON.stringify(requestData)
         })
         .then(response => response.json())
         .then(data => {

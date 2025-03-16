@@ -238,4 +238,158 @@ function showConfirm(message, onConfirm, onCancel = null) {
 
     // 添加ESC键监听
     document.addEventListener('keydown', handleEscKey);
+}
+
+/**
+ * 创建并初始化自定义输入框组件
+ * @param {string} id - 输入框ID
+ * @param {string} label - 输入框标签
+ * @param {Object} options - 配置选项
+ * @param {string} options.icon - 图标类名（Font Awesome）
+ * @param {string} options.placeholder - 占位文本
+ * @param {string} options.hint - 提示文本
+ * @param {string} options.type - 输入类型 (text, password, email等)
+ * @param {function} options.validator - 验证函数，返回{valid:boolean, message:string}
+ * @param {function} options.onChange - 值变化回调函数
+ * @returns {HTMLElement} 创建的输入框容器元素
+ */
+function createInputField(id, label, options = {}) {
+    // 默认选项
+    const defaultOptions = {
+        icon: null,
+        placeholder: '',
+        hint: '',
+        type: 'text',
+        validator: null,
+        onChange: null
+    };
+    
+    // 合并选项
+    const settings = Object.assign({}, defaultOptions, options);
+    
+    // 创建容器
+    const container = document.createElement('div');
+    container.className = 'input-container';
+    
+    // 创建输入框
+    const input = document.createElement('input');
+    input.type = settings.type;
+    input.id = id;
+    input.className = 'input-field';
+    input.placeholder = settings.placeholder;
+    
+    // 创建标签
+    const labelElement = document.createElement('label');
+    labelElement.htmlFor = id;
+    labelElement.className = 'input-label';
+    labelElement.textContent = label;
+    
+    // 添加图标（如果提供）
+    if (settings.icon) {
+        const iconElement = document.createElement('i');
+        iconElement.className = `input-icon ${settings.icon}`;
+        container.appendChild(iconElement);
+    }
+    
+    // 添加提示文本（如果提供）
+    if (settings.hint) {
+        const hintElement = document.createElement('div');
+        hintElement.className = 'input-hint';
+        hintElement.textContent = settings.hint;
+        container.appendChild(hintElement);
+    }
+    
+    // 添加错误消息元素
+    const errorElement = document.createElement('div');
+    errorElement.className = 'input-error';
+    
+    // 添加事件监听器
+    input.addEventListener('input', (e) => {
+        // 调用自定义onChange回调
+        if (typeof settings.onChange === 'function') {
+            settings.onChange(e.target.value);
+        }
+        
+        // 执行验证（如果提供验证器）
+        if (typeof settings.validator === 'function') {
+            const result = settings.validator(e.target.value);
+            if (!result.valid) {
+                input.classList.add('error');
+                errorElement.textContent = result.message;
+            } else {
+                input.classList.remove('error');
+                if (result.success) {
+                    input.classList.add('success');
+                } else {
+                    input.classList.remove('success');
+                }
+            }
+        }
+    });
+    
+    // 组装组件
+    container.appendChild(input);
+    container.appendChild(labelElement);
+    container.appendChild(errorElement);
+    
+    return container;
+}
+
+/**
+ * 获取输入框的值
+ * @param {string} id - 输入框ID
+ * @returns {string} 输入框的值
+ */
+function getInputValue(id) {
+    const input = document.getElementById(id);
+    return input ? input.value : '';
+}
+
+/**
+ * 设置输入框的值
+ * @param {string} id - 输入框ID
+ * @param {string} value - 要设置的值
+ */
+function setInputValue(id, value) {
+    const input = document.getElementById(id);
+    if (input) {
+        input.value = value;
+        
+        // 触发input事件以激活验证和标签效果
+        const event = new Event('input', {
+            bubbles: true,
+            cancelable: true,
+        });
+        input.dispatchEvent(event);
+    }
+}
+
+/**
+ * 设置输入框错误状态
+ * @param {string} id - 输入框ID
+ * @param {string} errorMessage - 错误消息
+ */
+function setInputError(id, errorMessage) {
+    const input = document.getElementById(id);
+    if (input) {
+        input.classList.add('error');
+        const container = input.closest('.input-container');
+        if (container) {
+            const errorElement = container.querySelector('.input-error');
+            if (errorElement) {
+                errorElement.textContent = errorMessage;
+            }
+        }
+    }
+}
+
+/**
+ * 清除输入框错误状态
+ * @param {string} id - 输入框ID
+ */
+function clearInputError(id) {
+    const input = document.getElementById(id);
+    if (input) {
+        input.classList.remove('error');
+    }
 } 

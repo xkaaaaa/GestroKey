@@ -48,16 +48,15 @@
             </div>
             
             <form id="gesture-form" class="gesture-form">
-                <div class="form-group">
-                    <label for="gesture-name">手势名称</label>
-                    <input type="text" id="gesture-name" name="name" placeholder="例如：上、下、左、右" required>
+                <!-- 使用新的输入框组件替换原有的手势名称输入框 -->
+                <div id="gesture-name-container" class="form-group">
+                    <!-- 容器会在JS中填充 -->
                 </div>
                 
                 <div class="form-group">
-                    <label for="gesture-directions">方向序列</label>
-                    <div class="input-with-helper">
-                        <input type="text" id="gesture-directions" name="directions" placeholder="例如：↑ → ↓ ←" required>
-                        <div id="directions-validation" class="validation-message"></div>
+                    <!-- 使用新的输入框组件替换原有的方向序列输入框 -->
+                    <div id="gesture-directions-container">
+                        <!-- 容器会在JS中填充 -->
                     </div>
                     
                     <div class="directions-helper">
@@ -105,12 +104,8 @@ os.startfile('calc.exe')  # 打开计算器</pre>
                     <button type="button" id="test-gesture-btn" class="btn btn-secondary">
                         <i class="fas fa-play"></i> 测试
                     </button>
-                    <button type="button" id="cancel-btn" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> 取消
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> 保存
-                    </button>
+                    <button type="button" id="cancel-edit-btn" class="btn secondary-btn">取消</button>
+                    <button type="submit" class="btn primary-btn">保存</button>
                 </div>
             </form>
         </div>

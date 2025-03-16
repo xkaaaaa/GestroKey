@@ -102,6 +102,7 @@ class WebServer(QObject):
             """显示手势管理页面"""
             log(__name__, "访问手势管理页面")
             gestures_data = self._load_gestures()
+            log(__name__, f"加载了 {len(gestures_data)} 个手势配置项")
             return render_template('gestures.html', gestures=gestures_data)
         
         # 静态资源路由
@@ -225,89 +226,117 @@ class WebServer(QObject):
                 
         @self.app.route('/api/gestures', methods=['GET', 'POST'])
         def manage_gestures():
-            """手势管理API"""
-            if request.method == 'GET':
-                # 获取所有手势
-                log(__name__, "API: 获取手势列表")
-                try:
-                    gestures_data = self._load_gestures()
-                    return jsonify({'success': True, 'gestures': gestures_data})
-                except Exception as e:
-                    log(__name__, f"获取手势列表失败: {str(e)}", level="error")
-                    return jsonify({'success': False, 'message': str(e)})
-            elif request.method == 'POST':
-                # 处理手势操作：添加/更新/删除
-                log(__name__, "API: 管理手势")
-                try:
-                    data = request.get_json()
-                    if not data or 'operation' not in data:
-                        return jsonify({'success': False, 'message': '缺少操作类型参数'})
-                    
-                    operation = data['operation']
+            """手势API，用于获取、添加、更新和删除手势"""
+            try:
+                if request.method == 'GET':
+                    # 获取所有手势
+                    log(__name__, "获取所有手势")
+                    gestures = self._load_gestures()
+                    return jsonify({"success": True, "gestures": gestures})
+                
+                elif request.method == 'POST':
+                    # 处理操作
+                    data = request.json
+                    operation = data.get('operation')
                     
                     if operation == 'add':
                         # 添加新手势
-                        if not all(k in data for k in ['name', 'directions', 'action']):
-                            return jsonify({'success': False, 'message': '缺少必要参数'})
+                        gesture_name = data.get('name')
+                        directions = data.get('directions')
+                        action = data.get('action')
                         
-                        result = self._add_gesture(data['name'], data['directions'], data['action'])
-                        return jsonify(result)
+                        log(__name__, f"添加新手势：{gesture_name}")
+                        log(__name__, f"收到添加手势请求数据: {data}")
+                        
+                        # 验证输入数据
+                        if not gesture_name or not directions or not action:
+                            log(__name__, f"添加手势失败：参数不完整 name={gesture_name}, directions={directions}, action={'有值' if action else '无值'}", level="warning")
+                            return jsonify({"success": False, "message": "参数不完整"}), 400
+                        
+                        result = self._add_gesture(gesture_name, directions, action)
+                        if result:
+                            log(__name__, f"手势'{gesture_name}'添加成功")
+                            return jsonify({"success": True, "message": f"手势 '{gesture_name}' 添加成功"})
+                        else:
+                            return jsonify({"success": False, "message": "添加手势失败，可能已存在同名手势"}), 400
                     
                     elif operation == 'update':
-                        # 更新现有手势
-                        if not all(k in data for k in ['old_name', 'name', 'directions', 'action']):
-                            return jsonify({'success': False, 'message': '缺少必要参数'})
+                        # 更新手势
+                        old_name = data.get('old_name')
+                        new_name = data.get('new_name')
+                        directions = data.get('directions')
+                        action = data.get('action')
                         
-                        result = self._update_gesture(data['old_name'], data['name'], data['directions'], data['action'])
-                        return jsonify(result)
+                        log(__name__, f"更新手势：{old_name} -> {new_name}")
+                        log(__name__, f"收到更新手势请求数据: {data}")
+                        
+                        # 验证输入数据
+                        if not old_name or not new_name or not directions or not action:
+                            log(__name__, f"更新手势失败：参数不完整 old_name={old_name}, new_name={new_name}, directions={directions}, action={'有值' if action else '无值'}", level="warning")
+                            return jsonify({"success": False, "message": "参数不完整"}), 400
+                        
+                        result = self._update_gesture(old_name, new_name, directions, action)
+                        if result:
+                            log(__name__, f"手势'{old_name}'更新为'{new_name}'成功")
+                            return jsonify({"success": True, "message": f"手势 '{new_name}' 更新成功"})
+                        else:
+                            return jsonify({"success": False, "message": "更新手势失败，请检查名称是否冲突"}), 400
                     
                     elif operation == 'delete':
                         # 删除手势
-                        if 'name' not in data:
-                            return jsonify({'success': False, 'message': '缺少手势名称参数'})
+                        gesture_name = data.get('name')
                         
-                        result = self._delete_gesture(data['name'])
-                        return jsonify(result)
+                        log(__name__, f"删除手势：{gesture_name}")
+                        
+                        # 验证输入数据
+                        if not gesture_name:
+                            log(__name__, "删除手势失败：未指定手势名称", level="warning")
+                            return jsonify({"success": False, "message": "未指定手势名称"}), 400
+                        
+                        result = self._delete_gesture(gesture_name)
+                        if result:
+                            log(__name__, f"手势'{gesture_name}'删除成功")
+                            return jsonify({"success": True, "message": f"手势 '{gesture_name}' 删除成功"})
+                        else:
+                            return jsonify({"success": False, "message": "删除手势失败，可能不存在该手势"}), 404
                     
                     else:
-                        return jsonify({'success': False, 'message': f'不支持的操作类型: {operation}'})
-                
-                except Exception as e:
-                    log(__name__, f"处理手势操作失败: {str(e)}", level="error")
-                    traceback.print_exc()
-                    return jsonify({'success': False, 'message': str(e)})
+                        log(__name__, f"未知的手势操作: {operation}", level="warning")
+                        return jsonify({"success": False, "message": "未知操作"}), 400
+            
+            except Exception as e:
+                log(__name__, f"手势管理API异常: {str(e)}", level="error")
+                return jsonify({"success": False, "message": f"服务器错误: {str(e)}"}), 500
         
         @self.app.route('/api/test_gesture', methods=['POST'])
         def test_gesture():
-            """测试手势动作执行"""
-            log(__name__, "API: 测试手势动作")
+            """测试手势执行效果"""
             try:
-                data = request.get_json()
-                if not data or 'action' not in data:
-                    log(__name__, "测试手势动作失败: 缺少动作参数", level="warning")
-                    return jsonify({'success': False, 'message': '缺少动作参数'})
+                data = request.json
+                action_base64 = data.get('action')
                 
-                # 解码Base64编码的action
-                action_base64 = data['action']
-                try:
-                    action_code = base64.b64decode(action_base64).decode('utf-8')
-                except Exception as e:
-                    log(__name__, f"解码action参数失败: {str(e)}", level="error")
-                    return jsonify({'success': False, 'message': f'解码失败: {str(e)}'})
+                log(__name__, "请求测试手势执行")
                 
-                # 安全检查及执行逻辑
-                log(__name__, f"准备执行测试代码: {action_code}")
-                try:
-                    # 此处执行代码，可以调用相应模块执行操作
-                    exec(action_code)
-                    log(__name__, "测试代码执行成功")
-                    return jsonify({'success': True})
-                except Exception as e:
-                    log(__name__, f"测试代码执行失败: {str(e)}", level="error")
-                    return jsonify({'success': False, 'message': f'执行失败: {str(e)}'})
+                if not action_base64:
+                    log(__name__, "测试手势失败：未提供动作代码", level="warning")
+                    return jsonify({"success": False, "message": "未提供动作代码"}), 400
+                    
+                # 执行动作代码
+                from app.operation_executor import execute
+                
+                log(__name__, "开始测试执行手势动作")
+                result = execute(action_base64)
+                
+                if result:
+                    log(__name__, "手势测试执行成功")
+                    return jsonify({"success": True, "message": "动作执行成功"})
+                else:
+                    log(__name__, "手势测试执行失败", level="warning")
+                    return jsonify({"success": False, "message": "动作执行失败"}), 500
+                    
             except Exception as e:
-                log(__name__, f"测试手势时发生未知错误: {str(e)}", level="error")
-                return jsonify({'success': False, 'message': f'服务器错误: {str(e)}'})
+                log(__name__, f"测试手势API异常: {str(e)}", level="error")
+                return jsonify({"success": False, "message": f"服务器错误: {str(e)}"}), 500
     
     def start(self):
         """启动Web服务器（在单独的线程中运行）"""
