@@ -21,6 +21,7 @@ import win32api
 import win32con
 import os
 import sys
+import re
 from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget
 from PyQt5.QtCore import Qt, QTimer, QPoint
 from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath
@@ -28,9 +29,11 @@ from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath
 try:
     from .gesture_parser import GestureParser
     from .log import log
+    from .operation_executor import execute as execute_operation
 except ImportError:
     from gesture_parser import GestureParser
     from log import log
+    from operation_executor import execute as execute_operation
 
 class Canvas(QWidget):
     def __init__(self, parent=None):
@@ -48,7 +51,8 @@ class Canvas(QWidget):
         # 线条绘制方式：单线条模式
         self.single_line_mode = True
 
-    def create_line(self, x1, y1, x2, y2, width, fill, capstyle, smooth, joinstyle):
+    def create_line(self, x1, y1, x2, y2, width, fill, capstyle=Qt.RoundCap, smooth=True, joinstyle=Qt.RoundJoin):
+        """创建一条线段"""
         line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': fill}
         self.lines.append(line)
         # 不立即更新，而是加入批量队列
@@ -81,11 +85,10 @@ class Canvas(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        # 开启抗锯齿
+        # 始终开启完整抗锯齿
         painter.setRenderHint(QPainter.Antialiasing, True)
-        if self.enable_hardware_acceleration:
-            painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
-            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
         
         # 仅绘制可见区域内的线条
         visible_rect = event.rect()
@@ -114,15 +117,10 @@ class Canvas(QWidget):
             path = QPainterPath()
             path.moveTo(x1, y1)
             
-            # 对于较长的线段，添加中间控制点以获得更平滑的曲线
-            dist = math.hypot(x2-x1, y2-y1)
-            if dist > 10:
-                # 添加中间控制点，使线条更平滑
-                mid_x = (x1 + x2) / 2
-                mid_y = (y1 + y2) / 2
-                path.quadTo(mid_x, mid_y, x2, y2)
-            else:
-                path.lineTo(x2, y2)
+            # 始终使用贝塞尔曲线绘制，提高平滑度
+            mid_x = (x1 + x2) / 2
+            mid_y = (y1 + y2) / 2
+            path.quadTo(mid_x, mid_y, x2, y2)
                 
             painter.drawPath(path)
 
@@ -135,12 +133,6 @@ class InkPainter:
         
         log(__name__, "绘画模块初始化")
         
-        # 确保settings.json存在
-        self.ensure_settings_file()
-        
-        # 绘画参数
-        self.load_drawing_settings()  # 加载绘画参数
-            
         # 状态控制
         self.drawing = False               # 绘画状态标志
         self.running = True                # 运行状态标志
@@ -152,367 +144,250 @@ class InkPainter:
         self.pending_points = []           # 存储达到触发条件前的轨迹点
         self.finished_strokes = []         # 已结束笔画，用于独立的手势识别
         self.forced_end = False            # 强制结束标志
+        self.point_buffer = []             # 点缓冲区，用于高性能绘制
         
-        # 初始化系统
-        self.load_gestures()               # 加载手势配置
-        self.init_canvas()                 # 创建GUI界面
-        self.init_gesture_parser()         # 初始化手势识别器
-        self.start_listening()             # 启动鼠标监听循环
+        # 初始化基本组件
+        self.init_canvas()
+        self.load_drawing_settings()
+        self.load_gestures()
+        self.init_gesture_parser()
+        self.start_listening()
         
         log(__name__, "绘画模块初始化完成")
 
-    def ensure_settings_file(self):
-        """确保settings.json存在，如果不存在则创建一个默认配置"""
-        settings_path = self.get_settings_path()
-        
-        if os.path.exists(settings_path):
-            log(self.file_name, f"配置文件已存在: {settings_path}")
-            return
-            
-        log(self.file_name, f"配置文件不存在，创建默认配置: {settings_path}")
-        
-        # 确保目录存在
-        settings_dir = os.path.dirname(settings_path)
-        os.makedirs(settings_dir, exist_ok=True)
-        
-        # 创建默认配置
-        default_settings = {
-            "drawing_settings": {
-                "base_width": 6,
-                "min_width": 3,
-                "max_width": 15,
-                "speed_factor": 1.2,
-                "fade_duration": 0.5,
-                "antialias_layers": 2,
-                "min_distance": 20,
-                "line_color": "#00BFFF",
-                "max_stroke_points": 200,
-                "max_stroke_duration": 5,
-                "enable_advanced_brush": True,
-                "force_topmost": True,
-                "enable_auto_smoothing": True,
-                "smoothing_factor": 0.6,
-                "enable_hardware_acceleration": True
-            },
-            "gestures": {
-                "上": {
-                    "directions": "↑",
-                    "action": "cGFzc2FwcC5taW5pbWl6ZV9hbGwoKQ=="  # base64编码的"passapp.minimize_all()"
-                },
-                "下": {
-                    "directions": "↓",
-                    "action": "cGFzc2FwcC5yZXN0b3JlX2FsbCgp"  # base64编码的"passapp.restore_all()"
-                },
-                "左": {
-                    "directions": "←",
-                    "action": "cGFzc2FwcC5wcmV2X3dpbmRvdygp"  # base64编码的"passapp.prev_window()"
-                },
-                "右": {
-                    "directions": "→",
-                    "action": "cGFzc2FwcC5uZXh0X3dpbmRvdygp"  # base64编码的"passapp.next_window()"
-                }
-            }
-        }
-        
-        try:
-            with open(settings_path, 'w', encoding='utf-8') as f:
-                json.dump(default_settings, f, ensure_ascii=False, indent=4)
-            log(self.file_name, "成功创建默认配置文件")
-        except Exception as e:
-            log(self.file_name, f"创建默认配置文件失败: {str(e)}", level="error")
-
     def get_settings_path(self):
-        """获取项目根目录的通用方法"""
+        """获取设置文件路径"""
+        # 与main.py中相同逻辑
         if getattr(sys, 'frozen', False):
             # 打包后使用exe所在目录的上二级目录
             return os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'settings.json')
         else:
-            # 开发时直接指向根目录下的settings.json
-            # 更可靠的方法：先获取当前文件的绝对路径，然后向上找3层到根目录
-            curr_path = os.path.abspath(__file__)
-            # src/app/ink_painter.py 向上3层到根目录
-            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(curr_path)))
-            return os.path.join(root_dir, 'settings.json')
+            # 开发时使用当前文件的上一级目录（src → 根目录）
+            return os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'settings.json'
+            )
+    
+    def get_gesture_path(self):
+        """获取手势库文件路径"""
+        # 与main.py中相同逻辑
+        if getattr(sys, 'frozen', False):
+            # 打包后使用exe所在目录的上二级目录
+            return os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'gestures.json')
+        else:
+            # 开发时使用当前文件的上一级目录（src → 根目录）
+            return os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'gestures.json'
+            )
 
     def init_canvas(self):
-        """创建全屏透明画布窗口"""
-        log(self.file_name, "开始初始化画布窗口")
-        self.app = QApplication(sys.argv)
-        self.root = QWidget()
-        # 窗口不在任务栏显示（使用 Qt.Tool），窗口大小设为全屏尺寸-1
-        # 同时设置 WA_ShowWithoutActivating 防止窗口夺取焦点
-        self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        self.root.setAttribute(Qt.WA_TranslucentBackground)
-        self.root.setAttribute(Qt.WA_ShowWithoutActivating, True)
-        self.root.setGeometry(0, 0, self.screen_width - 1, self.screen_height - 1)
-        self.root.setWindowOpacity(0.85)
+        """初始化Canvas"""
+        log(self.file_name, "初始化画布")
+        # 创建QApplication实例，如果不存在则创建
+        if not QApplication.instance():
+            self.app = QApplication(sys.argv)
+        else:
+            self.app = QApplication.instance()
         
-        self.canvas = Canvas(self.root)
-        self.canvas.setGeometry(0, 0, self.screen_width - 1, self.screen_height - 1)
-        self.canvas.enable_hardware_acceleration = self.enable_hardware_acceleration
-        log(self.file_name, "画布窗口初始化完成")
+        # 创建透明全屏画布
+        self.canvas = Canvas()
+        self.canvas.resize(self.screen_width, self.screen_height)
+        self.canvas.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.canvas.setAttribute(Qt.WA_TranslucentBackground)
+        self.canvas.setAttribute(Qt.WA_ShowWithoutActivating)
+        log(self.file_name, "画布初始化完成")
 
     def load_drawing_settings(self):
-        """从settings.json加载绘画参数"""
-        log(self.file_name, "开始加载绘画参数")
+        """加载绘画设置"""
+        log(self.file_name, "加载绘画设置")
         
-        # 设置默认值，以防配置文件不存在或读取失败
+        # 默认设置
         self.base_width = 6
         self.min_width = 3
         self.max_width = 15
         self.speed_factor = 1.2
-        self.fade_duration = 0.5
-        self.antialias_layers = 2
-        self.min_distance = 20
-        self.line_color = '#00BFFF'
-        self.max_stroke_points = 200
-        self.max_stroke_duration = 5
-        self.enable_advanced_brush = True
-        self.force_topmost = True
-        self.enable_auto_smoothing = True
-        self.smoothing_factor = 0.6
-        self.enable_hardware_acceleration = True
+        self.fade_duration = 0.5  # 渐隐效果持续时间（秒）
+        self.antialias_layers = 2  # 抗锯齿层数
+        self.min_distance = 20  # 最小绘制距离
+        self.line_color = "#00BFFF"  # 深天蓝色
+        self.max_stroke_points = 200  # 每次笔画最大点数
+        self.max_stroke_duration = 5  # 每次笔画最大时长（秒）
+        self.enable_advanced_brush = True  # 启用高级笔刷效果
+        self.force_topmost = True  # 强制窗口保持在最前
+        self.enable_auto_smoothing = True  # 启用自动平滑
+        self.smoothing_factor = 0.6  # 平滑因子
+        self.enable_hardware_acceleration = True  # 启用硬件加速
         
         try:
             settings_path = self.get_settings_path()
-            if not os.path.exists(settings_path):
-                log(self.file_name, f"找不到配置文件: {settings_path}，使用默认设置", level="warning")
-                return
-                
-            log(self.file_name, f"从 {settings_path} 加载配置")
-            with open(settings_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            if 'drawing_settings' not in config:
-                log(self.file_name, "配置文件中不存在drawing_settings部分，使用默认设置", level="warning")
-                return
-                
-            drawing_settings = config['drawing_settings']
-            
-            # 使用get方法安全获取值，如果键不存在则使用默认值
-            self.base_width = drawing_settings.get('base_width', self.base_width)
-            self.min_width = drawing_settings.get('min_width', self.min_width)
-            self.max_width = drawing_settings.get('max_width', self.max_width)
-            self.speed_factor = drawing_settings.get('speed_factor', self.speed_factor)
-            self.fade_duration = drawing_settings.get('fade_duration', self.fade_duration)
-            self.antialias_layers = drawing_settings.get('antialias_layers', self.antialias_layers)
-            self.min_distance = drawing_settings.get('min_distance', self.min_distance)
-            self.line_color = drawing_settings.get('line_color', self.line_color)
-            self.max_stroke_points = drawing_settings.get('max_stroke_points', self.max_stroke_points)
-            self.max_stroke_duration = drawing_settings.get('max_stroke_duration', self.max_stroke_duration)
-            self.enable_advanced_brush = drawing_settings.get('enable_advanced_brush', self.enable_advanced_brush)
-            self.force_topmost = drawing_settings.get('force_topmost', self.force_topmost)
-            self.enable_auto_smoothing = drawing_settings.get('enable_auto_smoothing', self.enable_auto_smoothing)
-            self.smoothing_factor = drawing_settings.get('smoothing_factor', self.smoothing_factor)
-            self.enable_hardware_acceleration = drawing_settings.get('enable_hardware_acceleration', self.enable_hardware_acceleration)
-            
-            log(self.file_name, f"成功加载绘画参数: {drawing_settings}")
-        except json.JSONDecodeError as e:
-            log(self.file_name, f"解析配置文件失败: {str(e)}，使用默认设置", level='error')
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    settings = config.get('drawing_settings', {})
+                    
+                    # 更新设置
+                    self.base_width = settings.get('base_width', self.base_width)
+                    self.min_width = settings.get('min_width', self.min_width)
+                    self.max_width = settings.get('max_width', self.max_width)
+                    self.speed_factor = settings.get('speed_factor', self.speed_factor)
+                    self.fade_duration = settings.get('fade_duration', self.fade_duration)
+                    self.antialias_layers = settings.get('antialias_layers', self.antialias_layers)
+                    self.min_distance = settings.get('min_distance', self.min_distance)
+                    self.line_color = settings.get('line_color', self.line_color)
+                    self.max_stroke_points = settings.get('max_stroke_points', self.max_stroke_points)
+                    self.max_stroke_duration = settings.get('max_stroke_duration', self.max_stroke_duration)
+                    self.enable_advanced_brush = settings.get('enable_advanced_brush', self.enable_advanced_brush)
+                    self.force_topmost = settings.get('force_topmost', self.force_topmost)
+                    self.enable_auto_smoothing = settings.get('enable_auto_smoothing', self.enable_auto_smoothing)
+                    self.smoothing_factor = settings.get('smoothing_factor', self.smoothing_factor)
+                    self.enable_hardware_acceleration = settings.get('enable_hardware_acceleration', self.enable_hardware_acceleration)
+                    
+                    log(self.file_name, "成功加载绘画设置")
+            else:
+                log(self.file_name, "设置文件不存在，使用默认设置")
         except Exception as e:
-            log(self.file_name, f"加载绘画参数失败: {str(e)}，使用默认设置", level='error')
+            log(self.file_name, f"加载设置失败: {str(e)}", level="error")
+            print(f"加载设置失败: {str(e)}")
+        
+        # 更新Canvas的硬件加速设置
+        if hasattr(self, 'canvas'):
+            self.canvas.enable_hardware_acceleration = self.enable_hardware_acceleration
 
     def load_gestures(self):
-        """从settings.json加载手势配置"""
-        log(self.file_name, "开始加载手势配置")
+        """加载手势库"""
+        log(self.file_name, "加载手势库")
+        self.gestures = {}
+        gesture_path = self.get_gesture_path()
+        
         try:
-            settings_path = self.get_settings_path()
-            if not os.path.exists(settings_path):
-                log(self.file_name, f"找不到配置文件: {settings_path}", level="error")
-                self.gesture_lib = []
-                return
-                
-            log(self.file_name, f"从 {settings_path} 加载配置")
-            with open(settings_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            if 'gestures' not in config:
-                log(self.file_name, "配置文件中不存在gestures部分", level="error")
-                self.gesture_lib = []
-                return
-                
-            self.gesture_lib = []
-            for name, gesture in config['gestures'].items():
-                if 'directions' not in gesture or 'action' not in gesture:
-                    log(self.file_name, f"手势 {name} 格式不正确，跳过", level="warning")
-                    continue
+            if os.path.exists(gesture_path):
+                with open(gesture_path, 'r', encoding='utf-8') as f:
+                    gesture_data = json.load(f)
+                    gestures_dict = gesture_data.get('gestures', {})
                     
-                self.gesture_lib.append({
-                    'name': name,
-                    'directions': gesture['directions'],
-                    'action': gesture['action']
-                })
-                
-            if not self.gesture_lib:
-                log(self.file_name, "没有加载到有效的手势配置", level="warning")
+                    # 处理手势数据
+                    for name, gesture in gestures_dict.items():
+                        directions = gesture.get('directions', '')
+                        action_base64 = gesture.get('action', '')
+                        
+                        try:
+                            # Base64解码操作
+                            action = base64.b64decode(action_base64).decode('utf-8')
+                            
+                            # 添加到手势库
+                            self.gestures[directions] = {
+                                'name': name,
+                                'action': action
+                            }
+                            log(self.file_name, f"成功加载手势: {name} - {directions}")
+                        except Exception as e:
+                            log(self.file_name, f"解析手势 {name} 失败: {str(e)}", level="error")
+                    
+                    log(self.file_name, f"成功加载手势库，共 {len(self.gestures)} 个手势")
             else:
-                log(self.file_name, f"成功加载{len(self.gesture_lib)}个手势")
-        except json.JSONDecodeError as e:
-            log(self.file_name, f"解析配置文件失败: {str(e)}", level='error')
-            self.gesture_lib = []
+                log(self.file_name, "手势库文件不存在，使用空手势库", level="warning")
         except Exception as e:
-            log(self.file_name, f"加载手势配置失败: {str(e)}", level='error')
-            self.gesture_lib = []
+            log(self.file_name, f"加载手势库失败: {str(e)}", level="error")
+            print(f"加载手势库失败: {str(e)}")
 
     def init_gesture_parser(self):
-        """初始化手势识别器"""
-        try:
-            # 确认settings.json路径存在
-            settings_path = self.get_settings_path()
-            if not os.path.exists(settings_path):
-                log(self.file_name, f"找不到手势配置文件: {settings_path}", level="error")
-                self.gesture_parser = None
-                return
-                
-            # 初始化手势识别器 - 使用空的trail_points列表，实际使用时会重新创建解析器
-            empty_trail = []
-            self.gesture_parser = GestureParser(empty_trail)
-            log(self.file_name, "手势识别器初始化完成")
-        except Exception as e:
-            log(self.file_name, f"手势识别器初始化失败: {str(e)}", level="error")
-            self.gesture_parser = None
+        """初始化手势解析器"""
+        log(self.file_name, "初始化手势解析器")
+        # 使用空列表作为trail_points初始化
+        # 这里只是初始化一个解析器实例，实际手势识别时会创建新的实例
+        self.parser = GestureParser(trail_points=[])
+        log(self.file_name, "手势解析器初始化完成")
 
     def start_listening(self):
-        """启动鼠标监听循环"""
-        log(self.file_name, "启动鼠标监听循环")
+        """开始监听鼠标事件"""
+        log(self.file_name, "开始监听鼠标事件")
+        # 创建专用线程处理绘画过程
+        self.processing_thread = QTimer()
+        self.processing_thread.timeout.connect(self.process_points)
+        self.processing_thread.start(10)  # 10ms一次处理
+        
+        # 初始化鼠标状态
         self.last_right_state = False
-        QTimer.singleShot(5, self.listen_mouse)
+        
+        # 启动鼠标监听循环
+        QTimer.singleShot(10, self.listen_mouse)
+        log(self.file_name, "鼠标监听已启动")
 
     def listen_mouse(self):
-        """核心监听逻辑"""
+        """核心鼠标监听逻辑"""
         if not self.running:
             return
-        
-        # 如果强制置顶开关开启，则重复调用raise_()，
-        # 但不调用activateWindow()以免夺取焦点，从而确保窗口始终在顶层且不干扰其他窗口
-        if self.force_topmost:
+            
+        # 如果强制置顶开关开启，确保窗口始终在顶层
+        if hasattr(self, 'canvas') and self.canvas and self.force_topmost:
             try:
-                self.root.raise_()
+                self.canvas.raise_()
             except Exception as e:
-                log(self.file_name, "强制置顶失败", level='error')
-        
+                log(self.file_name, f"强制置顶失败: {str(e)}", level="error")
+                
+        # 获取鼠标状态和位置
         right_pressed = win32api.GetAsyncKeyState(win32con.VK_RBUTTON) < 0
         x, y = pyautogui.position()
         
-        # 引入节流算法，减少点采样频率
-        current_time = time.time()
-        is_throttled = False
-        
-        if self.drawing and self.current_stroke:
-            prev_x, prev_y, prev_time = self.current_stroke[-1]
-            # 如果距离上次记录点时间太短，且移动距离很小，则跳过本次更新
-            dt = current_time - prev_time
-            dist = math.hypot(x - prev_x, y - prev_y)
-            
-            # 提高渲染频率：减小间隔时间
-            is_hovering = dist < 2
-            min_interval = 0.001  # 统一使用1ms的最小间隔，提高响应速度
-            # 停留时更敏感，移动时容许更大距离
-            min_distance = 0.5 if is_hovering else 1.0
-            
-            if dt < min_interval and dist < min_distance:
-                is_throttled = True
-        
         # 状态切换处理
         if right_pressed and not self.last_right_state:
-            # 只在没有绘画状态时记录起始点
+            # 刚按下右键，记录起始点
             if not self.drawing:
-                self.start_point = (x, y)  # 记录起始点
-                self.pending_points = [(x, y, time.time())]  # 初始化缓存
+                self.start_point = (x, y)
+                self.pending_points = [(x, y, time.time())]
+                log(self.file_name, f"右键按下，记录起始点: ({x}, {y})")
         elif right_pressed and not self.drawing and self.start_point:
-            # 持续缓存轨迹点（即使未达触发距离）
+            # 持续按住右键但还未开始绘画，判断是否达到触发距离
             self.pending_points.append((x, y, time.time()))
             
-            # 检查触发条件：提取元组中的坐标分量
+            # 检查触发条件
             start_x, start_y = self.start_point
             dx = x - start_x
             dy = y - start_y
-            if math.hypot(dx, dy) >= self.min_distance:
-                # 只有未在绘画状态时才调用start_drawing
-                self.start_drawing()  # 触发后开始绘制历史轨迹
-        elif right_pressed and self.drawing and not is_throttled:
-            # 已经在绘画状态时更新绘图
-            self.update_drawing(x, y)
+            distance = math.hypot(dx, dy)
+            
+            if distance >= self.min_distance:
+                # 达到触发距离，开始绘画
+                self.start_drawing()
+                log(self.file_name, f"达到触发距离({distance:.1f}px >= {self.min_distance}px)，开始绘画")
+        elif right_pressed and self.drawing:
+            # 已在绘画中，添加点到缓冲区
+            if not hasattr(self, 'last_point') or self.last_point != (x, y):
+                self.point_buffer.append((x, y))
+                self.last_point = (x, y)
         elif not right_pressed and self.last_right_state:
-            # 松开右键时清理
-            if self.pending_points:
-                log(self.file_name, "松开右键，清理未完成的轨迹")
-                for line in self.active_lines:
-                    try:
-                        self.canvas.delete(line)
-                    except Exception:
-                        pass
-                self.active_lines = []
+            # 松开右键，结束绘画
+            if self.pending_points and not self.drawing:
+                # 清理未完成的轨迹
+                log(self.file_name, "松开右键，清理未触发的轨迹")
                 self.pending_points = []
-            # 结束当前笔画
+                self.start_point = None
+            
+            # 如果正在绘画，结束当前笔画
             if self.drawing:
+                log(self.file_name, "松开右键，结束当前笔画")
                 self.finish_drawing()
-            self.start_point = None
         
+        # 更新上一次右键状态
         self.last_right_state = right_pressed
         
-        # 减小监听间隔，提高响应速度
-        next_interval = 1 if self.drawing else 5  # 绘制时用1ms以确保最大流畅度
-        QTimer.singleShot(next_interval, self.listen_mouse)
+        # 继续监听
+        QTimer.singleShot(5, self.listen_mouse)  # 5ms更新一次，保证响应灵敏
 
-    def start_drawing(self):
-        """启动绘画模式"""
-        log(__name__, "启动绘画模式")
-        # 避免重复启动
-        if self.drawing:
-            log(__name__, "绘画模式已经处于激活状态")
+    def process_points(self):
+        """处理积累的点数据"""
+        if not self.drawing or not self.point_buffer:
             return
             
-        # 设置绘画状态为True
-        self.drawing = True
-        
-        # 显示全屏透明窗口
-        if hasattr(self, 'root') and self.root:
-            self.root.show()
-            log(__name__, "绘画窗口已显示")
-        else:
-            log(__name__, "绘画窗口初始化失败", level="error")
+        # 批量处理缓冲区内的点，限制每次处理的点数量
+        points_to_process = self.point_buffer[:20]  # 每次最多处理20个点
+        if points_to_process:
+            del self.point_buffer[:len(points_to_process)]
             
-        # 处理收集的pending_points，避免出现意外长连线
-        if self.pending_points and len(self.pending_points) > 0:
-            # 使用收集到的第一个点作为起点
-            first_x, first_y, first_time = self.pending_points[0]
-            # 初始化笔画数据
-            self.current_stroke = [(first_x, first_y, first_time)]
-            self.smoothed_stroke = [(first_x, first_y, first_time)]
-            self.stroke_start_time = first_time
-            self.line_width_history = []
-            self.last_line_width = self.base_width
-            
-            # 处理其余点
-            if len(self.pending_points) > 1:
-                for i in range(1, len(self.pending_points)):
-                    x, y, t = self.pending_points[i]
-                    # 更新点数据
-                    self.current_stroke.append((x, y, t))
-                    self.smoothed_stroke.append((x, y, t))
-                    
-                    # 计算并绘制线段
-                    if len(self.smoothed_stroke) > 1:
-                        prev_x, prev_y, _ = self.smoothed_stroke[-2]
-                        curr_x, curr_y, _ = self.smoothed_stroke[-1]
-                        line_width = self.base_width  # 初始点使用基础线宽
-                        new_lines = self.draw_single_line(prev_x, prev_y, curr_x, curr_y, line_width)
-                        self.active_lines.extend(new_lines)
-            
-            # 清空pending_points
-            self.pending_points = []
-
-    def stop_drawing(self):
-        """停止绘画模式"""
-        log(__name__, "停止绘画模式")
-        
-        # 调用现有的shutdown方法来处理资源释放
-        self.shutdown()
-        
-        # 确保drawing状态被重置
-        self.drawing = False
-        log(__name__, "绘画模式已停止")
+            # 批量处理绘制点
+            for point in points_to_process:
+                self.update_drawing(point[0], point[1])
 
     def update_drawing(self, x, y):
         """更新绘画状态"""
@@ -521,13 +396,15 @@ class InkPainter:
             # 已修改start_drawing方法，所以这里可以直接返回
             return
             
+        current_time = time.time()
+            
         # 检查是否是新笔画的第一个点
         if not hasattr(self, 'stroke_start_time') or not self.current_stroke:
             # 开始新笔画
             log(__name__, "开始新笔画")
             self.start_point = (x, y)
-            self.current_stroke = [(x, y, time.time())]
-            self.smoothed_stroke = [(x, y, time.time())]
+            self.current_stroke = [(x, y, current_time)]
+            self.smoothed_stroke = [(x, y, current_time)]
             self.pending_points = []
             self.forced_end = False  # 重置强制结束标志
             
@@ -536,14 +413,12 @@ class InkPainter:
             self.last_line_width = self.base_width
             
             # 重置笔画保护计时器
-            self.stroke_start_time = time.time()
+            self.stroke_start_time = current_time
             return
-        
-        current_time = time.time()
         
         # 防止与前一个点完全重合造成的零长度线段
         if self.current_stroke and len(self.current_stroke) > 0:
-            prev_x, prev_y, _ = self.current_stroke[-1]
+            prev_x, prev_y, prev_time = self.current_stroke[-1]
             if abs(x - prev_x) < 0.1 and abs(y - prev_y) < 0.1:
                 return
         
@@ -592,47 +467,99 @@ class InkPainter:
             
             # 计算移动距离和时间差
             dist = math.sqrt((curr_x - prev_x) ** 2 + (curr_y - prev_y) ** 2)
-            time_diff = max(0.001, curr_time - prev_time)  # 防止除零
             
-            # 计算速度
-            speed = dist / time_diff
-            
-            # 速度映射到线宽调整系数，速度越大线条越细
-            raw_speed_multiplier = max(0.5, min(1.5, 1.5 - (speed / (200 * self.speed_factor))))
-            
-            # 添加线宽平滑处理 - 使用移动平均来平滑线宽变化
-            # 保留最近8个线宽值进行平均
-            self.line_width_history.append(raw_speed_multiplier)
-            if len(self.line_width_history) > 8:
-                self.line_width_history.pop(0)
-            
-            # 计算平滑后的线宽调整系数 - 使用加权移动平均
-            weights = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # 越新的值权重越高
-            trimmed_weights = weights[-len(self.line_width_history):]
-            
-            # 计算加权平均
-            weighted_sum = sum(w * v for w, v in zip(trimmed_weights, self.line_width_history))
-            weight_sum = sum(trimmed_weights)
-            smooth_speed_multiplier = weighted_sum / weight_sum
-            
-            # 平滑处理：让当前值与上一个值之间有平滑过渡
-            if hasattr(self, 'last_line_width'):
-                # 在上一个值和当前计算值之间进行插值 - 60%上一个，40%当前
-                transition_factor = 0.6  # 平滑因子，越大越平滑
-                final_multiplier = (transition_factor * self.last_line_width/self.base_width + 
-                                  (1-transition_factor) * smooth_speed_multiplier)
+            # 即使距离较大也进行连接，但需要处理大距离情况
+            if dist > 100:
+                log(self.file_name, f"发现距离较大的点，执行平滑连接: {dist:.1f}")
                 
-                # 计算实际线宽
-                line_width = max(self.min_width, min(self.max_width, self.base_width * final_multiplier))
-                self.last_line_width = line_width  # 保存当前线宽用于下次平滑
-            else:
-                # 第一个点，直接使用计算值
-                line_width = max(self.min_width, min(self.max_width, self.base_width * smooth_speed_multiplier))
-                self.last_line_width = line_width
+                # 对于特别大的距离，插入中间点
+                if dist > 200:
+                    # 计算需要插入多少个中间点
+                    insert_count = min(10, int(dist / 30))
+                    
+                    # 最后绘制的坐标点
+                    last_drawn_x, last_drawn_y = prev_x, prev_y
+                    
+                    # 计算高级画笔的线宽
+                    line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
+                    
+                    # 创建插值点绘制线条
+                    for i in range(1, insert_count + 1):
+                        t = i / (insert_count + 1)
+                        mid_x = prev_x + t * (curr_x - prev_x)
+                        mid_y = prev_y + t * (curr_y - prev_y)
+                        
+                        # 绘制连接线段
+                        new_lines = self.draw_single_line(
+                            last_drawn_x, last_drawn_y, mid_x, mid_y, line_width)
+                        self.active_lines.extend(new_lines)
+                        
+                        # 更新最后绘制点
+                        last_drawn_x, last_drawn_y = mid_x, mid_y
+                    
+                    # 绘制最后一段到实际点
+                    new_lines = self.draw_single_line(
+                        last_drawn_x, last_drawn_y, curr_x, curr_y, line_width)
+                    self.active_lines.extend(new_lines)
+                    return
+            
+            # 计算并应用高级画笔线宽
+            line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
             
             # 绘制线段
             new_lines = self.draw_single_line(prev_x, prev_y, curr_x, curr_y, line_width)
             self.active_lines.extend(new_lines)
+            
+    def calculate_line_width(self, prev_x, prev_y, curr_x, curr_y, prev_time, curr_time):
+        """根据绘制速度计算线宽"""
+        # 如果高级画笔功能被禁用，直接返回基础线宽
+        if not self.enable_advanced_brush:
+            return self.base_width
+            
+        # 计算移动距离和时间差
+        dist = math.sqrt((curr_x - prev_x) ** 2 + (curr_y - prev_y) ** 2)
+        time_diff = max(0.001, curr_time - prev_time)  # 防止除零
+        
+        # 计算速度
+        speed = dist / time_diff
+        
+        # 速度映射到线宽调整系数，速度越大线条越细
+        raw_speed_multiplier = max(0.5, min(1.5, 1.5 - (speed / (200 * self.speed_factor))))
+        
+        # 添加线宽平滑处理 - 使用移动平均来平滑线宽变化
+        # 保留最近8个线宽值进行平均
+        if not hasattr(self, 'line_width_history'):
+            self.line_width_history = []
+            
+        self.line_width_history.append(raw_speed_multiplier)
+        if len(self.line_width_history) > 8:
+            self.line_width_history.pop(0)
+        
+        # 计算平滑后的线宽调整系数 - 使用加权移动平均
+        weights = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # 越新的值权重越高
+        trimmed_weights = weights[-len(self.line_width_history):]
+        
+        # 计算加权平均
+        weighted_sum = sum(w * v for w, v in zip(trimmed_weights, self.line_width_history))
+        weight_sum = sum(trimmed_weights)
+        smooth_speed_multiplier = weighted_sum / weight_sum
+        
+        # 平滑处理：让当前值与上一个值之间有平滑过渡
+        if hasattr(self, 'last_line_width'):
+            # 在上一个值和当前计算值之间进行插值 - 60%上一个，40%当前
+            transition_factor = 0.6  # 平滑因子，越大越平滑
+            final_multiplier = (transition_factor * self.last_line_width/self.base_width + 
+                              (1-transition_factor) * smooth_speed_multiplier)
+            
+            # 计算实际线宽
+            line_width = max(self.min_width, min(self.max_width, self.base_width * final_multiplier))
+            self.last_line_width = line_width  # 保存当前线宽用于下次平滑
+        else:
+            # 第一个点，直接使用计算值
+            line_width = max(self.min_width, min(self.max_width, self.base_width * smooth_speed_multiplier))
+            self.last_line_width = line_width
+            
+        return line_width
 
     def draw_single_line(self, x1, y1, x2, y2, width):
         """使用单线条模式绘制线段，简化实现，避免重叠描边"""
@@ -671,30 +598,14 @@ class InkPainter:
         if len(current_stroke_copy) > 5 and not is_forced_end:  # 至少需要5个点才能作为有效笔画
             self.finished_strokes.append(current_stroke_copy)
             
-            # 尝试识别手势 - 使用新方法创建GestureParser实例
+            # 尝试识别手势 - 直接处理，不使用线程
             try:
-                log(__name__, "尝试识别手势")
-                # 提取轨迹点坐标（去掉时间戳）
+                log(__name__, "进行手势识别")
+                # 准备轨迹点数据
                 trail_points = [(x, y) for x, y, _ in current_stroke_copy]
                 
-                # 创建新的GestureParser实例
-                parser = GestureParser(trail_points)
-                action = parser.parse()
-                
-                if action:
-                    log(__name__, f"识别到手势动作: {action}")
-                    # 执行手势动作
-                    self.execute_operation(action)
-                    
-                    # 对于已识别的手势，清空线条（立即消失）
-                    for line in self.active_lines:
-                        self.canvas.delete(line)
-                    self.active_lines = []
-                    # 重置强制结束标志
-                    self.forced_end = False
-                    return
-                else:
-                    log(__name__, "未识别到有效手势")
+                # 直接调用手势识别方法
+                self._process_gesture(trail_points)
             except Exception as e:
                 log(__name__, f"手势识别失败: {str(e)}", level="error")
         elif is_forced_end:
@@ -742,7 +653,51 @@ class InkPainter:
         self.current_stroke = []
         self.smoothed_stroke = []
         self.line_width_history = []
+        self.point_buffer = []  # 清空点缓冲区
         log(__name__, "笔画结束处理完成")
+        
+    def _process_gesture(self, trail_points):
+        """处理手势识别"""
+        try:
+            log(__name__, "开始手势识别")
+            
+            # 创建新的GestureParser实例，传入轨迹点
+            parser = GestureParser(trail_points)
+            action = parser.parse()
+            
+            # 直接处理结果
+            if action:
+                log(__name__, f"识别到手势动作: {action}")
+                self._handle_recognized_gesture(action)
+            else:
+                log(__name__, "未识别到有效手势")
+                
+        except Exception as e:
+            log(__name__, f"手势识别出错: {str(e)}", level="error")
+            
+    def _handle_recognized_gesture(self, action):
+        """处理识别出的手势"""
+        try:
+            log(__name__, "处理识别到的手势")
+            
+            # 清除线条显示
+            if self.fade_animations:
+                log(__name__, "清除渐隐线条")
+                fade_copy = self.fade_animations.copy()
+                for anim in fade_copy:
+                    for line in anim['lines']:
+                        try:
+                            self.canvas.delete(line)
+                        except Exception:
+                            pass
+                self.fade_animations.clear()
+            
+            # 直接调用顶部导入的execute_operation函数
+            log(__name__, "执行手势动作")
+            execute_operation(action)
+            
+        except Exception as e:
+            log(__name__, f"处理手势失败: {str(e)}", level="error")
 
     def process_fade_animation(self):
         """处理渐隐动画帧"""
@@ -755,7 +710,7 @@ class InkPainter:
             if current_time - self.last_animation_time < min_interval:
                 # 如果距离上次更新不足1/30秒，跳过本次更新
                 QTimer.singleShot(int((min_interval - (current_time - self.last_animation_time)) * 1000), 
-                                 self.process_fade_animation)
+                                self.process_fade_animation)
                 return
                 
         self.last_animation_time = current_time
@@ -781,44 +736,44 @@ class InkPainter:
         
         # 批量执行更新
         for line_id, color in batch_updates:
-            try:
-                self.canvas.itemconfig(line_id, fill=color)
-            except Exception as e:
-                log(__name__, f"更新线条颜色失败: {str(e)}", level="error")
+            self.canvas.itemconfig(line_id, color)
         
-        # 清理已完成的渐隐动画
+        # 移除已完成的动画
         for anim in removals:
             self.fade_animations.remove(anim)
         
-        # 如果还有动画在运行，继续调度下一帧
+        # 如果还有活动的动画，继续定时器
         if self.fade_animations:
-            QTimer.singleShot(max(1, int(min_interval * 1000)), self.process_fade_animation)
+            # 不需要重新启动定时器，会自动继续
+            pass
         else:
-            # 没有更多动画，停止定时器
-            if hasattr(self, 'fade_timer') and self.fade_timer.isActive():
+            # 没有活动动画了，停止定时器
+            if hasattr(self, 'fade_timer') and self.fade_timer:
                 self.fade_timer.stop()
-                log(__name__, "渐隐动画完成，停止定时器")
 
     def calculate_fade_color(self, base_color, progress):
-        """根据进度计算渐隐颜色（线条逐渐变透明），返回格式为 #AARRGGBB
-        说明：随着 progress 增大（0~1），alpha值逐渐减小，从而实现渐隐效果。
-        """
+        """计算渐隐过程中的颜色（保持RGB不变，仅降低alpha值）"""
         try:
-            # 将HEX转RGB
-            if base_color.startswith('#'):
+            # 解析原始颜色
+            if base_color.startswith("#"):
+                # 十六进制颜色
                 if len(base_color) == 7:  # #RRGGBB
                     r = int(base_color[1:3], 16)
                     g = int(base_color[3:5], 16)
                     b = int(base_color[5:7], 16)
                 elif len(base_color) == 9:  # #AARRGGBB
-                    # 已经带透明度的颜色
-                    a_orig = int(base_color[1:3], 16)
                     r = int(base_color[3:5], 16)
                     g = int(base_color[5:7], 16)
                     b = int(base_color[7:9], 16)
+                else:
+                    r, g, b = 0, 191, 255  # 默认值
             else:
-                # 默认使用蓝色
-                r, g, b = 0, 191, 255  # 默认蓝色 #00BFFF
+                # 如果不是十六进制，假设是rgb格式
+                color_match = re.search(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', base_color)
+                if color_match:
+                    r, g, b = map(int, color_match.groups())
+                else:
+                    r, g, b = 0, 191, 255  # 默认值
             
             # 计算alpha值 - 使用非线性衰减，让开始减淡更慢一些
             a = int(255 * (1 - progress**0.7))  # 降低幂次，使淡出更平滑
@@ -829,15 +784,6 @@ class InkPainter:
             log(__name__, f"计算渐隐颜色失败: {str(e)}", level="error")
             return "#00BFFF"  # 返回默认颜色
 
-    def execute_operation(self, encoded_cmd):
-        """执行Base64编码的操作指令"""
-        try:
-            decoded = base64.b64decode(encoded_cmd).decode('utf-8')
-            exec(decoded)
-            log(self.file_name, f"成功执行操作: {decoded}")
-        except Exception as e:
-            log(self.file_name, f"操作执行失败: {str(e)}", level='error')
-
     def shutdown(self):
         """安全关闭程序，释放资源"""
         log(__name__, "关闭绘画模块，释放资源")
@@ -846,6 +792,9 @@ class InkPainter:
         # 停止所有定时器
         if hasattr(self, 'fade_timer') and self.fade_timer:
             self.fade_timer.stop()
+            
+        if hasattr(self, 'processing_thread') and self.processing_thread:
+            self.processing_thread.stop()
         
         # 清空所有线条
         if hasattr(self, 'canvas') and self.canvas:
@@ -857,14 +806,45 @@ class InkPainter:
                     self.canvas.delete(line)
         
         # 关闭窗口
-        if hasattr(self, 'root') and self.root:
-            self.root.hide()
-            self.root.close()
+        if hasattr(self, 'canvas') and self.canvas:
+            self.canvas.hide()
+        self.canvas.close()
         
         log(__name__, "绘画模块已安全关闭")
+
+    def start_drawing(self):
+        """启动绘画模式"""
+        log(__name__, "启动绘画模式")
+        # 避免重复启动
+        if self.drawing:
+            log(__name__, "绘画模式已经处于激活状态")
+            return
+        
+        # 设置绘画状态为True
+        self.drawing = True
+        
+        # 显示画布
+        if hasattr(self, 'canvas') and self.canvas:
+            self.canvas.show()
+            log(__name__, "绘画窗口已显示")
+        else:
+            log(__name__, "绘画窗口初始化失败", level="error")
+        
+        log(__name__, "绘画模式已启动")
+
+    def stop_drawing(self):
+        """停止绘画模式"""
+        log(__name__, "停止绘画模式")
+        
+        # 调用shutdown方法来处理资源释放
+        self.shutdown()
+        
+        # 确保drawing状态被重置
+        self.drawing = False
+        log(__name__, "绘画模式已停止")
 
 if __name__ == "__main__":
     print("建议通过主程序运行。")
     test_painter = InkPainter()
-    test_painter.root.show()
+    # 启动Qt事件循环，保持程序运行
     sys.exit(test_painter.app.exec_())

@@ -1,5 +1,8 @@
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
+    // 禁用右键菜单
+    disableRightClick();
+    
     // 初始化导航菜单
     initNavigation();
     
@@ -12,7 +15,199 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.querySelector('.settings-page')) {
         initSettings();
     }
+    
+    // 创建提示框组件
+    createToastComponent();
 });
+
+// 禁用右键菜单
+function disableRightClick() {
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        return false;
+    });
+    
+    // 禁用选择文本
+    document.addEventListener('selectstart', function(e) {
+        // 允许输入框中的选择
+        if (e.target.tagName === 'INPUT' || 
+            e.target.tagName === 'TEXTAREA' || 
+            e.target.isContentEditable) {
+            return true;
+        }
+        e.preventDefault();
+        return false;
+    });
+}
+
+// 创建自定义提示框组件
+function createToastComponent() {
+    // 创建提示框容器
+    const toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    toastContainer.style.cssText = `
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        z-index: 9999;
+    `;
+    document.body.appendChild(toastContainer);
+    
+    // 覆盖原生alert
+    window.originalAlert = window.alert;
+    window.alert = function(message) {
+        showToast(message);
+    };
+}
+
+// 显示提示框
+function showToast(message, type = 'info', duration = 3000) {
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+    
+    // 创建提示框元素
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.style.cssText = `
+        background-color: white;
+        color: #333;
+        padding: 12px 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        max-width: 300px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        border-left: 4px solid var(--primary-color);
+        font-size: 14px;
+        word-break: break-word;
+    `;
+    
+    // 根据类型设置边框颜色
+    if (type === 'success') {
+        toast.style.borderLeftColor = '#28a745';
+    } else if (type === 'error') {
+        toast.style.borderLeftColor = '#dc3545';
+    } else if (type === 'warning') {
+        toast.style.borderLeftColor = '#ffc107';
+    }
+    
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    
+    // 显示提示框
+    setTimeout(() => {
+        toast.style.opacity = '1';
+    }, 10);
+    
+    // 自动关闭提示框
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            toastContainer.removeChild(toast);
+        }, 300);
+    }, duration);
+    
+    return toast;
+}
+
+// 显示确认对话框
+function showConfirm(message, onConfirm, onCancel) {
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+    
+    // 创建确认框元素
+    const confirm = document.createElement('div');
+    confirm.className = 'toast toast-confirm';
+    confirm.style.cssText = `
+        background-color: white;
+        color: #333;
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        max-width: 300px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        border-left: 4px solid #ffc107;
+        font-size: 14px;
+        word-break: break-word;
+    `;
+    
+    // 创建消息文本
+    const messageEl = document.createElement('div');
+    messageEl.style.marginBottom = '15px';
+    messageEl.textContent = message;
+    confirm.appendChild(messageEl);
+    
+    // 创建按钮容器
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    `;
+    
+    // 创建取消按钮
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消';
+    cancelBtn.style.cssText = `
+        padding: 5px 12px;
+        border: none;
+        border-radius: 4px;
+        background-color: #6c757d;
+        color: white;
+        cursor: pointer;
+    `;
+    
+    // 创建确认按钮
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = '确定';
+    confirmBtn.style.cssText = `
+        padding: 5px 12px;
+        border: none;
+        border-radius: 4px;
+        background-color: var(--primary-color);
+        color: white;
+        cursor: pointer;
+    `;
+    
+    // 添加按钮到容器
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(confirmBtn);
+    confirm.appendChild(buttonContainer);
+    
+    // 添加确认框到容器
+    toastContainer.appendChild(confirm);
+    
+    // 显示确认框
+    setTimeout(() => {
+        confirm.style.opacity = '1';
+    }, 10);
+    
+    // 绑定按钮事件
+    cancelBtn.addEventListener('click', () => {
+        confirm.style.opacity = '0';
+        setTimeout(() => {
+            toastContainer.removeChild(confirm);
+            if (typeof onCancel === 'function') {
+                onCancel();
+            }
+        }, 300);
+    });
+    
+    confirmBtn.addEventListener('click', () => {
+        confirm.style.opacity = '0';
+        setTimeout(() => {
+            toastContainer.removeChild(confirm);
+            if (typeof onConfirm === 'function') {
+                onConfirm();
+            }
+        }, 300);
+    });
+    
+    return confirm;
+}
 
 // 导航菜单初始化
 function initNavigation() {
@@ -79,11 +274,11 @@ function initConsole() {
     // 退出程序按钮
     if (exitBtn) {
         exitBtn.addEventListener('click', function() {
-            if (confirm('确定要退出程序吗？')) {
+            showConfirm('确定要退出程序吗？', function() {
                 fetch('/api/exit', {
                     method: 'POST'
                 });
-            }
+            });
         });
     }
     
@@ -96,8 +291,11 @@ function initConsole() {
 function updateSystemInfo() {
     const runtimeElement = document.getElementById('runtime');
     const memoryUsageElement = document.getElementById('memory-usage');
+    const statusIndicator = document.querySelector('.status-indicator');
+    const statusText = document.getElementById('status-text');
+    const toggleBtn = document.getElementById('toggle-btn');
     
-    if (runtimeElement || memoryUsageElement) {
+    if (runtimeElement || memoryUsageElement || statusIndicator) {
         fetch('/api/system_info')
             .then(response => response.json())
             .then(data => {
@@ -106,6 +304,18 @@ function updateSystemInfo() {
                 }
                 if (memoryUsageElement) {
                     memoryUsageElement.textContent = data.memory_usage;
+                }
+                // 更新绘画状态
+                if (statusIndicator && statusText && toggleBtn) {
+                    if (data.is_painting_running) {
+                        statusIndicator.classList.add('active');
+                        statusText.textContent = '运行中';
+                        toggleBtn.textContent = '停止绘画';
+                    } else {
+                        statusIndicator.classList.remove('active');
+                        statusText.textContent = '已停止';
+                        toggleBtn.textContent = '开始绘画';
+                    }
                 }
             })
             .catch(error => {
@@ -119,6 +329,7 @@ function initSettings() {
     const settingsForm = document.getElementById('settings-form');
     const resetBtn = document.getElementById('reset-btn');
     const rangeInputs = document.querySelectorAll('input[type="range"]');
+    const startWithSystemCheckbox = document.getElementById('start_with_system');
     
     // 范围滑块值实时显示
     rangeInputs.forEach(input => {
@@ -128,6 +339,49 @@ function initSettings() {
             valueDisplay.textContent = this.value;
         });
     });
+    
+    // 开机自启动复选框单独处理
+    if (startWithSystemCheckbox) {
+        // 获取当前自启动状态
+        fetch('/api/system_info')
+            .then(response => response.json())
+            .then(data => {
+                startWithSystemCheckbox.checked = data.autostart_enabled;
+            })
+            .catch(error => {
+                console.error('获取自启动状态失败:', error);
+            });
+            
+        // 监听复选框变更
+        startWithSystemCheckbox.addEventListener('change', function() {
+            const enabled = this.checked;
+            
+            fetch('/api/autostart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ enabled: enabled })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 更新复选框状态以匹配实际设置
+                    this.checked = data.enabled;
+                } else {
+                    showToast('设置开机自启动失败: ' + data.message, 'error');
+                    // 恢复复选框状态
+                    this.checked = !enabled;
+                }
+            })
+            .catch(error => {
+                console.error('设置开机自启动失败:', error);
+                showToast('设置开机自启动失败，请重试', 'error');
+                // 恢复复选框状态
+                this.checked = !enabled;
+            });
+        });
+    }
     
     // 设置表单提交
     if (settingsForm) {
@@ -173,14 +427,14 @@ function initSettings() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('设置已保存');
+                    showToast('设置已保存', 'success');
                 } else {
-                    alert('保存失败: ' + data.message);
+                    showToast('保存失败: ' + data.message, 'error');
                 }
             })
             .catch(error => {
                 console.error('保存设置失败:', error);
-                alert('保存设置失败，请重试');
+                showToast('保存设置失败，请重试', 'error');
             });
         });
     }
@@ -188,24 +442,26 @@ function initSettings() {
     // 重置按钮
     if (resetBtn) {
         resetBtn.addEventListener('click', function() {
-            if (confirm('确定要恢复默认设置吗？')) {
+            showConfirm('确定要恢复默认设置吗？', function() {
                 fetch('/api/reset_settings', {
                     method: 'POST'
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert('已恢复默认设置，页面将刷新');
-                        window.location.reload();
+                        showToast('已恢复默认设置，页面将刷新', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
                     } else {
-                        alert('恢复默认设置失败: ' + data.message);
+                        showToast('恢复默认设置失败: ' + data.message, 'error');
                     }
                 })
                 .catch(error => {
                     console.error('恢复默认设置失败:', error);
-                    alert('恢复默认设置失败，请重试');
+                    showToast('恢复默认设置失败，请重试', 'error');
                 });
-            }
+            });
         });
     }
 } 

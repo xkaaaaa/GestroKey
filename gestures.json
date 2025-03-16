@@ -1,0 +1,20 @@
+{
+    "gestures": {
+        "上": {
+            "directions": "↑",
+            "action": "cGFzc2FwcC5taW5pbWl6ZV9hbGwoKQ=="
+        },
+        "下": {
+            "directions": "↓",
+            "action": "cGFzc2FwcC5yZXN0b3JlX2FsbCgp"
+        },
+        "左": {
+            "directions": "←",
+            "action": "cGFzc2FwcC5wcmV2X3dpbmRvdygp"
+        },
+        "右": {
+            "directions": "→",
+            "action": "cGFzc2FwcC5uZXh0X3dpbmRvdygp"
+        }
+    }
+}

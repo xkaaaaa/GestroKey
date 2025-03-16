@@ -43,12 +43,8 @@
         <path id="不知道" class="st1" d="M58.6,198.9l0,112c0,82,54,153,140,153s140-71,140-153v-112L58.6,198.9z"/>
     </g>
     <g id="右键">
-        
-            <image style="overflow:visible;opacity:0.63;" width="208" height="198"  transform="matrix(0.9659 0.2588 -0.2588 0.9659 192.8916 11.0782)">
-        </image>
         <g>
-            
-                <linearGradient id="SVGID_2_" gradientUnits="userSpaceOnUse" x1="-373.8634" y1="611.4753" x2="-374.8634" y2="611.4753" gradientTransform="matrix(135.2296 43.9992 36.2346 -164.2074 28739.3809 116972.3594)">
+            <linearGradient id="SVGID_2_" gradientUnits="userSpaceOnUse" x1="-373.8634" y1="611.4753" x2="-374.8634" y2="611.4753" gradientTransform="matrix(135.2296 43.9992 36.2346 -164.2074 28739.3809 116972.3594)">
                 <stop  offset="0" style="stop-color:#FF2288"/>
                 <stop  offset="1" style="stop-color:#007BFF"/>
             </linearGradient>

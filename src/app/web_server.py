@@ -9,6 +9,7 @@ import time
 import threading
 import psutil
 import platform
+import sys
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from PyQt5.QtCore import QObject, pyqtSignal, QMetaObject, Qt, Q_ARG
@@ -16,6 +17,27 @@ from app.log import log
 
 # 应用启动时间
 START_TIME = datetime.now()
+
+# 尝试导入主模块中的自启动函数
+try:
+    from src.main import create_autostart_entry, remove_autostart_entry, check_autostart_enabled
+except ImportError:
+    try:
+        # 相对导入可能失败，尝试绝对导入
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        from src.main import create_autostart_entry, remove_autostart_entry, check_autostart_enabled
+    except ImportError:
+        # 如果导入仍然失败，定义占位函数
+        def create_autostart_entry():
+            log(__name__, "创建自启动项失败：未能导入相关函数", level="error")
+            return False
+            
+        def remove_autostart_entry():
+            log(__name__, "移除自启动项失败：未能导入相关函数", level="error")
+            return False
+            
+        def check_autostart_enabled():
+            return False
 
 class WebServer(QObject):
     """Web服务器类，提供界面和API服务"""
@@ -61,9 +83,7 @@ class WebServer(QObject):
         @self.app.route('/console')
         def console():
             log(__name__, "访问控制台页面")
-            is_running = False
-            if self.app_instance and hasattr(self.app_instance, 'painter'):
-                is_running = self.app_instance.painter is not None
+            is_running = self._is_painting_running()
             
             system_info = self._get_system_info()
             return render_template('console.html', is_running=is_running, system_info=system_info)
@@ -90,15 +110,31 @@ class WebServer(QObject):
                 # 使用信号在主线程中执行绘画状态切换
                 self.togglePaintingSignal.emit()
                 
-                # 获取当前状态
-                is_running = False
-                if hasattr(self.app_instance, 'painter') and self.app_instance.painter is not None:
-                    is_running = True
+                # 获取当前状态 - 延迟检查给主线程一些时间来切换状态
+                def delayed_response():
+                    time.sleep(0.1)  # 短暂延迟确保主线程有时间更新状态
+                    is_running = self._is_painting_running()
                     
-                return jsonify({'success': True, 'is_running': is_running})
+                    # 使用with语句确保在Flask应用上下文中运行
+                    with self.app.app_context():
+                        return jsonify({'success': True, 'is_running': is_running})
+                
+                # 在另一个线程中执行延迟响应
+                thread = threading.Thread(target=delayed_response)
+                thread.daemon = True
+                thread.start()
+                
+                return jsonify({'success': True, 'message': '状态切换中...'})
             except Exception as e:
                 log(__name__, f"切换绘画状态失败: {str(e)}", level="error")
-                return jsonify({'success': False, 'message': str(e)})
+                return jsonify({'success': False, 'message': f'错误: {str(e)}'})
+        
+        @self.app.route('/api/painting_status', methods=['GET'])
+        def painting_status():
+            """获取当前绘画状态"""
+            log(__name__, "API: 查询绘画状态")
+            is_running = self._is_painting_running()
+            return jsonify({'success': True, 'is_running': is_running})
         
         @self.app.route('/api/minimize', methods=['POST'])
         def minimize():
@@ -130,7 +166,31 @@ class WebServer(QObject):
         
         @self.app.route('/api/system_info')
         def system_info():
-            return jsonify(self._get_system_info())
+            """获取系统信息"""
+            info = self._get_system_info()
+            info['is_painting_running'] = self._is_painting_running()
+            info['autostart_enabled'] = check_autostart_enabled()
+            return jsonify(info)
+        
+        @self.app.route('/api/autostart', methods=['POST'])
+        def autostart():
+            """设置开机自启动"""
+            log(__name__, "API: 设置开机自启动")
+            data = request.get_json()
+            if not data or 'enabled' not in data:
+                return jsonify({'success': False, 'message': '缺少参数'})
+                
+            enabled = data['enabled']
+            if enabled:
+                success = create_autostart_entry()
+            else:
+                success = remove_autostart_entry()
+                
+            return jsonify({
+                'success': success, 
+                'enabled': check_autostart_enabled(),
+                'message': '开机自启设置已更新' if success else '开机自启设置失败'
+            })
         
         @self.app.route('/api/save_settings', methods=['POST'])
         def save_settings():
@@ -293,3 +353,15 @@ class WebServer(QObject):
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                 'settings.json'
             ) 
+    
+    def _is_painting_running(self):
+        """检查绘画模块是否正在运行"""
+        if not self.app_instance:
+            return False
+            
+        try:
+            # 检查painter属性是否存在且不为None
+            return hasattr(self.app_instance, 'painter') and self.app_instance.painter is not None
+        except Exception as e:
+            log(__name__, f"检查绘画状态失败: {str(e)}", level="error")
+            return False 
