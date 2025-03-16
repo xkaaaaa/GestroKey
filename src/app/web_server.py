@@ -13,7 +13,7 @@ import sys
 import base64
 import traceback
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, render_template, jsonify, request, send_from_directory, send_file
 from PyQt5.QtCore import QObject, pyqtSignal, QMetaObject, Qt, Q_ARG
 from app.log import log
 from app.operation_executor import execute
@@ -111,6 +111,12 @@ class WebServer(QObject):
         def static_files(filename):
             return send_from_directory(self.app.static_folder, filename)
         
+        @self.app.route('/static/js/form-controls.js')
+        def form_controls_js():
+            """提供表单控件JS文件"""
+            log(__name__, "加载表单控件增强脚本 - UI已优化")
+            return send_file(os.path.join(os.path.dirname(__file__), 'ui/static/js/form-controls.js'))
+        
         # API端点
         @self.app.route('/api/log', methods=['POST'])
         def log_message():
@@ -196,6 +202,10 @@ class WebServer(QObject):
             info = self._get_system_info()
             info['is_painting_running'] = self._is_painting_running()
             info['autostart_enabled'] = check_autostart_enabled()
+            
+            # 添加当前设置数据，用于前端局部刷新
+            info['settings'] = self._load_settings()
+            
             return jsonify(info)
         
         @self.app.route('/api/autostart', methods=['POST'])
@@ -269,11 +279,11 @@ class WebServer(QObject):
                             return jsonify({"success": False, "message": "参数不完整"}), 400
                         
                         result = self._add_gesture(gesture_name, directions, action)
-                        if result:
+                        if result['success']:
                             log(__name__, f"手势'{gesture_name}'添加成功")
                             return jsonify({"success": True, "message": f"手势 '{gesture_name}' 添加成功"})
                         else:
-                            return jsonify({"success": False, "message": "添加手势失败，可能已存在同名手势"}), 400
+                            return jsonify({"success": False, "message": result['message']}), 400
                     
                     elif operation == 'update':
                         # 更新手势
@@ -291,11 +301,11 @@ class WebServer(QObject):
                             return jsonify({"success": False, "message": "参数不完整"}), 400
                         
                         result = self._update_gesture(old_name, new_name, directions, action)
-                        if result:
+                        if result['success']:
                             log(__name__, f"手势'{old_name}'更新为'{new_name}'成功")
                             return jsonify({"success": True, "message": f"手势 '{new_name}' 更新成功"})
                         else:
-                            return jsonify({"success": False, "message": "更新手势失败，请检查名称是否冲突"}), 400
+                            return jsonify({"success": False, "message": result['message']}), 400
                     
                     elif operation == 'delete':
                         # 删除手势
@@ -435,6 +445,19 @@ class WebServer(QObject):
                 json.dump(config, f, ensure_ascii=False, indent=4)
                 
             log(__name__, "设置已保存")
+            
+            # 如果绘画实例已经在运行，立即应用新设置
+            if self.app_instance and hasattr(self.app_instance, 'painter') and self.app_instance.painter is not None:
+                try:
+                    # 更新运行中的绘画实例的参数
+                    result = self.app_instance.painter.update_drawing_settings(settings_data)
+                    if result:
+                        log(__name__, "绘画设置已即时应用到运行中的实例")
+                    else:
+                        log(__name__, "运行时更新绘画设置失败", level="warning")
+                except Exception as e:
+                    log(__name__, f"更新运行中的绘画设置时出错: {str(e)}", level="error")
+            
             return True
         except Exception as e:
             log(__name__, f"保存设置失败: {str(e)}", level="error")
@@ -474,6 +497,19 @@ class WebServer(QObject):
                 json.dump(config, f, ensure_ascii=False, indent=4)
             
             log(__name__, "设置已重置为默认值")
+            
+            # 如果绘画实例已经在运行，立即应用重置后的设置
+            if self.app_instance and hasattr(self.app_instance, 'painter') and self.app_instance.painter is not None:
+                try:
+                    # 更新运行中的绘画实例的参数
+                    result = self.app_instance.painter.update_drawing_settings(config['drawing_settings'])
+                    if result:
+                        log(__name__, "默认设置已即时应用到运行中的实例")
+                    else:
+                        log(__name__, "运行时更新默认设置失败", level="warning")
+                except Exception as e:
+                    log(__name__, f"重置并更新运行中的绘画设置时出错: {str(e)}", level="error")
+            
             return True
         except Exception as e:
             log(__name__, f"重置设置失败: {str(e)}", level="error")
@@ -524,6 +560,58 @@ class WebServer(QObject):
             traceback.print_exc()
             return {}
     
+    def _check_gesture_validity(self, directions, gestures_data, current_name=None):
+        """检查手势的合法性
+        
+        参数:
+            directions: 待检查的方向序列
+            gestures_data: 当前手势库数据
+            current_name: 当前手势名称（用于更新手势时跳过自身）
+            
+        返回:
+            (is_valid, message): 是否合法及原因
+        """
+        arrow_symbols = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
+        
+        # 检查是否包含合法的箭头符号
+        has_arrows = any(symbol in directions for symbol in arrow_symbols)
+        if not has_arrows:
+            return False, "手势不包含有效的箭头符号"
+        
+        # 提取方向序列中的所有箭头符号
+        gesture_arrows = [c for c in directions if c in arrow_symbols]
+        
+        # 检查是否有连续的同方向
+        for i in range(1, len(gesture_arrows)):
+            if gesture_arrows[i] == gesture_arrows[i-1]:
+                return False, f"手势包含连续的同方向: {gesture_arrows[i-1]}{gesture_arrows[i]}"
+        
+        # 检查是否有多组相同的手势
+        if len(gesture_arrows) >= 4:
+            for pattern_len in range(2, len(gesture_arrows) // 2 + 1):
+                for i in range(len(gesture_arrows) - pattern_len * 2 + 1):
+                    pattern = gesture_arrows[i:i+pattern_len]
+                    # 查找相同模式重复
+                    for j in range(i + pattern_len, len(gesture_arrows) - pattern_len + 1):
+                        if gesture_arrows[j:j+pattern_len] == pattern:
+                            pattern_str = ''.join(pattern)
+                            return False, f"手势包含重复的模式: {pattern_str}"
+        
+        # 检查是否与库中其他手势触发条件相同
+        gesture_str = ''.join(gesture_arrows)
+        for name, data in gestures_data.items():
+            # 跳过当前正在更新的手势
+            if name == current_name:
+                continue
+                
+            existing_arrows = [c for c in data['directions'] if c in arrow_symbols]
+            existing_str = ''.join(existing_arrows)
+            
+            if gesture_str == existing_str:
+                return False, f"与已有手势 '{name}' 的触发条件相同"
+        
+        return True, ""
+    
     def _save_gestures(self, gestures_data):
         """保存手势数据"""
         gestures_path = self._get_gestures_path()
@@ -543,6 +631,11 @@ class WebServer(QObject):
             traceback.print_exc()
             return False
     
+    def _get_gestures_path(self):
+        """获取手势文件路径"""
+        # 与settings文件保持在同一目录
+        return os.path.join(os.path.dirname(self._get_settings_path()), 'gestures.json') 
+    
     def _add_gesture(self, name, directions, action):
         """添加新手势"""
         gestures_data = self._load_gestures()
@@ -552,12 +645,12 @@ class WebServer(QObject):
             log(__name__, f"添加手势失败: 手势名称 '{name}' 已存在", level="warning")
             return {'success': False, 'message': f'手势名称 "{name}" 已存在'}
         
-        # 检查方向格式是否包含箭头符号
-        arrow_symbols = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
-        has_arrows = any(symbol in directions for symbol in arrow_symbols)
-        if not has_arrows:
-            log(__name__, f"添加手势警告: 手势 '{name}' 的方向不包含箭头符号", level="warning")
-        
+        # 检查手势合法性
+        is_valid, error_message = self._check_gesture_validity(directions, gestures_data)
+        if not is_valid:
+            log(__name__, f"添加手势失败: 手势 '{name}' {error_message}", level="warning")
+            return {'success': False, 'message': f"手势无效: {error_message}"}
+            
         # 添加手势
         gestures_data[name] = {
             'directions': directions,
@@ -585,11 +678,11 @@ class WebServer(QObject):
             log(__name__, f"更新手势失败: 新手势名称 '{new_name}' 已存在", level="warning")
             return {'success': False, 'message': f'手势名称 "{new_name}" 已存在'}
         
-        # 检查方向格式是否包含箭头符号
-        arrow_symbols = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
-        has_arrows = any(symbol in directions for symbol in arrow_symbols)
-        if not has_arrows:
-            log(__name__, f"更新手势警告: 手势 '{new_name}' 的方向不包含箭头符号", level="warning")
+        # 检查手势合法性（更新时传入当前名称以避免与自身比较）
+        is_valid, error_message = self._check_gesture_validity(directions, gestures_data, old_name)
+        if not is_valid:
+            log(__name__, f"更新手势失败: 手势 '{new_name}' {error_message}", level="warning")
+            return {'success': False, 'message': f"手势无效: {error_message}"}
         
         # 删除旧手势
         if old_name in gestures_data:
@@ -625,9 +718,4 @@ class WebServer(QObject):
             log(__name__, f"已删除手势: {name}")
             return {'success': True, 'message': '手势删除成功'}
         else:
-            return {'success': False, 'message': '保存手势数据失败'}
-    
-    def _get_gestures_path(self):
-        """获取手势文件路径"""
-        # 与settings文件保持在同一目录
-        return os.path.join(os.path.dirname(self._get_settings_path()), 'gestures.json') 
+            return {'success': False, 'message': '保存手势数据失败'} 

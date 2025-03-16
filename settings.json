@@ -7,7 +7,7 @@
         "fade_duration": 0.5,
         "antialias_layers": 2,
         "min_distance": 20,
-        "line_color": "#00BFFF",
+        "line_color": "#00bfff",
         "max_stroke_points": 200,
         "max_stroke_duration": 5,
         "enable_advanced_brush": true,

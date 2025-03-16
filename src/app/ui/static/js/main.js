@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化侧边栏折叠功能
     initSidebarCollapse();
     
+    // 初始化图标交互效果
+    initIconInteractions();
+    
     // 初始化控制台页面功能
     if (document.querySelector('.console-page')) {
         initConsole();
@@ -19,8 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
         initSettings();
     }
     
-    // 创建提示框组件
-    createToastComponent();
+    // 创建全局提示框容器
+    createGlobalToastContainer();
     
     // 添加页面过渡动画
     addPageTransitionEffects();
@@ -69,6 +72,12 @@ function addPageTransitionEffects() {
     const navLinks = document.querySelectorAll('.nav-item');
     navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
+            // 如果点击的是当前激活的选项卡，则不执行任何操作
+            if (this.classList.contains('active')) {
+                e.preventDefault();
+                return false;
+            }
+            
             // 只处理同域名下的链接
             if (this.hostname === window.location.hostname) {
                 e.preventDefault();
@@ -95,6 +104,14 @@ function addButtonRippleEffect() {
     const buttons = document.querySelectorAll('.btn');
     
     buttons.forEach(button => {
+        // 添加鼠标悬停事件监听
+        if (button.classList.contains('primary-btn')) {
+            button.addEventListener('mouseenter', function() {
+                // 记录主按钮悬停事件
+                logToServer('用户界面', '主按钮悬停交互', 'info');
+            });
+        }
+        
         button.addEventListener('click', function(e) {
             // 创建波纹元素
             const ripple = document.createElement('span');
@@ -146,103 +163,122 @@ function addButtonRippleEffect() {
     document.head.appendChild(style);
 }
 
-// 创建自定义提示框组件
-function createToastComponent() {
-    // 创建提示框容器
-    const toastContainer = document.createElement('div');
-    toastContainer.id = 'toast-container';
-    toastContainer.style.cssText = `
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        z-index: 9999;
-    `;
-    document.body.appendChild(toastContainer);
+// 创建全局提示框容器
+function createGlobalToastContainer() {
+    // 检查是否已存在
+    if (document.getElementById('global-toast-container')) return;
     
-    // 覆盖原生alert
-    window.originalAlert = window.alert;
-    window.alert = function(message) {
-        showToast(message);
-    };
+    // 创建容器
+    const container = document.createElement('div');
+    container.id = 'global-toast-container';
+    container.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 10px;
+        pointer-events: none;
+    `;
+    document.body.appendChild(container);
+    
+    // 创建样式
+    const style = document.createElement('style');
+    style.textContent = `
+        #global-toast-container .toast {
+            background-color: white;
+            color: #333333;
+            border-radius: 4px;
+            padding: 12px 20px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateX(30px);
+            transition: opacity 0.3s, transform 0.3s;
+            border-left: 4px solid #4A90E2;
+            max-width: 300px;
+            pointer-events: auto;
+        }
+        
+        #global-toast-container .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        #global-toast-container .toast.success {
+            border-left-color: #28a745;
+        }
+        
+        #global-toast-container .toast.error {
+            border-left-color: #dc3545;
+        }
+        
+        #global-toast-container .toast.warning {
+            border-left-color: #ffc107;
+        }
+        
+        #global-toast-container .toast.info {
+            border-left-color: #4A90E2;
+        }
+        
+        #global-toast-container .toast.confirm {
+            background-color: #f8f9fa;
+            border-left-color: #6c757d;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+    `;
+    document.head.appendChild(style);
 }
 
-// 显示提示框
+// 显示全局提示框
 function showToast(message, type = 'info', duration = 3000) {
-    const toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) return;
+    const container = document.getElementById('global-toast-container');
+    if (!container) return;
     
-    // 创建提示框元素
+    // 创建提示框
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.style.cssText = `
-        background-color: white;
-        color: #333;
-        padding: 12px 20px;
-        border-radius: 4px;
-        margin-top: 10px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        max-width: 300px;
-        opacity: 0;
-        transition: opacity 0.3s;
-        border-left: 4px solid var(--primary-color);
-        font-size: 14px;
-        word-break: break-word;
-    `;
-    
-    // 根据类型设置边框颜色
-    if (type === 'success') {
-        toast.style.borderLeftColor = '#28a745';
-    } else if (type === 'error') {
-        toast.style.borderLeftColor = '#dc3545';
-    } else if (type === 'warning') {
-        toast.style.borderLeftColor = '#ffc107';
-    }
-    
+    toast.className = `toast ${type}`;
     toast.textContent = message;
-    toastContainer.appendChild(toast);
+    toast.style.color = '#333333';
+    container.appendChild(toast);
     
-    // 显示提示框
-    setTimeout(() => {
-        toast.style.opacity = '1';
-    }, 10);
+    // 显示提示框（使用requestAnimationFrame确保DOM更新后再添加动画类）
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+    });
     
-    // 自动关闭提示框
+    // 设置自动消失
     setTimeout(() => {
-        toast.style.opacity = '0';
+        toast.classList.remove('show');
         setTimeout(() => {
-            toastContainer.removeChild(toast);
-        }, 300);
+            container.removeChild(toast);
+        }, 300); // 等待淡出动画完成
     }, duration);
     
     return toast;
 }
 
-// 显示提示框样式的确认对话框
-function showToastConfirm(message, onConfirm, onCancel) {
-    const toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) return;
+// 显示全局确认对话框
+function showConfirm(message, onConfirm, onCancel) {
+    const container = document.getElementById('global-toast-container');
+    if (!container) return;
     
-    // 创建确认框元素
+    // 创建确认框
     const confirm = document.createElement('div');
-    confirm.className = 'toast toast-confirm';
-    confirm.style.cssText = `
-        background-color: white;
-        color: #333;
-        padding: 15px 20px;
-        border-radius: 4px;
-        margin-top: 10px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        max-width: 300px;
-        opacity: 0;
-        transition: opacity 0.3s;
-        border-left: 4px solid #ffc107;
-        font-size: 14px;
-        word-break: break-word;
-    `;
+    confirm.className = 'toast confirm';
+    confirm.style.width = '280px';
+    confirm.style.padding = '15px';
+    confirm.style.backgroundColor = '#f8f9fa';
+    confirm.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.3)';
     
     // 创建消息文本
     const messageEl = document.createElement('div');
     messageEl.style.marginBottom = '15px';
+    messageEl.style.color = '#333333';
+    messageEl.style.fontWeight = '500';
     messageEl.textContent = message;
     confirm.appendChild(messageEl);
     
@@ -264,6 +300,7 @@ function showToastConfirm(message, onConfirm, onCancel) {
         background-color: #6c757d;
         color: white;
         cursor: pointer;
+        font-weight: 500;
     `;
     
     // 创建确认按钮
@@ -273,9 +310,10 @@ function showToastConfirm(message, onConfirm, onCancel) {
         padding: 5px 12px;
         border: none;
         border-radius: 4px;
-        background-color: var(--primary-color);
+        background-color: #4A90E2;
         color: white;
         cursor: pointer;
+        font-weight: 500;
     `;
     
     // 添加按钮到容器
@@ -284,18 +322,20 @@ function showToastConfirm(message, onConfirm, onCancel) {
     confirm.appendChild(buttonContainer);
     
     // 添加确认框到容器
-    toastContainer.appendChild(confirm);
+    container.appendChild(confirm);
     
     // 显示确认框
-    setTimeout(() => {
-        confirm.style.opacity = '1';
-    }, 10);
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            confirm.classList.add('show');
+        });
+    });
     
     // 绑定按钮事件
     cancelBtn.addEventListener('click', () => {
-        confirm.style.opacity = '0';
+        confirm.classList.remove('show');
         setTimeout(() => {
-            toastContainer.removeChild(confirm);
+            container.removeChild(confirm);
             if (typeof onCancel === 'function') {
                 onCancel();
             }
@@ -303,9 +343,9 @@ function showToastConfirm(message, onConfirm, onCancel) {
     });
     
     confirmBtn.addEventListener('click', () => {
-        confirm.style.opacity = '0';
+        confirm.classList.remove('show');
         setTimeout(() => {
-            toastContainer.removeChild(confirm);
+            container.removeChild(confirm);
             if (typeof onConfirm === 'function') {
                 onConfirm();
             }
@@ -507,11 +547,44 @@ function initSettings() {
     // 范围滑块值实时显示
     rangeInputs.forEach(input => {
         const valueDisplay = input.parentElement.querySelector('.range-value');
+        const min = parseFloat(input.min) || 0;
+        const max = parseFloat(input.max) || 100;
         
+        // 初始化滑动条填充进度
+        updateSliderProgress(input);
+        
+        // 监听滑块值变化
         input.addEventListener('input', function() {
+            // 更新显示值
             valueDisplay.textContent = this.value;
+            
+            // 更新滑动条填充进度
+            updateSliderProgress(this);
+            
+            // 添加值更新动画效果
+            valueDisplay.classList.add('updating');
+            setTimeout(() => {
+                valueDisplay.classList.remove('updating');
+            }, 400);
+        });
+        
+        // 滑块值确认变化时记录日志
+        input.addEventListener('change', function() {
+            // 记录滑动条值变化
+            logToServer('用户界面', `${this.id}设置值改为${this.value}`, 'info');
         });
     });
+    
+    // 更新滑动条填充进度
+    function updateSliderProgress(slider) {
+        const min = parseFloat(slider.min) || 0;
+        const max = parseFloat(slider.max) || 100;
+        const val = parseFloat(slider.value);
+        const percentage = ((val - min) * 100) / (max - min);
+        
+        // 使用CSS变量设置填充进度
+        slider.style.setProperty('--percent', `${percentage}%`);
+    }
     
     // 开机自启动复选框单独处理
     if (startWithSystemCheckbox) {
@@ -578,6 +651,9 @@ function initSettings() {
                 }
             }
             
+            // 显示保存中提示
+            showToast('正在保存设置...', 'info');
+            
             // 发送到后端
             fetch('/api/save_settings', {
                 method: 'POST',
@@ -590,6 +666,14 @@ function initSettings() {
             .then(data => {
                 if (data.success) {
                     showToast('设置已保存', 'success');
+                    // 禁用表单按钮短暂时间，避免重复提交
+                    const submitBtn = settingsForm.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        setTimeout(() => {
+                            submitBtn.disabled = false;
+                        }, 1000);
+                    }
                 } else {
                     showToast('保存设置失败: ' + data.message, 'error');
                 }
@@ -605,16 +689,31 @@ function initSettings() {
     if (resetBtn) {
         resetBtn.addEventListener('click', function() {
             showConfirm('确定要恢复默认设置吗？', function() {
+                // 显示重置中提示
+                showToast('正在恢复默认设置...', 'info');
+                
                 fetch('/api/reset_settings', {
                     method: 'POST'
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        showToast('已恢复默认设置，页面将刷新', 'success');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
+                        showToast('已恢复默认设置', 'success');
+                        
+                        // 获取最新设置并更新表单
+                        fetch('/api/system_info')
+                            .then(response => response.json())
+                            .then(infoData => {
+                                // 更新表单字段值
+                                updateSettingsFormValues(infoData);
+                            })
+                            .catch(error => {
+                                console.error('获取设置数据失败:', error);
+                                // 如果无法获取最新设置，才刷新页面
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 1500);
+                            });
                     } else {
                         showToast('恢复默认设置失败: ' + data.message, 'error');
                     }
@@ -626,4 +725,95 @@ function initSettings() {
             });
         });
     }
+    
+    // 更新设置表单值的函数
+    function updateSettingsFormValues(data) {
+        const settings = data.settings || {};
+        
+        // 遍历表单元素并更新值
+        for (const [key, value] of Object.entries(settings)) {
+            const input = document.getElementById(key);
+            if (!input) continue;
+            
+            // 根据输入类型设置值
+            if (input.type === 'checkbox') {
+                input.checked = value;
+            } else if (input.type === 'range') {
+                input.value = value;
+                // 更新显示的值和进度条
+                const valueDisplay = input.parentElement.querySelector('.range-value');
+                if (valueDisplay) valueDisplay.textContent = value;
+                updateSliderProgress(input);
+            } else {
+                input.value = value;
+            }
+        }
+    }
+}
+
+// 初始化图标交互效果
+function initIconInteractions() {
+    // 设置选项卡点击旋转效果
+    const settingsNavItem = document.querySelector('.nav-item[data-page="settings"]');
+    const settingsIcon = settingsNavItem ? settingsNavItem.querySelector('.icon i') : null;
+    
+    if (settingsNavItem && settingsIcon) {
+        // 跟踪鼠标是否悬停在选项卡上
+        let isHovering = false;
+        
+        // 监听鼠标进入
+        settingsNavItem.addEventListener('mouseenter', function() {
+            isHovering = true;
+        });
+        
+        // 监听鼠标离开
+        settingsNavItem.addEventListener('mouseleave', function() {
+            isHovering = false;
+        });
+        
+        // 为整个设置选项卡添加点击事件
+        settingsNavItem.addEventListener('click', function(e) {
+            // 如果已经在设置页面（有active类），则不执行旋转动画
+            if (this.classList.contains('active')) {
+                return;
+            }
+            
+            // 记录日志
+            logToServer('用户界面', '设置选项卡点击', 'info');
+            
+            // 防止快速连续点击
+            if (settingsIcon.classList.contains('icon-spin')) {
+                return;
+            }
+            
+            // 添加旋转动画类
+            settingsIcon.classList.add('icon-spin');
+            
+            // 动画完成后移除类
+            setTimeout(() => {
+                settingsIcon.classList.remove('icon-spin');
+                
+                // 如果此时鼠标仍然悬停在选项卡上，确保应用悬停样式
+                if (isHovering && !settingsNavItem.classList.contains('active')) {
+                    // 触发一次鼠标进入事件以重新应用悬停样式
+                    settingsNavItem.dispatchEvent(new MouseEvent('mouseenter'));
+                }
+            }, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--spin-duration')) * 1000);
+        });
+    }
+}
+
+// 向服务器发送日志
+function logToServer(module, message, level = 'info') {
+    fetch('/api/log', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            module: module,
+            message: message,
+            level: level
+        })
+    }).catch(err => console.error('发送日志失败:', err));
 } 

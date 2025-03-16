@@ -389,6 +389,8 @@ class MainWindow(QMainWindow):
                 try:
                     log(__name__, "正在启动绘画...")
                     self.painter = InkPainter()
+                    # 确保是最新设置
+                    self.painter.load_drawing_settings()
                     start_result = self.painter.start_drawing()
                     log(__name__, f"启动绘画结果: {start_result}")
                     self.toggle_action.setText("停止绘画")

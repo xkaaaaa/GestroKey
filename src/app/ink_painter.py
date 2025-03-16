@@ -253,6 +253,38 @@ class InkPainter:
         if hasattr(self, 'canvas'):
             self.canvas.enable_hardware_acceleration = self.enable_hardware_acceleration
 
+    def update_drawing_settings(self, settings):
+        """运行时更新绘画设置"""
+        log(self.file_name, "运行时更新绘画设置")
+        
+        try:
+            # 更新设置参数
+            self.base_width = settings.get('base_width', self.base_width)
+            self.min_width = settings.get('min_width', self.min_width)
+            self.max_width = settings.get('max_width', self.max_width)
+            self.speed_factor = settings.get('speed_factor', self.speed_factor)
+            self.fade_duration = settings.get('fade_duration', self.fade_duration)
+            self.antialias_layers = settings.get('antialias_layers', self.antialias_layers)
+            self.min_distance = settings.get('min_distance', self.min_distance)
+            self.line_color = settings.get('line_color', self.line_color)
+            self.max_stroke_points = settings.get('max_stroke_points', self.max_stroke_points)
+            self.max_stroke_duration = settings.get('max_stroke_duration', self.max_stroke_duration)
+            self.enable_advanced_brush = settings.get('enable_advanced_brush', self.enable_advanced_brush)
+            self.force_topmost = settings.get('force_topmost', self.force_topmost)
+            self.enable_auto_smoothing = settings.get('enable_auto_smoothing', self.enable_auto_smoothing)
+            self.smoothing_factor = settings.get('smoothing_factor', self.smoothing_factor)
+            self.enable_hardware_acceleration = settings.get('enable_hardware_acceleration', self.enable_hardware_acceleration)
+            
+            # 更新Canvas的硬件加速设置
+            if hasattr(self, 'canvas'):
+                self.canvas.enable_hardware_acceleration = self.enable_hardware_acceleration
+            
+            log(self.file_name, "绘画设置已实时更新")
+            return True
+        except Exception as e:
+            log(self.file_name, f"运行时更新设置失败: {str(e)}", level="error")
+            return False
+
     def load_gestures(self):
         """加载手势库"""
         log(self.file_name, "加载手势库")

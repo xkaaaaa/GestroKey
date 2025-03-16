@@ -82,7 +82,13 @@
                 
                 <div class="form-group">
                     <label for="gesture-action">执行动作 (Python代码)</label>
-                    <textarea id="gesture-action" name="action" rows="8" placeholder="输入要执行的Python代码" required></textarea>
+                    
+                    <!-- 高级代码编辑器容器 -->
+                    <div class="code-editor-container">
+                        <div class="code-editor-wrapper">
+                            <textarea id="gesture-action" name="action" class="code-editor" data-language="python" placeholder="输入要执行的Python代码" required></textarea>
+                        </div>
+                    </div>
                     
                     <div class="code-helper">
                         <p>常用动作示例：</p>
@@ -91,16 +97,22 @@
                                 <h4>模拟按键</h4>
                                 <pre>import pyautogui
 pyautogui.press('ctrl')  # 按下Ctrl键</pre>
+                                <button class="btn btn-sm insert-example" data-example="import pyautogui
+pyautogui.press('ctrl')  # 按下Ctrl键">插入</button>
                             </div>
                             <div class="code-example">
                                 <h4>模拟组合键</h4>
                                 <pre>import pyautogui
 pyautogui.hotkey('ctrl', 'c')  # 复制</pre>
+                                <button class="btn btn-sm insert-example" data-example="import pyautogui
+pyautogui.hotkey('ctrl', 'c')  # 复制">插入</button>
                             </div>
                             <div class="code-example">
                                 <h4>运行程序</h4>
                                 <pre>import os
 os.startfile('calc.exe')  # 打开计算器</pre>
+                                <button class="btn btn-sm insert-example" data-example="import os
+os.startfile('calc.exe')  # 打开计算器">插入</button>
                             </div>
                         </div>
                     </div>
@@ -120,5 +132,5 @@ os.startfile('calc.exe')  # 打开计算器</pre>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/gestures.js"></script>
+<script src="{{ url_for('static', filename='js/gestures.js') }}"></script>
 {% endblock %} 

@@ -55,12 +55,14 @@
             <div class="form-group checkbox-group">
                 <input type="checkbox" id="enable_advanced_brush" name="enable_advanced_brush" 
                        {% if settings.enable_advanced_brush %}checked{% endif %}>
+                <span class="checkbox-ripple"></span>
                 <label for="enable_advanced_brush">启用高级画笔</label>
             </div>
             
             <div class="form-group checkbox-group">
                 <input type="checkbox" id="enable_auto_smoothing" name="enable_auto_smoothing" 
                        {% if settings.enable_auto_smoothing %}checked{% endif %}>
+                <span class="checkbox-ripple"></span>
                 <label for="enable_auto_smoothing">启用自动平滑</label>
             </div>
         </div>
@@ -71,18 +73,21 @@
             <div class="form-group checkbox-group">
                 <input type="checkbox" id="force_topmost" name="force_topmost" 
                        {% if settings.force_topmost %}checked{% endif %}>
+                <span class="checkbox-ripple"></span>
                 <label for="force_topmost">强制置顶</label>
             </div>
             
             <div class="form-group checkbox-group">
                 <input type="checkbox" id="enable_hardware_acceleration" name="enable_hardware_acceleration" 
                        {% if settings.enable_hardware_acceleration %}checked{% endif %}>
+                <span class="checkbox-ripple"></span>
                 <label for="enable_hardware_acceleration">启用硬件加速</label>
             </div>
             
             <div class="form-group checkbox-group">
                 <input type="checkbox" id="start_with_system" name="start_with_system" 
                        {% if settings.start_with_system %}checked{% endif %}>
+                <span class="checkbox-ripple"></span>
                 <label for="start_with_system">开机自启动</label>
             </div>
         </div>
