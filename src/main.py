@@ -159,7 +159,7 @@ class MainWindow(QMainWindow):
         else:
             log(__name__, f"窗口图标文件不存在: {icon_path}", level="warning")
         
-        self.setMinimumSize(900, 600)
+        self.setMinimumSize(1000, 700)
         
         # 禁用窗口关闭按钮，改为最小化到托盘
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
