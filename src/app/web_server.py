@@ -48,6 +48,7 @@ class WebServer(QObject):
     # 定义信号
     togglePaintingSignal = pyqtSignal()
     minimizeSignal = pyqtSignal()
+    maximizeSignal = pyqtSignal()
     exitSignal = pyqtSignal()
     
     def __init__(self, app_instance=None):
@@ -68,7 +69,7 @@ class WebServer(QObject):
         # 连接信号到应用实例方法
         if self.app_instance:
             self.togglePaintingSignal.connect(self.app_instance.toggle_painting)
-            self.minimizeSignal.connect(self.app_instance.hide)
+            self.minimizeSignal.connect(self.app_instance.showMinimized)  # 改为调用标准最小化方法
             self.exitSignal.connect(self.app_instance.clean_exit)
         
         log(__name__, "WebServer初始化完成")
@@ -164,18 +165,16 @@ class WebServer(QObject):
             return jsonify({'success': True, 'is_running': is_running})
         
         @self.app.route('/api/minimize', methods=['POST'])
-        def minimize():
-            log(__name__, "API: 最小化")
-            if not self.app_instance:
-                return jsonify({'success': False, 'message': '应用实例未初始化'})
-            
-            try:
-                # 使用信号在主线程中执行最小化
+        def minimize_window():
+            """最小化窗口API"""
+            log(__name__, "API: 最小化窗口")
+            if self.app_instance:
+                result = self.app_instance.minimize_window()
+                return jsonify(result)
+            else:
+                # 如果没有app_instance，则通过信号触发
                 self.minimizeSignal.emit()
-                return jsonify({'success': True})
-            except Exception as e:
-                log(__name__, f"最小化失败: {str(e)}", level="error")
-                return jsonify({'success': False, 'message': str(e)})
+                return jsonify({"success": True})
         
         @self.app.route('/api/exit', methods=['POST'])
         def exit_app():

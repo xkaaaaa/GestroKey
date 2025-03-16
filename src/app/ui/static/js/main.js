@@ -419,11 +419,25 @@ function initConsole() {
         });
     }
     
-    // 最小化到托盘按钮
+    // 最小化按钮
     if (minimizeBtn) {
+        // 设置按钮文本为"最小化到托盘"
+        minimizeBtn.textContent = '最小化到托盘';
+        
         minimizeBtn.addEventListener('click', function() {
+            console.log('隐藏窗口到托盘');
             fetch('/api/minimize', {
                 method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    console.error('隐藏窗口到托盘失败');
+                    showToast('隐藏窗口到托盘失败', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('隐藏窗口到托盘请求错误:', error);
+                showToast('隐藏窗口到托盘失败: ' + error.message, 'error');
             });
         });
     }

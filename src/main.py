@@ -5,9 +5,10 @@ import psutil
 import signal
 import platform
 import ctypes
+from ctypes import wintypes
 import time
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu, QAction, QWidget, QVBoxLayout, QSplashScreen, QLabel, QProgressBar, QHBoxLayout
-from PyQt5.QtCore import Qt, QMetaObject, Q_ARG, QThread, QTimer, QUrl, QByteArray, QPropertyAnimation, QEasingCurve, QSize, QRect
+from PyQt5.QtCore import Qt, QMetaObject, Q_ARG, QThread, QTimer, QUrl, QByteArray, QPropertyAnimation, QEasingCurve, QSize, QRect, QEvent
 from PyQt5.QtGui import QIcon, QPixmap, QColor, QPainter, QFont, QMovie
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 from app.ink_painter import InkPainter
@@ -135,21 +136,36 @@ class SplashScreen(QWidget):
 
 class MainWindow(QMainWindow):
     def __init__(self):
+        # 使用简单的初始化方式
         super().__init__()
         log(__name__, "主窗口初始化")
+        
+        # 保存窗口大小和位置
+        self.saved_geometry = None
+        
+        # 设置窗口标题
+        self.setWindowTitle("GestroKey")
+        
+        # 初始化painter
+        self.painter = None
+        
+        # 设置窗口大小范围，不再使用固定大小
+        self.setMinimumSize(800, 600)  # 最小尺寸
+        self.setMaximumSize(1600, 1200)  # 最大尺寸
+        self.resize(1000, 700)  # 初始大小
+        self.is_maximized = False
+        
+        # 加载设置
+        self.settings = self._load_settings()
         
         # 初始化系统托盘
         self._initTray()
         
-        # 先初始化Web服务
+        # 初始化Web服务
         self._initWebServer()
         
-        # 再初始化界面
+        # 初始化界面
         self._initUI()
-        
-        # 设置窗口属性
-        self.painter = None
-        self.setWindowTitle("GestroKey")
         
         # 加载图标
         icon_path = os.path.join(os.path.dirname(__file__), "app/ui/static/img/logo.svg")
@@ -159,18 +175,12 @@ class MainWindow(QMainWindow):
         else:
             log(__name__, f"窗口图标文件不存在: {icon_path}", level="warning")
         
-        self.setMinimumSize(1000, 700)
-        
-        # 禁用窗口关闭按钮，改为最小化到托盘
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-        
-        # 设置窗口置顶
-        self.settings = self._load_settings()
+        # 如果需要窗口置顶
         if self.settings.get('force_topmost', True):
             self.setWindowFlag(Qt.WindowStaysOnTopHint)
         
         log(__name__, "主窗口初始化完成")
-
+    
     def _initUI(self):
         """初始化用户界面"""
         log(__name__, "初始化用户界面")
@@ -220,27 +230,47 @@ class MainWindow(QMainWindow):
     def _initTray(self):
         """初始化系统托盘"""
         log(__name__, "初始化系统托盘")
+        # 确保先销毁旧的托盘图标（如果存在）
+        try:
+            if hasattr(self, 'tray_icon') and self.tray_icon is not None:
+                try:
+                    self.tray_icon.activated.disconnect()  # 断开信号连接
+                except:
+                    pass
+                self.tray_icon.hide()
+                self.tray_icon.deleteLater()
+                # 给QT事件循环一些时间处理删除操作
+                QApplication.processEvents()
+        except Exception as e:
+            log(__name__, f"清理旧托盘图标时出错: {str(e)}", level="warning")
+        
+        # 创建新的托盘图标实例
         self.tray_icon = QSystemTrayIcon(self)
         
         # 加载托盘图标
         icon_path = os.path.join(os.path.dirname(__file__), "app/ui/static/img/logo.svg")
         log(__name__, f"为托盘加载图标: {icon_path}")
         if os.path.exists(icon_path):
-            self.tray_icon.setIcon(QIcon(icon_path))
+            tray_icon = QIcon(icon_path)
+            self.tray_icon.setIcon(tray_icon)
         else:
             log(__name__, f"托盘图标文件不存在: {icon_path}", level="warning")
+            # 尝试使用备用图标
+            self.tray_icon.setIcon(QIcon.fromTheme("application-x-executable"))
             
         # 创建托盘菜单
         tray_menu = QMenu()
         
-        # 绘画开关操作
-        self.toggle_action = QAction("开始绘画", self)
+        # 绘画开关操作 - 添加安全检查
+        painter_exists = hasattr(self, 'painter')
+        self.toggle_action = QAction("开始绘画" if not painter_exists or self.painter is None else "停止绘画", self)
         self.toggle_action.triggered.connect(self.toggle_painting)
         tray_menu.addAction(self.toggle_action)
         
         # 显示/隐藏主窗口操作
-        self.show_action = QAction("显示主窗口", self)
-        self.show_action.triggered.connect(self.show)
+        is_visible = self.isVisible() and not self.isMinimized()
+        self.show_action = QAction("隐藏主窗口" if is_visible else "显示主窗口", self)
+        self.show_action.triggered.connect(self.show if not is_visible else self.hide)
         tray_menu.addAction(self.show_action)
         
         # 退出操作
@@ -250,30 +280,95 @@ class MainWindow(QMainWindow):
         
         # 设置托盘菜单并显示
         self.tray_icon.setContextMenu(tray_menu)
+        
+        # 绑定托盘图标的激活信号
         self.tray_icon.activated.connect(self._on_tray_activated)
+        
+        # 设置工具提示
         self.tray_icon.setToolTip("GestroKey")
+        
+        # 确保托盘图标显示
         self.tray_icon.show()
         
-        log(__name__, "系统托盘初始化完成")
+        # 验证托盘图标是否可见
+        if not self.tray_icon.isVisible():
+            log(__name__, "警告：托盘图标创建后不可见", level="warning")
+            # 尝试再次显示
+            QTimer.singleShot(500, self.tray_icon.show)
+        
+        log(__name__, "系统托盘初始化完成，已设置点击事件")
     
     def _on_tray_activated(self, reason):
         """响应托盘图标点击"""
-        log(__name__, f"托盘图标激活，原因: {reason}")
+        try:
+            # 转换reason为字符串形式以便调试
+            reason_str = "未知"
+            if reason == QSystemTrayIcon.Trigger:
+                reason_str = "左键单击(Trigger)"
+            elif reason == QSystemTrayIcon.DoubleClick:
+                reason_str = "双击(DoubleClick)"
+            elif reason == QSystemTrayIcon.MiddleClick:
+                reason_str = "中键点击(MiddleClick)"
+            elif reason == QSystemTrayIcon.Context:
+                reason_str = "右键菜单(Context)"
+            elif reason == QSystemTrayIcon.Unknown:
+                reason_str = "未知(Unknown)"
+
+            log(__name__, f"托盘图标激活，原因: {reason} ({reason_str})")
+            
+            if reason == QSystemTrayIcon.Trigger:  # 左键单击
+                log(__name__, "托盘图标左键单击 - 切换绘画状态")
+                # 使用try-except包装以避免异常导致托盘失效
+                try:
+                    # 直接调用而不是使用Timer，可能是Timer导致的问题
+                    self.toggle_painting()
+                except Exception as e:
+                    log(__name__, f"切换绘画状态时出错: {str(e)}", level="error")
+                    # 显示错误通知
+                    self._show_error_message(f"切换绘画状态时出错: {str(e)}")
+            
+            elif reason == QSystemTrayIcon.DoubleClick:  # 双击
+                log(__name__, "托盘图标双击 - 显示主窗口")
+                try:
+                    # 直接调用显示窗口方法
+                    self._show_and_activate()
+                except Exception as e:
+                    log(__name__, f"显示窗口时出错: {str(e)}", level="error")
+                    self._show_error_message(f"显示窗口时出错: {str(e)}")
+            
+            elif reason == QSystemTrayIcon.MiddleClick:  # 中键点击
+                log(__name__, "托盘图标中键点击 - 显示状态信息")
+                try:
+                    # 直接显示状态信息
+                    self._show_status_message()
+                except Exception as e:
+                    log(__name__, f"显示状态信息时出错: {str(e)}", level="error")
         
-        if reason == QSystemTrayIcon.Trigger:  # 左键单击
-            log(__name__, "托盘图标左键单击")
-            self.toggle_painting()
-        elif reason == QSystemTrayIcon.DoubleClick:  # 双击
-            log(__name__, "托盘图标双击")
-            if self.isVisible():
-                self.hide()
-            else:
-                self.show()
-                self.activateWindow()
-        elif reason == QSystemTrayIcon.MiddleClick:  # 中键点击
-            log(__name__, "托盘图标中键点击")
-            # 中键点击可以添加额外功能，如显示简要状态信息
-            self._show_status_message()
+        except Exception as e:
+            log(__name__, f"处理托盘图标事件时发生严重错误: {str(e)}", level="error")
+            # 尝试重新初始化托盘图标
+            QTimer.singleShot(500, self._initTray)
+    
+    def _show_error_message(self, message):
+        """显示错误消息"""
+        try:
+            self.tray_icon.showMessage(
+                "GestroKey错误",
+                message,
+                QSystemTrayIcon.Critical,
+                3000
+            )
+        except:
+            # 如果连通知都不能显示，至少打印到控制台
+            print(f"错误: {message}")
+            log(__name__, f"无法显示错误通知: {message}", level="error")
+    
+    def _show_and_activate(self):
+        """显示窗口并激活"""
+        self.showNormal()
+        self.activateWindow()
+        self.show_action.setText("隐藏主窗口")
+        log(__name__, "显示并激活主窗口")
     
     def _show_status_message(self):
         """显示状态消息"""
@@ -288,63 +383,112 @@ class MainWindow(QMainWindow):
     def toggle_painting(self):
         """切换绘画状态"""
         log(__name__, "切换绘画状态")
-        if self.painter is None:
-            # 启动绘画
-            try:
-                log(__name__, "启动绘画")
-                self.painter = InkPainter()
-                self.painter.start_drawing()
-                self.toggle_action.setText("停止绘画")
-                log(__name__, "绘画已启动")
-            except Exception as e:
-                log(__name__, f"启动绘画失败：{str(e)}", level="error")
-                print(f"启动绘画失败：{str(e)}")
-        else:
-            # 停止绘画
-            try:
-                log(__name__, "停止绘画")
-                self.painter.stop_drawing()
-                self.painter = None
-                self.toggle_action.setText("开始绘画")
-                log(__name__, "绘画已停止")
-            except Exception as e:
-                log(__name__, f"停止绘画失败：{str(e)}", level="error")
-                print(f"停止绘画失败：{str(e)}")
+        try:
+            if self.painter is None:
+                # 启动绘画
+                try:
+                    log(__name__, "正在启动绘画...")
+                    self.painter = InkPainter()
+                    start_result = self.painter.start_drawing()
+                    log(__name__, f"启动绘画结果: {start_result}")
+                    self.toggle_action.setText("停止绘画")
+                    
+                    # 显示启动成功通知
+                    self.tray_icon.showMessage(
+                        "GestroKey",
+                        "绘画模式已启动",
+                        QSystemTrayIcon.Information,
+                        2000
+                    )
+                    log(__name__, "绘画已启动")
+                except Exception as e:
+                    log(__name__, f"启动绘画失败：{str(e)}", level="error")
+                    # 显示错误通知
+                    self.tray_icon.showMessage(
+                        "GestroKey错误",
+                        f"启动绘画失败：{str(e)}",
+                        QSystemTrayIcon.Critical,
+                        3000
+                    )
+                    print(f"启动绘画失败：{str(e)}")
+            else:
+                # 停止绘画
+                try:
+                    log(__name__, "正在停止绘画...")
+                    stop_result = self.painter.stop_drawing()
+                    log(__name__, f"停止绘画结果: {stop_result}")
+                    self.painter = None
+                    self.toggle_action.setText("开始绘画")
+                    
+                    # 显示停止成功通知
+                    self.tray_icon.showMessage(
+                        "GestroKey",
+                        "绘画模式已停止",
+                        QSystemTrayIcon.Information,
+                        2000
+                    )
+                    log(__name__, "绘画已停止")
+                except Exception as e:
+                    log(__name__, f"停止绘画失败：{str(e)}", level="error")
+                    # 显示错误通知
+                    self.tray_icon.showMessage(
+                        "GestroKey错误",
+                        f"停止绘画失败：{str(e)}",
+                        QSystemTrayIcon.Critical,
+                        3000
+                    )
+                    print(f"停止绘画失败：{str(e)}")
+        except Exception as e:
+            log(__name__, f"切换绘画状态时发生错误: {str(e)}", level="error")
+            self.tray_icon.showMessage(
+                "GestroKey错误",
+                f"切换绘画状态失败：{str(e)}",
+                QSystemTrayIcon.Critical,
+                3000
+            )
     
     def show(self):
         """显示主窗口"""
-        super().show()
-        self.show_action.setText("隐藏主窗口")
-        log(__name__, "显示主窗口")
+        log(__name__, "准备显示主窗口")
         
-        # 更新显示状态
-        # QMetaObject调用可能不存在的方法会导致错误，暂时注释掉
-        # QMetaObject.invokeMethod(
-        #     self, 
-        #     "activate", 
-        #     Qt.QueuedConnection
-        # )
+        if self.isMinimized():
+            # 从最小化状态恢复
+            super().showNormal()
+        else:
+            # 正常显示
+            super().show()
+        
+        self.activateWindow()  # 确保窗口获得焦点
+        self.show_action.setText("隐藏主窗口")
+        log(__name__, "主窗口已显示")
     
     def hide(self):
         """隐藏主窗口"""
+        log(__name__, "隐藏主窗口")
         super().hide()
         self.show_action.setText("显示主窗口")
-        log(__name__, "隐藏主窗口")
-        
-        # 更新显示状态
-        # QMetaObject调用可能不存在的方法会导致错误，暂时注释掉
-        # QMetaObject.invokeMethod(
-        #     self, 
-        #     "deactivate", 
-        #     Qt.QueuedConnection
-        # )
+        # 隐藏窗口后确保托盘图标响应
+        QTimer.singleShot(100, self._ensure_tray_responsive)
     
     def closeEvent(self, event):
         """处理窗口关闭事件"""
-        # 关闭窗口时最小化到托盘而不是退出
-        event.ignore()
-        self.hide()
-        log(__name__, "窗口关闭请求 - 已最小化到托盘")
+        # 关闭窗口时不直接退出，而是触发网页中的确认对话框
+        log(__name__, "窗口关闭请求 - 显示确认对话框")
+        event.ignore()  # 忽略关闭事件
+        
+        # 通过JavaScript执行网页中的确认对话框函数
+        js_code = """
+        if (typeof showConfirm === 'function') {
+            showConfirm('您确定要退出应用程序吗?', function() {
+                fetch('/api/exit', { method: 'POST' });
+            });
+        } else {
+            console.error('showConfirm函数未定义');
+            fetch('/api/exit', { method: 'POST' });
+        }
+        """
+        self.web_view.page().runJavaScript(js_code)
+        log(__name__, "已显示退出确认对话框")
 
     def clean_exit(self):
         """干净地退出应用程序"""
@@ -397,6 +541,60 @@ class MainWindow(QMainWindow):
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                 'settings.json'
             )
+
+    def minimize_window(self):
+        """最小化窗口"""
+        log(__name__, "窗口最小化")
+        # 使用标准的窗口最小化功能
+        self.showMinimized()
+        return {"success": True}
+    
+    def _ensure_tray_responsive(self):
+        """确保托盘图标保持响应状态"""
+        log(__name__, "检查托盘图标状态...")
+        try:
+            if not hasattr(self, 'tray_icon') or self.tray_icon is None or not self.tray_icon.isVisible():
+                log(__name__, "托盘图标状态异常，重新初始化", level="warning")
+                self._initTray()
+            else:
+                # 重新连接信号，确保托盘图标能接收点击事件
+                try:
+                    self.tray_icon.activated.disconnect()
+                except:
+                    pass
+                self.tray_icon.activated.connect(self._on_tray_activated)
+                log(__name__, "托盘图标状态正常")
+        except Exception as e:
+            log(__name__, f"确保托盘响应时出错: {str(e)}", level="error")
+            print(f"托盘图标错误: {str(e)}")
+        
+    def changeEvent(self, event):
+        """处理窗口状态改变事件"""
+        try:
+            if event.type() == QEvent.WindowStateChange:
+                log(__name__, f"窗口状态改变: {self.windowState()}")
+                # 如果窗口从最小化状态恢复
+                if self.windowState() & Qt.WindowMinimized:
+                    log(__name__, "窗口从最小化状态恢复")
+                    # 更新托盘菜单显示状态
+                    self.show_action.setText("隐藏主窗口")
+                elif self.windowState() == Qt.WindowNoState and not self.isVisible():
+                    log(__name__, "窗口处于正常状态但不可见")
+                    # 如果窗口恢复但不可见，则显示它
+                    self.show()
+        except Exception as e:
+            log(__name__, f"处理窗口状态改变事件出错: {str(e)}", level="error")
+        super().changeEvent(event)
+
+    def showEvent(self, event):
+        """窗口显示事件处理"""
+        super().showEvent(event)
+        log(__name__, "窗口显示事件处理完成")
+
+    def nativeEvent(self, eventType, message):
+        """处理底层平台事件"""
+        # 直接让Qt处理事件，不做额外干预
+        return super().nativeEvent(eventType, message)
 
 def check_files():
     """检查必要文件是否存在"""
@@ -528,7 +726,10 @@ def main():
     
     # 设置应用程序ID (Windows)
     if platform.system() == 'Windows':
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GestroKey")
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GestroKey")
+        except Exception as e:
+            log(__name__, f"设置应用程序ID失败: {str(e)}", level="warning")
     
     # 创建应用程序
     app = QApplication(sys.argv)
@@ -554,7 +755,7 @@ def main():
         # 正常显示主窗口
         window.show()
     
-    log(__name__, "主窗口已显示，程序初始化完成")
+    log(__name__, "程序初始化完成，进入事件循环")
     
     # 设置中断处理
     def signal_handler(sig, frame):
@@ -565,90 +766,6 @@ def main():
     
     # 运行应用程序
     sys.exit(app.exec_())
-
-def create_autostart_entry():
-    """创建开机自启动项"""
-    try:
-        import winreg
-        log(__name__, "尝试创建开机自启动项")
-        
-        # 应用程序路径
-        app_path = sys.executable
-        if getattr(sys, 'frozen', False):
-            # 如果是打包后的可执行文件
-            autostart_cmd = f'"{app_path}" --autostart'
-        else:
-            # 如果是Python脚本
-            autostart_cmd = f'"{sys.executable}" "{os.path.abspath(__file__)}" --autostart'
-            
-        # 打开注册表键
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0,
-            winreg.KEY_SET_VALUE
-        )
-        
-        # 设置自启动项
-        winreg.SetValueEx(key, "GestroKey", 0, winreg.REG_SZ, autostart_cmd)
-        winreg.CloseKey(key)
-        log(__name__, "成功创建开机自启动项")
-        return True
-    except Exception as e:
-        log(__name__, f"创建开机自启动项失败: {str(e)}", level="error")
-        return False
-
-def remove_autostart_entry():
-    """移除开机自启动项"""
-    try:
-        import winreg
-        log(__name__, "尝试移除开机自启动项")
-        
-        # 打开注册表键
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0,
-            winreg.KEY_SET_VALUE
-        )
-        
-        # 删除自启动项
-        try:
-            winreg.DeleteValue(key, "GestroKey")
-        except WindowsError:
-            # 键不存在，可以忽略
-            pass
-            
-        winreg.CloseKey(key)
-        log(__name__, "成功移除开机自启动项")
-        return True
-    except Exception as e:
-        log(__name__, f"移除开机自启动项失败: {str(e)}", level="error")
-        return False
-
-def check_autostart_enabled():
-    """检查开机自启动是否已启用"""
-    try:
-        import winreg
-        
-        # 打开注册表键
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0,
-            winreg.KEY_READ
-        )
-        
-        try:
-            value, _ = winreg.QueryValueEx(key, "GestroKey")
-            winreg.CloseKey(key)
-            return True
-        except WindowsError:
-            # 键不存在
-            winreg.CloseKey(key)
-            return False
-    except Exception:
-        return False
 
 if __name__ == "__main__":
     main()
