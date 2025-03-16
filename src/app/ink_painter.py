@@ -22,9 +22,10 @@ import win32con
 import os
 import sys
 import re
-from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget
-from PyQt5.QtCore import Qt, QTimer, QPoint
-from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath
+from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget, QOpenGLWidget
+from PyQt5.QtCore import Qt, QTimer, QPoint, QPointF, QRectF, QSize
+from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QOpenGLContext, QSurfaceFormat, QBrush
+from PyQt5.QtOpenGL import QGLFormat, QGL
 
 try:
     from .gesture_parser import GestureParser
@@ -34,6 +35,134 @@ except ImportError:
     from gesture_parser import GestureParser
     from log import log
     from operation_executor import execute as execute_operation
+
+class CanvasGPU(QOpenGLWidget):
+    """使用OpenGL渲染的画布"""
+    def __init__(self, parent=None):
+        # 配置OpenGL格式
+        fmt = QSurfaceFormat()
+        fmt.setSamples(8)  # 增加多重采样抗锯齿采样点
+        fmt.setSwapInterval(0)  # 关闭垂直同步以提高性能
+        fmt.setSwapBehavior(QSurfaceFormat.DoubleBuffer)  # 双缓冲
+        QSurfaceFormat.setDefaultFormat(fmt)
+        
+        super(CanvasGPU, self).__init__(parent)
+        
+        self.lines = []
+        self.active_paths = []
+        # 设置为透明背景
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+        # 硬件加速开关（由设置控制）
+        self.enable_hardware_acceleration = True
+        # 减少不必要的重绘
+        self.update_scheduled = False
+        # 批量绘制队列
+        self.batch_updates = []
+        # 线条绘制方式：单线条模式
+        self.single_line_mode = True
+        
+        # 启用OpenGL功能
+        self.setAutoFillBackground(False)
+        
+        log('canvas_gpu', "GPU加速画布初始化完成")
+
+    def initializeGL(self):
+        """初始化OpenGL上下文"""
+        # 检查OpenGL支持
+        context = QOpenGLContext.currentContext()
+        if context:
+            log('canvas_gpu', f"OpenGL 已初始化，版本: {context.format().majorVersion()}.{context.format().minorVersion()}")
+            # 记录GPU信息 - 不调用renderText，它可能会导致问题
+            log('canvas_gpu', f"GPU硬件加速已启用")
+        else:
+            log('canvas_gpu', "OpenGL 初始化失败，将回退到软件渲染", level="warning")
+            self.enable_hardware_acceleration = False
+
+    def create_line(self, x1, y1, x2, y2, width, fill, capstyle=Qt.RoundCap, smooth=True, joinstyle=Qt.RoundJoin):
+        """创建一条线段"""
+        line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': fill}
+        self.lines.append(line)
+        
+        # 构建路径用于加速渲染
+        path = QPainterPath()
+        path.moveTo(QPointF(x1, y1))
+        
+        # 直接使用线段连接而不是曲线，避免断线
+        path.lineTo(QPointF(x2, y2))
+        
+        # 添加到路径缓存
+        self.active_paths.append({
+            'path': path,
+            'width': width,
+            'color': fill,
+            'line_ref': line  # 引用原线条对象以便后续更新
+        })
+        
+        # 批量队列处理
+        self.batch_updates.append(line)
+        self.schedule_update()
+        return line
+
+    def itemconfig(self, line, fill):
+        """更新线条颜色"""
+        line['color'] = fill
+        # 同时更新对应路径的颜色
+        for path_obj in self.active_paths:
+            if path_obj['line_ref'] == line:
+                path_obj['color'] = fill
+                break
+        self.schedule_update()
+
+    def delete(self, line):
+        """删除线条"""
+        try:
+            self.lines.remove(line)
+            # 同时删除对应的路径
+            self.active_paths = [p for p in self.active_paths if p['line_ref'] != line]
+        except ValueError:
+            pass
+        self.schedule_update()
+    
+    def schedule_update(self):
+        """智能调度更新，避免频繁重绘"""
+        if not self.update_scheduled:
+            self.update_scheduled = True
+            QTimer.singleShot(1, self.do_update)  # 降低延迟以减少断线感
+    
+    def do_update(self):
+        """执行实际更新"""
+        self.update_scheduled = False
+        self.batch_updates.clear()
+        self.update()
+
+    def paintEvent(self, event):
+        """绘制事件处理，使用硬件加速"""
+        # 基本设置
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        
+        # 仅绘制可见区域内的线条
+        visible_rect = event.rect()
+        
+        # 使用更适合线条绘制的合成模式
+        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        
+        # 批量绘制所有路径（性能优化）
+        for path_obj in self.active_paths:
+            # 跳过边界检查以确保所有线条都被绘制
+            pen = QPen(QColor(path_obj['color']))
+            pen.setWidthF(path_obj['width'])
+            pen.setCapStyle(Qt.RoundCap)
+            pen.setJoinStyle(Qt.RoundJoin)
+            
+            # 对于OpenGL渲染，使用标准装饰性画笔效果更好
+            pen.setCosmetic(True)
+                
+            painter.setPen(pen)
+            painter.drawPath(path_obj['path'])
 
 class Canvas(QWidget):
     def __init__(self, parent=None):
@@ -50,11 +179,29 @@ class Canvas(QWidget):
         self.batch_updates = []
         # 线条绘制方式：单线条模式
         self.single_line_mode = True
+        # 路径缓存优化
+        self.path_cache = []
 
     def create_line(self, x1, y1, x2, y2, width, fill, capstyle=Qt.RoundCap, smooth=True, joinstyle=Qt.RoundJoin):
         """创建一条线段"""
         line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': fill}
         self.lines.append(line)
+        
+        # 创建并缓存路径对象（提高渲染性能）
+        if self.enable_hardware_acceleration:
+            path = QPainterPath()
+            path.moveTo(QPointF(x1, y1))
+            
+            # 直接连接点，避免使用曲线导致断线
+            path.lineTo(QPointF(x2, y2))
+            
+            self.path_cache.append({
+                'path': path,
+                'width': width,
+                'color': fill,
+                'line_ref': line
+            })
+        
         # 不立即更新，而是加入批量队列
         self.batch_updates.append(line)
         self.schedule_update()
@@ -62,11 +209,20 @@ class Canvas(QWidget):
 
     def itemconfig(self, line, fill):
         line['color'] = fill
+        # 更新路径缓存中的颜色
+        if self.enable_hardware_acceleration:
+            for path_obj in self.path_cache:
+                if path_obj['line_ref'] == line:
+                    path_obj['color'] = fill
+                    break
         self.schedule_update()
 
     def delete(self, line):
         try:
             self.lines.remove(line)
+            # 同时从路径缓存中删除
+            if self.enable_hardware_acceleration:
+                self.path_cache = [p for p in self.path_cache if p['line_ref'] != line]
         except ValueError:
             pass
         self.schedule_update()
@@ -75,16 +231,18 @@ class Canvas(QWidget):
         """智能调度更新，避免频繁重绘"""
         if not self.update_scheduled:
             self.update_scheduled = True
-            QTimer.singleShot(2, self.do_update)  # 2ms延迟，合并多次更新但保持反应灵敏
+            QTimer.singleShot(0, self.do_update)  # 立即更新，避免断线
     
     def do_update(self):
         """执行实际更新"""
         self.update_scheduled = False
         self.batch_updates.clear()
-        self.update()
+        self.update()  # 全屏更新，解决局部更新可能导致的断线问题
 
     def paintEvent(self, event):
+        # 使用更高级的图形上下文
         painter = QPainter(self)
+        
         # 始终开启完整抗锯齿
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
@@ -96,33 +254,41 @@ class Canvas(QWidget):
         # 使用更适合线条绘制的合成模式
         painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
         
-        for line in self.lines:
-            pen = QPen(QColor(line['color']))
-            pen.setWidthF(line['width'])
-            pen.setCapStyle(Qt.RoundCap)
-            pen.setJoinStyle(Qt.RoundJoin)
-            
-            # 将坐标转换为浮点数以实现更平滑的线条
-            x1, y1 = float(line['x1']), float(line['y1'])
-            x2, y2 = float(line['x2']), float(line['y2'])
-            
-            # 粗略判断线条是否在可见区域内（边界框检测）
-            if (max(x1, x2) < visible_rect.left() or min(x1, x2) > visible_rect.right() or
-                max(y1, y2) < visible_rect.top() or min(y1, y2) > visible_rect.bottom()):
-                continue  # 不在可见区域内，跳过绘制
+        # 设置硬件加速相关项
+        if self.enable_hardware_acceleration:
+            # 在硬件加速模式下使用路径缓存进行批量绘制
+            for path_obj in self.path_cache:
+                pen = QPen(QColor(path_obj['color']))
+                pen.setWidthF(path_obj['width'])
+                pen.setCapStyle(Qt.RoundCap)
+                pen.setJoinStyle(Qt.RoundJoin)
                 
-            painter.setPen(pen)
-            
-            # 使用路径绘制实现更平滑的线条效果
-            path = QPainterPath()
-            path.moveTo(x1, y1)
-            
-            # 始终使用贝塞尔曲线绘制，提高平滑度
-            mid_x = (x1 + x2) / 2
-            mid_y = (y1 + y2) / 2
-            path.quadTo(mid_x, mid_y, x2, y2)
+                # 使用装饰性画笔，避免断线
+                pen.setCosmetic(True)
                 
-            painter.drawPath(path)
+                painter.setPen(pen)
+                painter.drawPath(path_obj['path'])
+        else:
+            # 传统绘制逻辑，保持向后兼容
+            for line in self.lines:
+                pen = QPen(QColor(line['color']))
+                pen.setWidthF(line['width'])
+                pen.setCapStyle(Qt.RoundCap)
+                pen.setJoinStyle(Qt.RoundJoin)
+                
+                # 将坐标转换为浮点数以实现更平滑的线条
+                x1, y1 = float(line['x1']), float(line['y1'])
+                x2, y2 = float(line['x2']), float(line['y2'])
+                
+                # 粗略判断线条是否在可见区域内（边界框检测）
+                if (max(x1, x2) < visible_rect.left() or min(x1, x2) > visible_rect.right() or
+                    max(y1, y2) < visible_rect.top() or min(y1, y2) > visible_rect.bottom()):
+                    continue  # 不在可见区域内，跳过绘制
+                    
+                painter.setPen(pen)
+                
+                # 使用直线连接而不是曲线路径
+                painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
 class InkPainter:
     def __init__(self):
@@ -190,11 +356,48 @@ class InkPainter:
             self.app = QApplication.instance()
         
         # 创建透明全屏画布
-        self.canvas = Canvas()
+        # 加载设置，确定是否使用OpenGL渲染
+        try:
+            settings_path = self.get_settings_path()
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    settings = config.get('drawing_settings', {})
+                    enable_hw_accel = settings.get('enable_hardware_acceleration', True)
+            else:
+                enable_hw_accel = True
+                
+            # 临时将GPU加速默认设为关闭，直到解决断线问题
+            enable_hw_accel = False
+            log(self.file_name, "暂时禁用GPU加速以解决线条断开问题")
+                
+            # 根据加速设置选择不同的画布类
+            if enable_hw_accel:
+                try:
+                    # 尝试创建OpenGL加速的画布
+                    log(self.file_name, "尝试创建GPU加速画布")
+                    self.canvas = CanvasGPU()
+                    log(self.file_name, "成功创建GPU加速画布")
+                except Exception as e:
+                    log(self.file_name, f"创建GPU加速画布失败: {str(e)}", level="warning")
+                    log(self.file_name, "回退到标准画布")
+                    self.canvas = Canvas()
+            else:
+                log(self.file_name, "硬件加速已禁用，使用标准画布")
+                self.canvas = Canvas()
+        except Exception as e:
+            log(self.file_name, f"加载设置失败: {str(e)}", level="error")
+            # 默认使用标准画布
+            self.canvas = Canvas()
+        
         self.canvas.resize(self.screen_width, self.screen_height)
         self.canvas.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.canvas.setAttribute(Qt.WA_TranslucentBackground)
         self.canvas.setAttribute(Qt.WA_ShowWithoutActivating)
+        
+        # 优化渲染性能 - 移除一些可能导致问题的设置
+        self.canvas.setAttribute(Qt.WA_NoSystemBackground)
+        
         log(self.file_name, "画布初始化完成")
 
     def load_drawing_settings(self):
@@ -572,7 +775,7 @@ class InkPainter:
             width=width,
             fill=self.line_color,
             capstyle=Qt.RoundCap,
-            smooth=True,
+            smooth=False,  # 禁用平滑处理，避免断线
             joinstyle=Qt.RoundJoin
         )
         
