@@ -1,19 +1,28 @@
 {
-    "drawing_settings": {
-        "base_width": 6,
-        "min_width": 3,
-        "max_width": 15,
-        "speed_factor": 1.2,
-        "fade_duration": 0.5,
-        "antialias_layers": 2,
-        "min_distance": 20,
-        "line_color": "#00BFFF",
-        "max_stroke_points": 200,
-        "max_stroke_duration": 5,
-        "enable_advanced_brush": true,
-        "force_topmost": true,
-        "enable_auto_smoothing": true,
-        "smoothing_factor": 0.6,
-        "enable_hardware_acceleration": true
-    }
+  "drawing": {
+    "speed_factor": 1.0,
+    "base_width": 3.0,
+    "min_width": 1.0,
+    "max_width": 5.0,
+    "smoothing": 0.7,
+    "color": "#4299E1",
+    "fade_time": 1.0,
+    "advanced_brush": false,
+    "auto_smoothing": true
+  },
+  "gesture": {
+    "min_points": 10,
+    "max_pause_ms": 300,
+    "min_length": 50,
+    "sensitivity": 0.8
+  },
+  "app": {
+    "start_with_windows": false,
+    "start_minimized": false,
+    "minimize_to_tray": true,
+    "auto_start_recognition": false,
+    "show_notifications": true,
+    "log_level": "info"
+  },
+  "min_width": 2.5
 }

@@ -250,56 +250,56 @@ class SettingsPage(QWidget):
         # 速度因子
         speed_slider = SliderSetting(
             "speed_factor", "速度因子", 0.1, 2.0, 0.1, 
-            self.settings_manager.get_setting("speed_factor", 1.0)
+            self.settings_manager.get_setting("drawing", "speed_factor", 1.0)
         )
         speed_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(speed_slider)
-        self.settings_controls["speed_factor"] = speed_slider
+        self.settings_controls["drawing/speed_factor"] = speed_slider
         
         # 基本宽度
         base_width_slider = SliderSetting(
             "base_width", "基本宽度", 1, 10, 0.5, 
-            self.settings_manager.get_setting("base_width", 5)
+            self.settings_manager.get_setting("drawing", "base_width", 5)
         )
         base_width_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(base_width_slider)
-        self.settings_controls["base_width"] = base_width_slider
+        self.settings_controls["drawing/base_width"] = base_width_slider
         
         # 最小宽度
         min_width_slider = SliderSetting(
             "min_width", "最小宽度", 1, 10, 0.5, 
-            self.settings_manager.get_setting("min_width", 3)
+            self.settings_manager.get_setting("drawing", "min_width", 3)
         )
         min_width_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(min_width_slider)
-        self.settings_controls["min_width"] = min_width_slider
+        self.settings_controls["drawing/min_width"] = min_width_slider
         
         # 最大宽度
         max_width_slider = SliderSetting(
             "max_width", "最大宽度", 2, 20, 0.5, 
-            self.settings_manager.get_setting("max_width", 12)
+            self.settings_manager.get_setting("drawing", "max_width", 12)
         )
         max_width_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(max_width_slider)
-        self.settings_controls["max_width"] = max_width_slider
+        self.settings_controls["drawing/max_width"] = max_width_slider
         
         # 启用高级画笔
         advanced_brush_checkbox = CheckboxSetting(
             "enable_advanced_brush", "启用高级画笔", 
-            self.settings_manager.get_setting("enable_advanced_brush", True)
+            self.settings_manager.get_setting("drawing", "advanced_brush", True)
         )
         advanced_brush_checkbox.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(advanced_brush_checkbox)
-        self.settings_controls["enable_advanced_brush"] = advanced_brush_checkbox
+        self.settings_controls["drawing/advanced_brush"] = advanced_brush_checkbox
         
         # 启用自动平滑
         auto_smoothing_checkbox = CheckboxSetting(
             "enable_auto_smoothing", "启用自动平滑", 
-            self.settings_manager.get_setting("enable_auto_smoothing", True)
+            self.settings_manager.get_setting("drawing", "auto_smoothing", True)
         )
         auto_smoothing_checkbox.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(auto_smoothing_checkbox)
-        self.settings_controls["enable_auto_smoothing"] = auto_smoothing_checkbox
+        self.settings_controls["drawing/auto_smoothing"] = auto_smoothing_checkbox
         
         # 添加绘画设置组到滚动区域
         scroll_layout.addWidget(drawing_group)
@@ -332,29 +332,29 @@ class SettingsPage(QWidget):
         # 窗口置顶
         topmost_checkbox = CheckboxSetting(
             "force_topmost", "强制窗口置顶", 
-            self.settings_manager.get_setting("force_topmost", True)
+            self.settings_manager.get_setting("app", "force_topmost", True)
         )
         topmost_checkbox.valueChanged.connect(self.on_setting_changed)
         app_layout.addWidget(topmost_checkbox)
-        self.settings_controls["force_topmost"] = topmost_checkbox
+        self.settings_controls["app/force_topmost"] = topmost_checkbox
         
         # 开机自启动
         autostart_checkbox = CheckboxSetting(
             "start_with_system", "开机自启动", 
-            self.settings_manager.get_setting("start_with_system", False)
+            self.settings_manager.get_setting("app", "start_with_windows", False)
         )
         autostart_checkbox.valueChanged.connect(self.on_setting_changed)
         app_layout.addWidget(autostart_checkbox)
-        self.settings_controls["start_with_system"] = autostart_checkbox
+        self.settings_controls["app/start_with_windows"] = autostart_checkbox
         
         # 硬件加速
         hardware_accel_checkbox = CheckboxSetting(
             "enable_hardware_acceleration", "启用硬件加速", 
-            self.settings_manager.get_setting("enable_hardware_acceleration", True)
+            self.settings_manager.get_setting("app", "enable_hardware_acceleration", True)
         )
         hardware_accel_checkbox.valueChanged.connect(self.on_setting_changed)
         app_layout.addWidget(hardware_accel_checkbox)
-        self.settings_controls["enable_hardware_acceleration"] = hardware_accel_checkbox
+        self.settings_controls["app/enable_hardware_acceleration"] = hardware_accel_checkbox
         
         # 添加应用设置组到滚动区域
         scroll_layout.addWidget(app_group)
@@ -449,16 +449,28 @@ class SettingsPage(QWidget):
         
         # 更新控件值
         for key, control in self.settings_controls.items():
-            if key in self.settings:
-                if isinstance(control, SliderSetting):
-                    control.set_value(self.settings[key])
-                elif isinstance(control, CheckboxSetting):
-                    control.set_checked(self.settings[key])
-        
+            if "/" in key:
+                category, setting_key = key.split("/", 1)
+                if category in self.settings and setting_key in self.settings[category]:
+                    if isinstance(control, SliderSetting):
+                        control.set_value(self.settings[category][setting_key])
+                    elif isinstance(control, CheckboxSetting):
+                        control.set_checked(self.settings[category][setting_key])
+
     def on_setting_changed(self, key, value):
         """设置变更处理"""
-        self.settings[key] = value
-        self.settingChanged.emit(key, value)
+        if "/" in key:
+            category, setting_key = key.split("/", 1)
+            # 确保分类存在
+            if category not in self.settings:
+                self.settings[category] = {}
+            # 更新设置值
+            self.settings[category][setting_key] = value
+            self.settingChanged.emit(key, value)
+        else:
+            # 兼容旧的无分类设置
+            self.settings[key] = value
+            self.settingChanged.emit(key, value)
         
     def on_save_clicked(self):
         """保存按钮点击处理"""
@@ -468,6 +480,14 @@ class SettingsPage(QWidget):
         """重置按钮点击处理"""
         self.resetSettingsClicked.emit()
         
+    def get_current_settings(self):
+        """获取当前设置
+        
+        Returns:
+            当前设置字典
+        """
+        return self.settings
+
     def update_settings(self, settings):
         """更新设置控件的值
         
@@ -478,19 +498,13 @@ class SettingsPage(QWidget):
         
         # 更新控件值
         for key, control in self.settings_controls.items():
-            if key in settings:
-                if isinstance(control, SliderSetting):
-                    control.set_value(settings[key])
-                elif isinstance(control, CheckboxSetting):
-                    control.set_checked(settings[key])
-        
-    def get_current_settings(self):
-        """获取当前设置
-        
-        Returns:
-            dict: 当前的设置字典
-        """
-        return self.settings
+            if "/" in key:
+                category, setting_key = key.split("/", 1)
+                if category in settings and setting_key in settings[category]:
+                    if isinstance(control, SliderSetting):
+                        control.set_value(settings[category][setting_key])
+                    elif isinstance(control, CheckboxSetting):
+                        control.set_checked(settings[category][setting_key])
         
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

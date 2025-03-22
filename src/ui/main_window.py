@@ -133,11 +133,8 @@ class MainWindow(QMainWindow):
         
     def connect_signals(self):
         """连接信号与槽"""
-        # 控制台页面的操作按钮信号
-        self.console_page.start_drawing_button.clicked.connect(self.toggle_drawing)
-        self.console_page.stop_drawing_button.clicked.connect(self.toggle_drawing)
-        self.console_page.minimize_button.clicked.connect(self.hide)
-        self.console_page.exit_button.clicked.connect(self.close)
+        # 控制台页面的切换按钮信号
+        self.console_page.toggle_button.clicked.connect(self.toggle_drawing)
         
         # 设置页面的保存按钮信号
         self.settings_page.save_button.clicked.connect(self.save_settings)

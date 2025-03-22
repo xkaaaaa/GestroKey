@@ -177,14 +177,6 @@ class Sidebar(QWidget):
                                       "app/ui/static/img/console.svg")
         self.add_nav_button("console", "控制台", console_icon)
         
-        # 添加设置按钮
-        settings_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/settings.svg")
-        if not os.path.exists(settings_icon):
-            # 尝试使用旧路径
-            settings_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                                       "app/ui/static/img/settings.svg")
-        self.add_nav_button("settings", "设置", settings_icon)
-        
         # 添加手势管理按钮
         gestures_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/gestures.svg")
         if not os.path.exists(gestures_icon):
@@ -192,6 +184,14 @@ class Sidebar(QWidget):
             gestures_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
                                        "app/ui/static/img/gestures.svg")
         self.add_nav_button("gestures", "手势管理", gestures_icon)
+        
+        # 添加设置按钮（放在最后）
+        settings_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/settings.svg")
+        if not os.path.exists(settings_icon):
+            # 尝试使用旧路径
+            settings_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                                       "app/ui/static/img/settings.svg")
+        self.add_nav_button("settings", "设置", settings_icon)
         
         # 添加导航容器到主布局
         self.layout.addWidget(self.nav_container)

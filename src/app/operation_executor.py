@@ -13,10 +13,8 @@ import traceback
 
 try:
     from .log import log
-    from . import passapp
 except ImportError:
     from log import log
-    import passapp
 
 def execute(action_base64):
     """解码并执行base64编码的Python代码"""
@@ -44,7 +42,6 @@ def execute(action_base64):
             'subprocess': subprocess,
             'pyautogui': pyautogui,
             'time': time,
-            'passapp': passapp  # 添加passapp模块到全局变量
         }
         
         # 执行代码

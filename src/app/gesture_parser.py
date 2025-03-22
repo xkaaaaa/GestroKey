@@ -414,8 +414,40 @@ class GestureParser:
                     log.info(f"{self.file_name} - 成功加载手势库，共加载{len(gestures)}个手势")
                     return gestures
                 else:
-                    log.error(f"{self.file_name} - 手势库文件格式错误：缺少'gestures'键")
-                    return []
+                    log.warning(f"{self.file_name} - 手势库文件格式错误：缺少'gestures'键，将创建空手势库")
+                    # 创建一个新的带有正确格式的手势库文件
+                    try:
+                        empty_gestures = {
+                            "version": "1.0",
+                            "gestures": {
+                                "示例手势1": {
+                                    "directions": "URDL",
+                                    "action": "cHlhdXRvZ3VpLmhvdGtleSgnY3RybCcsICdjJyk="  # base64编码的: pyautogui.hotkey('ctrl', 'c')
+                                },
+                                "示例手势2": {
+                                    "directions": "LR",
+                                    "action": "cHlhdXRvZ3VpLmhvdGtleSgnYWx0JywgJ3RhYicp"  # base64编码的: pyautogui.hotkey('alt', 'tab')
+                                }
+                            }
+                        }
+                        with open(self.gestures_path, 'w', encoding='utf-8') as f:
+                            json.dump(empty_gestures, f, ensure_ascii=False, indent=4)
+                        log.info(f"{self.file_name} - 已创建新的手势库文件 {self.gestures_path}")
+                        
+                        # 从新创建的文件加载手势
+                        gestures = []
+                        for name, gesture in empty_gestures['gestures'].items():
+                            directions_str = gesture['directions']
+                            directions_list = [directions_str] if isinstance(directions_str, str) else directions_str
+                            gestures.append({
+                                'name': name,
+                                'directions': directions_list,
+                                'action': gesture['action']
+                            })
+                        return gestures
+                    except Exception as e:
+                        log.error(f"{self.file_name} - 创建手势库文件失败: {str(e)}")
+                        return []
                     
             except FileNotFoundError:
                 log.error(f"{self.file_name} - 手势库文件未找到: {self.gestures_path}")

@@ -1,12 +1,14 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                               QGroupBox, QFrame, QSpacerItem, QSizePolicy, QGridLayout,
                               QListWidget, QListWidgetItem, QLineEdit, QComboBox, QMessageBox,
-                              QScrollArea, QToolButton, QDialog, QDialogButtonBox, QFormLayout)
+                              QScrollArea, QToolButton, QDialog, QDialogButtonBox, QFormLayout,
+                              QTextEdit, QPlainTextEdit, QApplication, QToolBar, QAction)
 from PyQt5.QtCore import Qt, pyqtSignal, QSize, QEvent
 from PyQt5.QtGui import QFont, QColor, QPalette, QIcon
 
 import os
 import sys
+import base64
 
 try:
     from app.log import log
@@ -14,18 +16,151 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from app.log import log
 
+class DirectionButtonGroup(QWidget):
+    """方向按钮组，用于可视化地选择手势方向"""
+    
+    directionChanged = pyqtSignal(list)  # 方向变更信号
+    
+    def __init__(self, initial_directions=None, parent=None):
+        super().__init__(parent)
+        
+        if initial_directions is None:
+            initial_directions = []
+            
+        self.directions = initial_directions.copy() if isinstance(initial_directions, list) else []
+        
+        # 布局
+        main_layout = QVBoxLayout(self)
+        
+        # 方向显示
+        self.direction_display = QLabel()
+        self.direction_display.setStyleSheet("""
+            QLabel {
+                background-color: #f8f9fa;
+                border: 1px solid #E2E8F0;
+                border-radius: 5px;
+                padding: 8px;
+                min-height: 20px;
+            }
+        """)
+        main_layout.addWidget(self.direction_display)
+        
+        # 方向按钮网格
+        button_grid = QGridLayout()
+        button_grid.setSpacing(5)
+        
+        # 方向映射
+        self.direction_map = {
+            "↖": (0, 0), "↑": (0, 1), "↗": (0, 2),
+            "←": (1, 0), "·": (1, 1), "→": (1, 2),
+            "↙": (2, 0), "↓": (2, 1), "↘": (2, 2)
+        }
+        
+        # 创建方向按钮
+        for direction, (row, col) in self.direction_map.items():
+            if direction == "·":  # 中心点不需要按钮
+                continue
+                
+            btn = QPushButton(direction)
+            btn.setFixedSize(40, 40)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #E2E8F0;
+                    border: none;
+                    border-radius: 20px;
+                    font-size: 18px;
+                    font-weight: bold;
+                }
+                
+                QPushButton:hover {
+                    background-color: #CBD5E0;
+                }
+                
+                QPushButton:pressed {
+                    background-color: #4299E1;
+                    color: white;
+                }
+            """)
+            btn.clicked.connect(lambda checked, d=direction: self.add_direction(d))
+            button_grid.addWidget(btn, row, col)
+        
+        main_layout.addLayout(button_grid)
+        
+        # 工具栏
+        toolbar = QHBoxLayout()
+        
+        # 删除最后一个方向
+        delete_btn = QPushButton("删除")
+        delete_btn.setIcon(QIcon.fromTheme("edit-delete"))
+        delete_btn.clicked.connect(self.remove_last_direction)
+        toolbar.addWidget(delete_btn)
+        
+        # 清空所有方向
+        clear_btn = QPushButton("清空")
+        clear_btn.setIcon(QIcon.fromTheme("edit-clear"))
+        clear_btn.clicked.connect(self.clear_directions)
+        toolbar.addWidget(clear_btn)
+        
+        main_layout.addLayout(toolbar)
+        
+        # 更新显示
+        self._update_display()
+        
+    def add_direction(self, direction):
+        """添加方向"""
+        # 手动记录方向添加,避免重复
+        self.directions.append(direction)
+        self._update_display()
+        # 发出信号通知方向已改变
+        self.directionChanged.emit(self.directions.copy())  # 发送副本以避免引用问题
+        
+    def remove_last_direction(self):
+        """删除最后一个方向"""
+        if self.directions:
+            self.directions.pop()
+            self._update_display()
+            self.directionChanged.emit(self.directions.copy())  # 发送副本以避免引用问题
+            
+    def clear_directions(self):
+        """清空所有方向"""
+        self.directions.clear()
+        self._update_display()
+        self.directionChanged.emit(self.directions.copy())  # 发送副本以避免引用问题
+        
+    def get_directions(self):
+        """获取当前的方向列表"""
+        return self.directions
+    
+    def set_directions(self, directions):
+        """设置方向列表"""
+        self.directions = directions.copy() if directions else []
+        self._update_display()
+        
+    def _update_display(self):
+        """更新方向显示"""
+        if not self.directions:
+            self.direction_display.setText("未设置方向")
+        else:
+            display_text = " → ".join(self.directions)
+            self.direction_display.setText(display_text)
+
 class GestureEditDialog(QDialog):
     """手势编辑对话框"""
     
-    def __init__(self, gesture_name="", gesture_directions="", gesture_action="", parent=None):
+    def __init__(self, gesture_name="", gesture_directions=None, gesture_action="", parent=None):
         super().__init__(parent)
         
+        if gesture_directions is None:
+            gesture_directions = []
+            
         self.setWindowTitle("编辑手势")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(500)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         
         # 创建布局
         layout = QVBoxLayout(self)
+        layout.setSpacing(15)
         
         # 表单布局
         form_layout = QFormLayout()
@@ -36,27 +171,72 @@ class GestureEditDialog(QDialog):
         self.name_input.setPlaceholderText("请输入手势名称")
         form_layout.addRow("手势名称:", self.name_input)
         
-        # 方向输入
-        self.direction_input = QLineEdit(gesture_directions)
-        self.direction_input.setPlaceholderText("例如: up,down,left,right")
-        form_layout.addRow("手势方向:", self.direction_input)
+        # 方向输入（使用按钮组）
+        directions_label = QLabel("手势方向:")
+        form_layout.addRow(directions_label)
         
-        # 操作选择
-        self.action_combo = QComboBox()
-        self.action_combo.addItems([
-            "next_window", "prev_window", "maximize_current_window", 
-            "minimize_current_window", "minimize_all", "restore_all"
-        ])
-        
-        if gesture_action:
-            index = self.action_combo.findText(gesture_action)
-            if index >= 0:
-                self.action_combo.setCurrentIndex(index)
-                
-        form_layout.addRow("触发操作:", self.action_combo)
+        self.direction_buttons = DirectionButtonGroup(gesture_directions)
+        form_layout.addRow("", self.direction_buttons)
         
         # 添加表单布局
         layout.addLayout(form_layout)
+        
+        # Python代码编辑
+        code_group = QGroupBox("操作代码 (Python)")
+        code_layout = QVBoxLayout(code_group)
+        
+        # 代码编辑器
+        self.code_editor = QPlainTextEdit()
+        self.code_editor.setStyleSheet("""
+            QPlainTextEdit {
+                font-family: Consolas, 'Courier New', monospace;
+                font-size: 14px;
+                background-color: #f8f9fa;
+                border: 1px solid #E2E8F0;
+                border-radius: 5px;
+                padding: 10px;
+            }
+        """)
+        
+        # 如果有传入的操作代码，尝试从Base64解码
+        if gesture_action:
+            try:
+                decoded_action = base64.b64decode(gesture_action).decode('utf-8')
+                self.code_editor.setPlainText(decoded_action)
+            except:
+                # 如果解码失败，可能是未编码的原始代码
+                self.code_editor.setPlainText(gesture_action)
+        else:
+            # 默认代码模板
+            self.code_editor.setPlainText("""# 在此编写Python代码
+# 可使用以下模块:
+# - os, sys: 系统操作
+# - pyautogui: 自动化键鼠操作
+# - subprocess: 执行命令
+# - time: 时间操作
+
+# 示例 - 模拟Alt+Tab键切换窗口:
+pyautogui.hotkey('alt', 'tab')
+""")
+            
+        code_layout.addWidget(self.code_editor)
+        
+        # 提示信息
+        help_text = """
+        <b>可用模块:</b>
+        <ul>
+            <li><b>pyautogui</b>: 控制鼠标键盘，如 pyautogui.hotkey('alt', 'tab')</li>
+            <li><b>os</b> & <b>sys</b>: 系统操作</li>
+            <li><b>subprocess</b>: 执行系统命令</li>
+            <li><b>time</b>: 时间操作，如 time.sleep(1)</li>
+        </ul>
+        """
+        help_label = QLabel(help_text)
+        help_label.setStyleSheet("color: #4A5568; background-color: #EDF2F7; padding: 10px; border-radius: 5px;")
+        help_label.setWordWrap(True)
+        code_layout.addWidget(help_label)
+        
+        layout.addWidget(code_group)
         
         # 对话框按钮
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -114,10 +294,19 @@ class GestureEditDialog(QDialog):
         Returns:
             包含手势数据的字典
         """
+        # 获取代码文本
+        code_text = self.code_editor.toPlainText().strip()
+        
+        # Base64编码
+        try:
+            encoded_action = base64.b64encode(code_text.encode('utf-8')).decode('utf-8')
+        except:
+            encoded_action = ""
+            
         return {
             "name": self.name_input.text().strip(),
-            "directions": self.direction_input.text().strip(),
-            "action": self.action_combo.currentText()
+            "directions": self.direction_buttons.get_directions(),
+            "action": encoded_action
         }
 
 class GestureItem(QWidget):
@@ -146,7 +335,24 @@ class GestureItem(QWidget):
         info_layout.addWidget(name_label)
         
         # 方向和操作
-        details_label = QLabel(f"方向: {directions} | 操作: {action}")
+        # 将方向列表格式化为文本
+        if isinstance(directions, list):
+            directions_text = " → ".join(directions) if directions else "无"
+        else:
+            directions_text = directions if directions else "无"
+            
+        # 尝试获取代码的前30个字符作为摘要
+        if action:
+            try:
+                # 尝试Base64解码
+                action_decoded = base64.b64decode(action).decode('utf-8')
+                action_summary = action_decoded[:30] + "..." if len(action_decoded) > 30 else action_decoded
+            except:
+                action_summary = action[:30] + "..." if len(action) > 30 else action
+        else:
+            action_summary = "无操作"
+            
+        details_label = QLabel(f"方向: {directions_text}")
         details_label.setStyleSheet("font-size: 13px; color: #4A5568;")
         info_layout.addWidget(details_label)
         
@@ -405,10 +611,21 @@ class GesturesPage(QWidget):
         if not gesture:
             QMessageBox.warning(self, "编辑失败", f"找不到键名为 {key} 的手势")
             return
+        
+        # 准备方向数据 - 确保以列表格式传入
+        directions = gesture.get('directions', [])
+        if not isinstance(directions, list):
+            # 如果是字符串格式，尝试转换
+            if ',' in directions:
+                directions = [d.strip() for d in directions.split(',')]
+            elif directions:
+                directions = [directions]
+            else:
+                directions = []
             
         dialog = GestureEditDialog(
             gesture.get('name', ''),
-            gesture.get('directions', ''),
+            directions,
             gesture.get('action', ''),
             parent=self
         )

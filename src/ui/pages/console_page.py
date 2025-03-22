@@ -309,23 +309,19 @@ class ControlPanel(QGroupBox):
         status_layout = QHBoxLayout(status_container)
         status_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 状态指示器
-        self.status_indicator = QProgressBar()
-        self.status_indicator.setRange(0, 0)  # 设置为忙碌状态指示器
-        self.status_indicator.setTextVisible(True)
-        self.status_indicator.setFormat("就绪")
+        # 状态指示器 - 使用标签替代进度条
+        self.status_indicator = QLabel("就绪")
+        self.status_indicator.setAlignment(Qt.AlignCenter)
+        self.status_indicator.setFixedHeight(30)
         self.status_indicator.setStyleSheet("""
-            QProgressBar {
+            QLabel {
                 border: 1px solid #E2E8F0;
                 border-radius: 5px;
                 background-color: #EDF2F7;
-                height: 25px;
-                text-align: center;
-            }
-            
-            QProgressBar::chunk {
-                background-color: #4299E1;
-                width: 20px;
+                padding: 5px 15px;
+                font-size: 14px;
+                font-weight: bold;
+                color: #4A5568;
             }
         """)
         status_layout.addWidget(self.status_indicator)
@@ -341,29 +337,13 @@ class ControlPanel(QGroupBox):
         layout.addWidget(status_container)
         
         # 绘画按钮
-        self.toggle_btn = QPushButton("开始绘画")
+        self.toggle_btn = QPushButton("开始")
         self.toggle_btn.setObjectName("toggle_btn")
         self.toggle_btn.setCursor(Qt.PointingHandCursor)
         self.toggle_btn.setProperty("class", "primary")  # 使用属性设置样式类
         self.toggle_btn.setStyleSheet("background-color: #4299E1; color: white;")
         self.toggle_btn.clicked.connect(self.toggle_painting)
         layout.addWidget(self.toggle_btn)
-        
-        # 最小化按钮
-        minimize_btn = QPushButton("最小化到托盘")
-        minimize_btn.setObjectName("minimize_btn")
-        minimize_btn.setCursor(Qt.PointingHandCursor)
-        minimize_btn.clicked.connect(self.minimize)
-        layout.addWidget(minimize_btn)
-        
-        # 退出按钮
-        exit_btn = QPushButton("退出程序")
-        exit_btn.setObjectName("exit_btn")
-        exit_btn.setCursor(Qt.PointingHandCursor)
-        exit_btn.setProperty("class", "danger")  # 使用属性设置样式类
-        exit_btn.setStyleSheet("background-color: #F56565; color: white;")
-        exit_btn.clicked.connect(self.exit_app)
-        layout.addWidget(exit_btn)
         
     def toggle_painting(self):
         """切换绘画状态"""
@@ -383,10 +363,15 @@ class ControlPanel(QGroupBox):
         Args:
             is_running: 是否正在运行
         """
-        self.status_indicator.setRange(0, 0)
-        self.status_indicator.setValue(0)
-        self.status_label.setText("已停止" if not is_running else "运行中")
-        self.toggle_btn.setText("停止绘画" if is_running else "开始绘画")
+        self.status_indicator.setText("运行中" if is_running else "已停止")
+        
+        # 更新按钮文本
+        if is_running:
+            self.toggle_btn.setText("关闭")
+            self.toggle_btn.setStyleSheet("background-color: #F56565; color: white;")
+        else:
+            self.toggle_btn.setText("开始")
+            self.toggle_btn.setStyleSheet("background-color: #4299E1; color: white;")
 
 class ConsolePage(QWidget):
     """控制台页面"""
@@ -478,23 +463,19 @@ class ConsolePage(QWidget):
         actions_layout.setContentsMargins(0, 20, 0, 0)
         actions_layout.setSpacing(15)
         
-        # 状态显示
-        self.status_indicator = QProgressBar()
-        self.status_indicator.setRange(0, 0)  # 设置为忙碌状态指示器
-        self.status_indicator.setTextVisible(True)
-        self.status_indicator.setFormat("就绪")
+        # 状态指示器 - 使用标签替代进度条
+        self.status_indicator = QLabel("就绪")
+        self.status_indicator.setAlignment(Qt.AlignCenter)
+        self.status_indicator.setFixedHeight(30)
         self.status_indicator.setStyleSheet("""
-            QProgressBar {
+            QLabel {
                 border: 1px solid #E2E8F0;
                 border-radius: 5px;
                 background-color: #EDF2F7;
-                height: 25px;
-                text-align: center;
-            }
-            
-            QProgressBar::chunk {
-                background-color: #4299E1;
-                width: 20px;
+                padding: 5px 15px;
+                font-size: 14px;
+                font-weight: bold;
+                color: #4A5568;
             }
         """)
         actions_layout.addWidget(self.status_indicator)
@@ -503,9 +484,9 @@ class ConsolePage(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(10)
         
-        # 开始按钮
-        self.start_drawing_button = QPushButton("开始手势识别")
-        self.start_drawing_button.setStyleSheet("""
+        # 切换按钮（开始/关闭）
+        self.toggle_button = QPushButton("开始")
+        self.toggle_button.setStyleSheet("""
             QPushButton {
                 background-color: #4299E1;
                 color: white;
@@ -524,92 +505,11 @@ class ConsolePage(QWidget):
                 background-color: #2B6CB0;
             }
         """)
-        buttons_layout.addWidget(self.start_drawing_button)
-        
-        # 停止按钮
-        self.stop_drawing_button = QPushButton("停止手势识别")
-        self.stop_drawing_button.setEnabled(False)  # 初始禁用
-        self.stop_drawing_button.setStyleSheet("""
-            QPushButton {
-                background-color: #E53E3E;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 10px 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            
-            QPushButton:hover {
-                background-color: #C53030;
-            }
-            
-            QPushButton:pressed {
-                background-color: #9B2C2C;
-            }
-            
-            QPushButton:disabled {
-                background-color: #FC8181;
-                color: #FED7D7;
-            }
-        """)
-        buttons_layout.addWidget(self.stop_drawing_button)
+        self.toggle_button.clicked.connect(self.toggle_drawing)
+        buttons_layout.addWidget(self.toggle_button)
         
         # 添加按钮布局到操作布局
         actions_layout.addLayout(buttons_layout)
-        
-        # 其他操作按钮布局
-        other_buttons_layout = QHBoxLayout()
-        other_buttons_layout.setSpacing(10)
-        
-        # 最小化按钮
-        self.minimize_button = QPushButton("最小化到系统托盘")
-        self.minimize_button.setStyleSheet("""
-            QPushButton {
-                background-color: #718096;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 10px 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            
-            QPushButton:hover {
-                background-color: #4A5568;
-            }
-            
-            QPushButton:pressed {
-                background-color: #2D3748;
-            }
-        """)
-        other_buttons_layout.addWidget(self.minimize_button)
-        
-        # 退出按钮
-        self.exit_button = QPushButton("退出应用")
-        self.exit_button.setStyleSheet("""
-            QPushButton {
-                background-color: #F56565;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 10px 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            
-            QPushButton:hover {
-                background-color: #E53E3E;
-            }
-            
-            QPushButton:pressed {
-                background-color: #C53030;
-            }
-        """)
-        other_buttons_layout.addWidget(self.exit_button)
-        
-        # 添加其他按钮布局到操作布局
-        actions_layout.addLayout(other_buttons_layout)
         
         # 添加操作组到内容布局
         content_layout.addWidget(actions_group)
@@ -620,6 +520,11 @@ class ConsolePage(QWidget):
         # 更新初始状态
         self.update_status_display()
         
+    def toggle_drawing(self):
+        """切换绘图状态"""
+        # 发出信号，通知应用切换绘图状态
+        self.togglePaintingSignal.emit()
+        
     def update_drawing_state(self, active):
         """更新绘制状态
         
@@ -628,41 +533,75 @@ class ConsolePage(QWidget):
         """
         self.drawing_active = active
         
-        # 更新按钮状态
-        self.start_drawing_button.setEnabled(not active)
-        self.stop_drawing_button.setEnabled(active)
-        
-        # 更新状态指示器
+        # 更新按钮文本和样式
         if active:
-            self.status_indicator.setFormat("正在运行")
-            self.status_indicator.setStyleSheet("""
-                QProgressBar {
-                    border: 1px solid #E2E8F0;
+            self.toggle_button.setText("关闭")
+            self.toggle_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #F56565;
+                    color: white;
+                    border: none;
                     border-radius: 5px;
-                    background-color: #EDF2F7;
-                    height: 25px;
-                    text-align: center;
+                    padding: 10px 20px;
+                    font-size: 14px;
+                    font-weight: bold;
                 }
                 
-                QProgressBar::chunk {
-                    background-color: #48BB78;
-                    width: 20px;
+                QPushButton:hover {
+                    background-color: #E53E3E;
+                }
+                
+                QPushButton:pressed {
+                    background-color: #C53030;
                 }
             """)
         else:
-            self.status_indicator.setFormat("已停止")
+            self.toggle_button.setText("开始")
+            self.toggle_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4299E1;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    padding: 10px 20px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+                
+                QPushButton:hover {
+                    background-color: #3182CE;
+                }
+                
+                QPushButton:pressed {
+                    background-color: #2B6CB0;
+                }
+            """)
+        
+        # 更新状态指示器
+        if active:
+            self.status_indicator.setText("正在运行")
             self.status_indicator.setStyleSheet("""
-                QProgressBar {
+                QLabel {
                     border: 1px solid #E2E8F0;
                     border-radius: 5px;
                     background-color: #EDF2F7;
-                    height: 25px;
-                    text-align: center;
+                    padding: 5px 15px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    color: #48BB78;
                 }
-                
-                QProgressBar::chunk {
-                    background-color: #F56565;
-                    width: 20px;
+            """)
+        else:
+            self.status_indicator.setText("已停止")
+            self.status_indicator.setStyleSheet("""
+                QLabel {
+                    border: 1px solid #E2E8F0;
+                    border-radius: 5px;
+                    background-color: #EDF2F7;
+                    padding: 5px 15px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    color: #F56565;
                 }
             """)
     
@@ -690,19 +629,16 @@ class ConsolePage(QWidget):
             elif status_value == "stopped":
                 self.update_drawing_state(False)
             elif status_value == "ready":
-                self.status_indicator.setFormat("就绪")
+                self.status_indicator.setText("就绪")
                 self.status_indicator.setStyleSheet("""
-                    QProgressBar {
+                    QLabel {
                         border: 1px solid #E2E8F0;
                         border-radius: 5px;
                         background-color: #EDF2F7;
-                        height: 25px;
-                        text-align: center;
-                    }
-                    
-                    QProgressBar::chunk {
-                        background-color: #4299E1;
-                        width: 20px;
+                        padding: 5px 15px;
+                        font-size: 14px;
+                        font-weight: bold;
+                        color: #4299E1;
                     }
                 """)
     

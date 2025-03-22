@@ -151,8 +151,8 @@ class GestureManager(QObject):
         Args:
             key: 手势键名
             name: 手势名称
-            directions: 手势方向
-            action: 触发操作
+            directions: 手势方向，可以是列表或字符串
+            action: 触发操作，可以是Base64编码的Python代码
             
         Returns:
             是否添加成功
@@ -162,10 +162,25 @@ class GestureManager(QObject):
             log.warning(f"添加手势失败: 键名 {key} 已存在")
             return False
             
+        # 确保directions是正确的格式
+        if isinstance(directions, list):
+            # 如果是列表，保持原样
+            directions_data = directions
+        elif isinstance(directions, str):
+            # 如果是字符串，检查是否有逗号，有则分割
+            if ',' in directions:
+                directions_data = directions.split(',')
+            else:
+                # 单个方向或空字符串
+                directions_data = [directions] if directions else []
+        else:
+            # 其他类型，转为空列表
+            directions_data = []
+            
         # 添加手势
         self.gestures[key] = {
             "name": name,
-            "directions": directions,
+            "directions": directions_data,
             "action": action
         }
         
@@ -184,8 +199,8 @@ class GestureManager(QObject):
             old_key: 原手势键名
             new_key: 新手势键名
             name: 手势名称
-            directions: 手势方向
-            action: 触发操作
+            directions: 手势方向，可以是列表或字符串
+            action: 触发操作，可以是Base64编码的Python代码
             
         Returns:
             是否更新成功
@@ -200,6 +215,21 @@ class GestureManager(QObject):
             log.warning(f"更新手势失败: 新键名 {new_key} 已存在")
             return False
             
+        # 确保directions是正确的格式
+        if isinstance(directions, list):
+            # 如果是列表，保持原样
+            directions_data = directions
+        elif isinstance(directions, str):
+            # 如果是字符串，检查是否有逗号，有则分割
+            if ',' in directions:
+                directions_data = directions.split(',')
+            else:
+                # 单个方向或空字符串
+                directions_data = [directions] if directions else []
+        else:
+            # 其他类型，转为空列表
+            directions_data = []
+            
         # 如果键名发生变化，需要删除旧键名并添加新键名
         if old_key != new_key:
             # 删除旧键名
@@ -207,7 +237,7 @@ class GestureManager(QObject):
             # 添加新键名
             self.gestures[new_key] = {
                 "name": name,
-                "directions": directions,
+                "directions": directions_data,
                 "action": action
             }
             log.info(f"手势键名已从 {old_key} 更改为 {new_key}")
@@ -215,7 +245,7 @@ class GestureManager(QObject):
             # 键名未变，直接更新数据
             self.gestures[old_key] = {
                 "name": name,
-                "directions": directions,
+                "directions": directions_data,
                 "action": action
             }
             
