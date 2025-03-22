@@ -32,11 +32,11 @@ except ImportError:
     except ImportError:
         # 如果导入仍然失败，定义占位函数
         def create_autostart_entry():
-            log(__name__, "创建自启动项失败：未能导入相关函数", level="error")
+            log.error("创建自启动项失败：未能导入相关函数")
             return False
             
         def remove_autostart_entry():
-            log(__name__, "移除自启动项失败：未能导入相关函数", level="error")
+            log.error("移除自启动项失败：未能导入相关函数")
             return False
             
         def check_autostart_enabled():
@@ -55,7 +55,7 @@ class WebServer(QObject):
         """初始化Web服务器"""
         super().__init__()
         
-        log(__name__, "WebServer初始化")
+        log.info("WebServer初始化")
         self.app = Flask(__name__, 
                          template_folder=os.path.join(os.path.dirname(__file__), 'ui/templates'),
                          static_folder=os.path.join(os.path.dirname(__file__), 'ui/static'))
@@ -72,21 +72,21 @@ class WebServer(QObject):
             self.minimizeSignal.connect(self.app_instance.showMinimized)  # 改为调用标准最小化方法
             self.exitSignal.connect(self.app_instance.clean_exit)
         
-        log(__name__, "WebServer初始化完成")
+        log.info("WebServer初始化完成")
     
     def _register_routes(self):
         """注册所有路由和API端点"""
-        log(__name__, "注册路由")
+        log.info("注册路由")
         # 页面路由
         @self.app.route('/')
         def index():
             """显示加载页面"""
-            log(__name__, "访问加载页面")
+            log.info("访问加载页面")
             return render_template('loading.html')
             
         @self.app.route('/console')
         def console():
-            log(__name__, "访问控制台页面")
+            log.info("访问控制台页面")
             is_running = self._is_painting_running()
             
             system_info = self._get_system_info()
@@ -94,16 +94,16 @@ class WebServer(QObject):
         
         @self.app.route('/settings')
         def settings():
-            log(__name__, "访问设置页面")
+            log.info("访问设置页面")
             settings_data = self._load_settings()
             return render_template('settings.html', settings=settings_data)
         
         @self.app.route('/gestures')
         def gestures():
             """显示手势管理页面"""
-            log(__name__, "访问手势管理页面")
+            log.info("访问手势管理页面")
             gestures_data = self._load_gestures()
-            log(__name__, f"加载了 {len(gestures_data)} 个手势配置项")
+            log.info(f"加载了 {len(gestures_data)} 个手势配置项")
             return render_template('gestures.html', gestures=gestures_data)
         
         # 静态资源路由
@@ -114,7 +114,7 @@ class WebServer(QObject):
         @self.app.route('/static/js/form-controls.js')
         def form_controls_js():
             """提供表单控件JS文件"""
-            log(__name__, "加载表单控件增强脚本 - UI已优化")
+            log.info("加载表单控件增强脚本 - UI已优化")
             return send_file(os.path.join(os.path.dirname(__file__), 'ui/static/js/form-controls.js'))
         
         # API端点
@@ -131,12 +131,12 @@ class WebServer(QObject):
                 log(module, message, level=level)
                 return jsonify({'success': True})
             except Exception as e:
-                log(__name__, f"记录前端日志失败: {str(e)}", level="error")
+                log.error(f"记录前端日志失败: {str(e)}")
                 return jsonify({'success': False, 'message': str(e)})
         
         @self.app.route('/api/toggle_painting', methods=['POST'])
         def toggle_painting():
-            log(__name__, "API: 切换绘画状态")
+            log.info("API: 切换绘画状态")
             if not self.app_instance:
                 return jsonify({'success': False, 'message': '应用实例未初始化'})
             
@@ -160,20 +160,20 @@ class WebServer(QObject):
                 
                 return jsonify({'success': True, 'message': '状态切换中...'})
             except Exception as e:
-                log(__name__, f"切换绘画状态失败: {str(e)}", level="error")
+                log.error(f"切换绘画状态失败: {str(e)}")
                 return jsonify({'success': False, 'message': f'错误: {str(e)}'})
         
         @self.app.route('/api/painting_status', methods=['GET'])
         def painting_status():
             """获取当前绘画状态"""
-            log(__name__, "API: 查询绘画状态")
+            log.info("API: 查询绘画状态")
             is_running = self._is_painting_running()
             return jsonify({'success': True, 'is_running': is_running})
         
         @self.app.route('/api/minimize', methods=['POST'])
         def minimize_window():
             """最小化窗口API"""
-            log(__name__, "API: 最小化窗口")
+            log.info("API: 最小化窗口")
             if self.app_instance:
                 result = self.app_instance.minimize_window()
                 return jsonify(result)
@@ -184,7 +184,7 @@ class WebServer(QObject):
         
         @self.app.route('/api/exit', methods=['POST'])
         def exit_app():
-            log(__name__, "API: 退出应用")
+            log.info("API: 退出应用")
             if not self.app_instance:
                 return jsonify({'success': False, 'message': '应用实例未初始化'})
             
@@ -193,7 +193,7 @@ class WebServer(QObject):
                 self.exitSignal.emit()
                 return jsonify({'success': True})
             except Exception as e:
-                log(__name__, f"退出失败: {str(e)}", level="error")
+                log.error(f"退出失败: {str(e)}")
                 return jsonify({'success': False, 'message': str(e)})
         
         @self.app.route('/api/system_info')
@@ -211,7 +211,7 @@ class WebServer(QObject):
         @self.app.route('/api/autostart', methods=['POST'])
         def autostart():
             """设置开机自启动"""
-            log(__name__, "API: 设置开机自启动")
+            log.info("API: 设置开机自启动")
             data = request.get_json()
             if not data or 'enabled' not in data:
                 return jsonify({'success': False, 'message': '缺少参数'})
@@ -230,23 +230,25 @@ class WebServer(QObject):
         
         @self.app.route('/api/save_settings', methods=['POST'])
         def save_settings():
-            log(__name__, "API: 保存设置")
+            log.info("API: 保存设置")
             try:
                 settings_data = request.json
                 self._save_settings(settings_data)
                 return jsonify({'success': True})
             except Exception as e:
-                log(__name__, f"保存设置失败: {str(e)}", level="error")
+                log.error(f"保存设置失败: {str(e)}")
+                print(f"保存设置失败: {str(e)}")
                 return jsonify({'success': False, 'message': str(e)})
         
         @self.app.route('/api/reset_settings', methods=['POST'])
         def reset_settings():
-            log(__name__, "API: 重置设置")
+            log.info("API: 重置设置")
             try:
                 self._reset_settings()
                 return jsonify({'success': True})
             except Exception as e:
-                log(__name__, f"重置设置失败: {str(e)}", level="error")
+                log.error(f"重置设置失败: {str(e)}")
+                print(f"重置设置失败: {str(e)}")
                 return jsonify({'success': False, 'message': str(e)})
                 
         @self.app.route('/api/gestures', methods=['GET', 'POST'])
@@ -255,7 +257,7 @@ class WebServer(QObject):
             try:
                 if request.method == 'GET':
                     # 获取所有手势
-                    log(__name__, "获取所有手势")
+                    log.info("获取所有手势")
                     gestures = self._load_gestures()
                     return jsonify({"success": True, "gestures": gestures})
                 
@@ -270,17 +272,17 @@ class WebServer(QObject):
                         directions = data.get('directions')
                         action = data.get('action')
                         
-                        log(__name__, f"添加新手势：{gesture_name}，方向序列：{directions}")
-                        log(__name__, f"收到添加手势请求数据: {data}")
+                        log.info(f"添加新手势：{gesture_name}，方向序列：{directions}")
+                        log.info(f"收到添加手势请求数据: {data}")
                         
                         # 验证输入数据
                         if not gesture_name or not directions or not action:
-                            log(__name__, f"添加手势失败：参数不完整 name={gesture_name}, directions={directions}, action={'有值' if action else '无值'}", level="warning")
+                            log.warning(f"添加手势失败：参数不完整 name={gesture_name}, directions={directions}, action={'有值' if action else '无值'}")
                             return jsonify({"success": False, "message": "参数不完整"}), 400
                         
                         result = self._add_gesture(gesture_name, directions, action)
                         if result['success']:
-                            log(__name__, f"手势'{gesture_name}'添加成功")
+                            log.info(f"手势'{gesture_name}'添加成功")
                             return jsonify({"success": True, "message": f"手势 '{gesture_name}' 添加成功"})
                         else:
                             return jsonify({"success": False, "message": result['message']}), 400
@@ -292,17 +294,17 @@ class WebServer(QObject):
                         directions = data.get('directions')
                         action = data.get('action')
                         
-                        log(__name__, f"更新手势：{old_name} -> {new_name}，方向序列：{directions}")
-                        log(__name__, f"收到更新手势请求数据: {data}")
+                        log.info(f"更新手势：{old_name} -> {new_name}，方向序列：{directions}")
+                        log.info(f"收到更新手势请求数据: {data}")
                         
                         # 验证输入数据
                         if not old_name or not new_name or not directions or not action:
-                            log(__name__, f"更新手势失败：参数不完整 old_name={old_name}, new_name={new_name}, directions={directions}, action={'有值' if action else '无值'}", level="warning")
+                            log.warning(f"更新手势失败：参数不完整 old_name={old_name}, new_name={new_name}, directions={directions}, action={'有值' if action else '无值'}")
                             return jsonify({"success": False, "message": "参数不完整"}), 400
                         
                         result = self._update_gesture(old_name, new_name, directions, action)
                         if result['success']:
-                            log(__name__, f"手势'{old_name}'更新为'{new_name}'成功")
+                            log.info(f"手势'{old_name}'更新为'{new_name}'成功")
                             return jsonify({"success": True, "message": f"手势 '{new_name}' 更新成功"})
                         else:
                             return jsonify({"success": False, "message": result['message']}), 400
@@ -311,26 +313,26 @@ class WebServer(QObject):
                         # 删除手势
                         gesture_name = data.get('name')
                         
-                        log(__name__, f"删除手势：{gesture_name}")
+                        log.info(f"删除手势：{gesture_name}")
                         
                         # 验证输入数据
                         if not gesture_name:
-                            log(__name__, "删除手势失败：未指定手势名称", level="warning")
+                            log.warning("删除手势失败：未指定手势名称")
                             return jsonify({"success": False, "message": "未指定手势名称"}), 400
                         
                         result = self._delete_gesture(gesture_name)
                         if result:
-                            log(__name__, f"手势'{gesture_name}'删除成功")
+                            log.info(f"手势'{gesture_name}'删除成功")
                             return jsonify({"success": True, "message": f"手势 '{gesture_name}' 删除成功"})
                         else:
                             return jsonify({"success": False, "message": "删除手势失败，可能不存在该手势"}), 404
                     
                     else:
-                        log(__name__, f"未知的手势操作: {operation}", level="warning")
+                        log.warning(f"未知的手势操作: {operation}")
                         return jsonify({"success": False, "message": "未知操作"}), 400
             
             except Exception as e:
-                log(__name__, f"手势管理API异常: {str(e)}", level="error")
+                log.error(f"手势管理API异常: {str(e)}")
                 return jsonify({"success": False, "message": f"服务器错误: {str(e)}"}), 500
         
         @self.app.route('/api/test_gesture', methods=['POST'])
@@ -340,27 +342,27 @@ class WebServer(QObject):
                 data = request.json
                 action_base64 = data.get('action')
                 
-                log(__name__, "请求测试手势执行")
+                log.info("请求测试手势执行")
                 
                 if not action_base64:
-                    log(__name__, "测试手势失败：未提供动作代码", level="warning")
+                    log.warning("测试手势失败：未提供动作代码")
                     return jsonify({"success": False, "message": "未提供动作代码"}), 400
                     
                 # 执行动作代码
                 from app.operation_executor import execute
                 
-                log(__name__, "开始测试执行手势动作")
+                log.info("开始测试执行手势动作")
                 result = execute(action_base64)
                 
                 if result:
-                    log(__name__, "手势测试执行成功")
+                    log.info("手势测试执行成功")
                     return jsonify({"success": True, "message": "动作执行成功"})
                 else:
-                    log(__name__, "手势测试执行失败", level="warning")
+                    log.warning("手势测试执行失败")
                     return jsonify({"success": False, "message": "动作执行失败"}), 500
                     
             except Exception as e:
-                log(__name__, f"测试手势API异常: {str(e)}", level="error")
+                log.error(f"测试手势API异常: {str(e)}")
                 return jsonify({"success": False, "message": f"服务器错误: {str(e)}"}), 500
     
     def start(self):
@@ -368,7 +370,7 @@ class WebServer(QObject):
         if self.running:
             return
         
-        log(__name__, "启动Web服务器")
+        log.info("启动Web服务器")
         
         def run_server():
             self.app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False, threaded=True)
@@ -377,12 +379,12 @@ class WebServer(QObject):
         self.server_thread.daemon = True  # 设为守护线程，主程序退出时自动结束
         self.server_thread.start()
         self.running = True
-        log(__name__, "Web服务器线程已启动")
+        log.info("Web服务器线程已启动")
     
     def stop(self):
         """停止Web服务器"""
         self.running = False
-        log(__name__, "停止Web服务器")
+        log.info("停止Web服务器")
         # Flask没有优雅的停止方法，依赖于daemon线程自动结束
     
     def _get_system_info(self):
@@ -412,7 +414,7 @@ class WebServer(QObject):
                 config = json.load(f)
                 return config['drawing_settings']
         except Exception as e:
-            log(__name__, f"加载设置失败: {str(e)}", level="error")
+            log.error(f"加载设置失败: {str(e)}")
             print(f"加载设置失败: {str(e)}")
             # 返回默认设置
             return {
@@ -444,7 +446,7 @@ class WebServer(QObject):
             with open(settings_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=4)
                 
-            log(__name__, "设置已保存")
+            log.info("设置已保存")
             
             # 如果绘画实例已经在运行，立即应用新设置
             if self.app_instance and hasattr(self.app_instance, 'painter') and self.app_instance.painter is not None:
@@ -452,15 +454,15 @@ class WebServer(QObject):
                     # 更新运行中的绘画实例的参数
                     result = self.app_instance.painter.update_drawing_settings(settings_data)
                     if result:
-                        log(__name__, "绘画设置已即时应用到运行中的实例")
+                        log.info("绘画设置已即时应用到运行中的实例")
                     else:
-                        log(__name__, "运行时更新绘画设置失败", level="warning")
+                        log.warning("运行时更新绘画设置失败")
                 except Exception as e:
-                    log(__name__, f"更新运行中的绘画设置时出错: {str(e)}", level="error")
+                    log.error(f"更新运行中的绘画设置时出错: {str(e)}")
             
             return True
         except Exception as e:
-            log(__name__, f"保存设置失败: {str(e)}", level="error")
+            log.error(f"保存设置失败: {str(e)}")
             print(f"保存设置失败: {str(e)}")
             return False
     
@@ -496,7 +498,7 @@ class WebServer(QObject):
             with open(settings_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=4)
             
-            log(__name__, "设置已重置为默认值")
+            log.info("设置已重置为默认值")
             
             # 如果绘画实例已经在运行，立即应用重置后的设置
             if self.app_instance and hasattr(self.app_instance, 'painter') and self.app_instance.painter is not None:
@@ -504,15 +506,15 @@ class WebServer(QObject):
                     # 更新运行中的绘画实例的参数
                     result = self.app_instance.painter.update_drawing_settings(config['drawing_settings'])
                     if result:
-                        log(__name__, "默认设置已即时应用到运行中的实例")
+                        log.info("默认设置已即时应用到运行中的实例")
                     else:
-                        log(__name__, "运行时更新默认设置失败", level="warning")
+                        log.warning("运行时更新默认设置失败")
                 except Exception as e:
-                    log(__name__, f"重置并更新运行中的绘画设置时出错: {str(e)}", level="error")
+                    log.error(f"重置并更新运行中的绘画设置时出错: {str(e)}")
             
             return True
         except Exception as e:
-            log(__name__, f"重置设置失败: {str(e)}", level="error")
+            log.error(f"重置设置失败: {str(e)}")
             print(f"重置设置失败: {str(e)}")
             return False
     
@@ -539,7 +541,7 @@ class WebServer(QObject):
             # 检查painter属性是否存在且不为None
             return hasattr(self.app_instance, 'painter') and self.app_instance.painter is not None
         except Exception as e:
-            log(__name__, f"检查绘画状态失败: {str(e)}", level="error")
+            log.error(f"检查绘画状态失败: {str(e)}")
             return False 
     
     def _load_gestures(self):
@@ -550,13 +552,13 @@ class WebServer(QObject):
             if os.path.exists(gestures_path):
                 with open(gestures_path, 'r', encoding='utf-8') as f:
                     gestures_data = json.load(f)
-                    log(__name__, f"已加载手势数据，包含 {len(gestures_data.get('gestures', {}))} 个手势")
+                    log.info(f"已加载手势数据，包含 {len(gestures_data.get('gestures', {}))} 个手势")
                     return gestures_data.get('gestures', {})
             else:
-                log(__name__, "手势文件不存在，将返回空列表", level="warning")
+                log.warning("手势文件不存在，将返回空列表")
                 return {}
         except Exception as e:
-            log(__name__, f"加载手势数据失败: {str(e)}", level="error")
+            log.error(f"加载手势数据失败: {str(e)}")
             traceback.print_exc()
             return {}
     
@@ -624,10 +626,10 @@ class WebServer(QObject):
             with open(gestures_path, 'w', encoding='utf-8') as f:
                 json.dump({'gestures': gestures_data}, f, ensure_ascii=False, indent=2)
             
-            log(__name__, f"手势数据保存成功，共 {len(gestures_data)} 个手势")
+            log.info(f"手势数据保存成功，共 {len(gestures_data)} 个手势")
             return True
         except Exception as e:
-            log(__name__, f"保存手势数据失败: {str(e)}", level="error")
+            log.error(f"保存手势数据失败: {str(e)}")
             traceback.print_exc()
             return False
     
@@ -642,13 +644,13 @@ class WebServer(QObject):
         
         # 检查名称是否已存在
         if name in gestures_data:
-            log(__name__, f"添加手势失败: 手势名称 '{name}' 已存在", level="warning")
+            log.warning(f"添加手势失败: 手势名称 '{name}' 已存在")
             return {'success': False, 'message': f'手势名称 "{name}" 已存在'}
         
         # 检查手势合法性
         is_valid, error_message = self._check_gesture_validity(directions, gestures_data)
         if not is_valid:
-            log(__name__, f"添加手势失败: 手势 '{name}' {error_message}", level="warning")
+            log.warning(f"添加手势失败: 手势 '{name}' {error_message}")
             return {'success': False, 'message': f"手势无效: {error_message}"}
             
         # 添加手势
@@ -659,7 +661,7 @@ class WebServer(QObject):
         
         # 保存手势库
         if self._save_gestures(gestures_data):
-            log(__name__, f"已添加新手势: {name}，方向序列: {directions}")
+            log.info(f"已添加新手势: {name}，方向序列: {directions}")
             return {'success': True, 'message': '手势添加成功'}
         else:
             return {'success': False, 'message': '保存手势数据失败'}
@@ -670,18 +672,18 @@ class WebServer(QObject):
         
         # 检查原手势是否存在
         if old_name not in gestures_data:
-            log(__name__, f"更新手势失败: 手势 '{old_name}' 不存在", level="warning")
+            log.warning(f"更新手势失败: 手势 '{old_name}' 不存在")
             return {'success': False, 'message': f'手势 "{old_name}" 不存在'}
         
         # 如果名称有变更，检查新名称是否已存在
         if old_name != new_name and new_name in gestures_data:
-            log(__name__, f"更新手势失败: 新手势名称 '{new_name}' 已存在", level="warning")
+            log.warning(f"更新手势失败: 新手势名称 '{new_name}' 已存在")
             return {'success': False, 'message': f'手势名称 "{new_name}" 已存在'}
         
         # 检查手势合法性（更新时传入当前名称以避免与自身比较）
         is_valid, error_message = self._check_gesture_validity(directions, gestures_data, old_name)
         if not is_valid:
-            log(__name__, f"更新手势失败: 手势 '{new_name}' {error_message}", level="warning")
+            log.warning(f"更新手势失败: 手势 '{new_name}' {error_message}")
             return {'success': False, 'message': f"手势无效: {error_message}"}
         
         # 删除旧手势
@@ -696,7 +698,7 @@ class WebServer(QObject):
         
         # 保存手势库
         if self._save_gestures(gestures_data):
-            log(__name__, f"已更新手势: {old_name} -> {new_name}，方向序列: {directions}")
+            log.info(f"已更新手势: {old_name} -> {new_name}，方向序列: {directions}")
             return {'success': True, 'message': '手势更新成功'}
         else:
             return {'success': False, 'message': '保存手势数据失败'}
@@ -707,7 +709,7 @@ class WebServer(QObject):
         
         # 检查手势是否存在
         if name not in gestures_data:
-            log(__name__, f"删除手势失败: 手势 '{name}' 不存在", level="warning")
+            log.warning(f"删除手势失败: 手势 '{name}' 不存在")
             return {'success': False, 'message': f'手势 "{name}" 不存在'}
         
         # 删除手势
@@ -715,7 +717,7 @@ class WebServer(QObject):
         
         # 保存手势库
         if self._save_gestures(gestures_data):
-            log(__name__, f"已删除手势: {name}")
+            log.info(f"已删除手势: {name}")
             return {'success': True, 'message': '手势删除成功'}
         else:
             return {'success': False, 'message': '保存手势数据失败'} 
