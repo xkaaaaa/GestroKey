@@ -520,8 +520,22 @@ class WebServer(QObject):
     
     def _get_settings_path(self):
         """获取设置文件路径"""
-        # 与ink_painter中相同的逻辑
+        # 优先查找src目录下的设置文件
         import sys
+        import os
+        
+        # 尝试项目src目录
+        try:
+            src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # src目录
+            src_settings_path = os.path.join(src_dir, 'settings.json')
+            
+            if os.path.exists(src_settings_path):
+                log.info(f"使用项目src目录下的设置文件: {src_settings_path}")
+                return src_settings_path
+        except Exception as e:
+            log.error(f"查找项目设置文件路径时出错: {str(e)}")
+        
+        # 如果项目目录中不存在，则使用原来的逻辑
         if getattr(sys, 'frozen', False):
             # 打包后使用exe所在目录的上二级目录
             return os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'settings.json')
@@ -530,7 +544,7 @@ class WebServer(QObject):
             return os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                 'settings.json'
-            ) 
+            )
     
     def _is_painting_running(self):
         """检查绘画模块是否正在运行"""

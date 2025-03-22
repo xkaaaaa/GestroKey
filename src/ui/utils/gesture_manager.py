@@ -21,12 +21,33 @@ class GestureManager(QObject):
         
         # 设置配置文件路径
         if config_file is None:
-            # 获取应用程序数据目录
-            app_data_dir = os.path.join(os.path.expanduser("~"), ".gestrokey")
-            if not os.path.exists(app_data_dir):
-                os.makedirs(app_data_dir)
-            
-            self.config_file = os.path.join(app_data_dir, "gestures.json")
+            # 优先查找项目目录下的手势库文件
+            try:
+                # 尝试获取项目目录
+                current_dir = os.path.dirname(os.path.abspath(__file__))  # utils目录
+                project_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))  # 项目根目录
+                src_dir = os.path.join(project_dir, "src")  # src目录
+                
+                src_gestures_path = os.path.join(src_dir, "gestures.json")
+                if os.path.exists(src_gestures_path):
+                    log.info(f"使用项目目录下的手势库文件: {src_gestures_path}")
+                    self.config_file = src_gestures_path
+                else:
+                    # 获取应用程序数据目录
+                    app_data_dir = os.path.join(os.path.expanduser("~"), ".gestrokey")
+                    if not os.path.exists(app_data_dir):
+                        os.makedirs(app_data_dir)
+                    
+                    self.config_file = os.path.join(app_data_dir, "gestures.json")
+                    log.info(f"使用用户目录下的手势库文件: {self.config_file}")
+            except Exception as e:
+                log.error(f"获取项目目录时出错: {str(e)}")
+                # 如果出错，使用默认的用户目录路径
+                app_data_dir = os.path.join(os.path.expanduser("~"), ".gestrokey")
+                if not os.path.exists(app_data_dir):
+                    os.makedirs(app_data_dir)
+                
+                self.config_file = os.path.join(app_data_dir, "gestures.json")
         else:
             self.config_file = config_file
         

@@ -66,12 +66,24 @@ class GestureParser:
         """
         self.trail = trail_points
         
-        # 如果没有指定路径，使用默认路径
+        # 如果没有指定路径，优先查找项目目录下的文件
         if config_path is None:
-            config_path = os.path.expanduser("~/.gestrokey/settings.json")
+            # 尝试查找项目目录下的设置文件
+            src_dir_config = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settings.json")
+            
+            if os.path.exists(src_dir_config):
+                config_path = src_dir_config
+            else:
+                config_path = os.path.expanduser("~/.gestrokey/settings.json")
         
         if gestures_path is None:
-            gestures_path = os.path.expanduser("~/.gestrokey/gestures.json")
+            # 尝试查找项目目录下的手势库文件
+            src_dir_gestures = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gestures.json")
+            
+            if os.path.exists(src_dir_gestures):
+                gestures_path = src_dir_gestures
+            else:
+                gestures_path = os.path.expanduser("~/.gestrokey/gestures.json")
             
         self.config_path = config_path
         self.gestures_path = gestures_path

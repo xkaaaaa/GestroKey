@@ -211,12 +211,26 @@ class InkPainter:
 
     def get_config_path(self):
         """获取配置文件路径"""
+        # 优先查找项目目录下的配置文件
+        src_dir_config = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settings.json")
+        
+        if os.path.exists(src_dir_config):
+            log.info(f"使用项目目录下的配置文件: {src_dir_config}")
+            return src_dir_config
+        
         # 使用用户主目录下的.gestrokey文件夹
         config_dir = os.path.expanduser("~/.gestrokey")
         return os.path.join(config_dir, "settings.json")
     
     def get_gesture_path(self):
         """获取手势库文件路径"""
+        # 优先查找项目目录下的手势库文件
+        src_dir_gestures = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gestures.json")
+        
+        if os.path.exists(src_dir_gestures):
+            log.info(f"使用项目目录下的手势库文件: {src_dir_gestures}")
+            return src_dir_gestures
+        
         # 使用用户主目录下的.gestrokey文件夹
         config_dir = os.path.expanduser("~/.gestrokey")
         return os.path.join(config_dir, "gestures.json")

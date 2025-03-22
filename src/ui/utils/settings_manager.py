@@ -21,12 +21,20 @@ class SettingsManager(QObject):
         
         # 设置配置文件路径
         if config_file is None:
-            # 获取应用程序数据目录
-            app_data_dir = os.path.join(os.path.expanduser("~"), ".gestrokey")
-            if not os.path.exists(app_data_dir):
-                os.makedirs(app_data_dir)
+            # 优先查找项目目录下的配置文件
+            src_dir_config = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "settings.json")
             
-            self.config_file = os.path.join(app_data_dir, "settings.json")
+            if os.path.exists(src_dir_config):
+                self.config_file = src_dir_config
+                log.info(f"使用项目目录下的配置文件: {src_dir_config}")
+            else:
+                # 获取应用程序数据目录
+                app_data_dir = os.path.join(os.path.expanduser("~"), ".gestrokey")
+                if not os.path.exists(app_data_dir):
+                    os.makedirs(app_data_dir)
+                
+                self.config_file = os.path.join(app_data_dir, "settings.json")
+                log.info(f"使用用户目录下的配置文件: {self.config_file}")
         else:
             self.config_file = config_file
         
@@ -92,12 +100,21 @@ class SettingsManager(QObject):
                 if not os.path.exists(gestures_file):
                     empty_gestures = {
                         "version": "1.0",
-                        "gestures": {}
+                        "gestures": {
+                            "示例手势1": {
+                                "directions": "URDL",
+                                "action": "ctrl+c"
+                            },
+                            "示例手势2": {
+                                "directions": "LR",
+                                "action": "alt+tab"
+                            }
+                        }
                     }
                     try:
                         with open(gestures_file, 'w', encoding='utf-8') as f:
                             json.dump(empty_gestures, f, ensure_ascii=False, indent=4)
-                        log.info(f"已创建空的手势库文件 {gestures_file}")
+                        log.info(f"已创建示例手势库文件 {gestures_file}")
                     except Exception as e:
                         log.error(f"创建手势库文件失败: {str(e)}")
                 
