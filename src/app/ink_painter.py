@@ -170,6 +170,7 @@ class InkPainter:
         self.min_distance = 20           # 最小触发距离（像素）
         self.max_stroke_points = 200     # 最大笔画点数
         self.max_stroke_duration = 5     # 最大笔画持续时间（秒）
+        self.canvas_border = 1           # 画布边框大小（像素）
         
         # 状态变量
         self.right_button_pressed = False  # 右键是否按下
@@ -246,7 +247,17 @@ class InkPainter:
         
         # 创建透明全屏画布
         self.canvas = Canvas()
-        self.canvas.resize(self.screen_width, self.screen_height)
+        
+        # 获取画布边框大小（从设置中获取，默认为1像素）
+        canvas_border = self.canvas_border if hasattr(self, 'canvas_border') else 1
+        
+        # 获取屏幕尺寸并调整画布大小，根据边框设置减少相应像素
+        log.info(f"{self.file_name}设置画布大小: 宽 {self.screen_width - canvas_border*2}px, 高 {self.screen_height - canvas_border*2}px, 边框 {canvas_border}px")
+        self.canvas.resize(self.screen_width - canvas_border*2, self.screen_height - canvas_border*2)
+        
+        # 设置窗口位置，考虑边框大小
+        self.canvas.move(canvas_border, canvas_border)
+        
         self.canvas.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.canvas.setAttribute(Qt.WA_TranslucentBackground)
         self.canvas.setAttribute(Qt.WA_ShowWithoutActivating)
@@ -1013,24 +1024,30 @@ class InkPainter:
         Returns:
             成功返回True，失败返回False
         """
-        log.info(self.file_name + "更新绘画设置")
+        log.info(self.file_name + "更新绘画设置: " + str(settings))
         
         try:
+            updated_settings = []
+            
             # 基础宽度
             if 'base_width' in settings:
                 self.base_width = float(settings['base_width'])
+                updated_settings.append(f"base_width={self.base_width}")
                 
             # 最小宽度
             if 'min_width' in settings:
                 self.min_width = float(settings['min_width'])
+                updated_settings.append(f"min_width={self.min_width}")
                 
             # 最大宽度
             if 'max_width' in settings:
                 self.max_width = float(settings['max_width'])
+                updated_settings.append(f"max_width={self.max_width}")
                 
             # 平滑度
             if 'smoothing' in settings:
                 self.smoothing = float(settings['smoothing'])
+                updated_settings.append(f"smoothing={self.smoothing}")
                 
             # 颜色
             if 'color' in settings:
@@ -1041,29 +1058,75 @@ class InkPainter:
                         r, g, b = self.hex_to_rgb(color_hex)
                         # 设置颜色
                         self.line_color = (r, g, b)
+                        updated_settings.append(f"color={color_hex}")
                     except Exception as e:
                         log.error(f"颜色解析失败: {str(e)}")
                         
             # 高级笔刷
             if 'advanced_brush' in settings:
                 self.use_advanced_brush = bool(settings['advanced_brush'])
+                updated_settings.append(f"advanced_brush={self.use_advanced_brush}")
                 
             # 自动平滑
             if 'auto_smoothing' in settings:
                 self.auto_smoothing = bool(settings['auto_smoothing'])
+                updated_settings.append(f"auto_smoothing={self.auto_smoothing}")
                 
             # 淡出时间
             if 'fade_time' in settings:
                 self.fade_duration = float(settings['fade_time'])
+                updated_settings.append(f"fade_time={self.fade_duration}")
                 
             # 速度因子
             if 'speed_factor' in settings:
                 self.speed_factor = float(settings['speed_factor'])
+                updated_settings.append(f"speed_factor={self.speed_factor}")
                 
-            log.info(self.file_name + "绘画设置已更新")
+            # 最小触发距离
+            if 'min_distance' in settings:
+                self.min_distance = int(float(settings['min_distance']))
+                updated_settings.append(f"min_distance={self.min_distance}")
+                
+            # 最大笔画点数
+            if 'max_stroke_points' in settings:
+                self.max_stroke_points = int(float(settings['max_stroke_points']))
+                updated_settings.append(f"max_stroke_points={self.max_stroke_points}")
+                
+            # 最大笔画持续时间
+            if 'max_stroke_duration' in settings:
+                self.max_stroke_duration = int(float(settings['max_stroke_duration']))
+                updated_settings.append(f"max_stroke_duration={self.max_stroke_duration}")
+                
+            # 硬件加速
+            if 'hardware_acceleration' in settings and hasattr(self, 'canvas'):
+                hardware_accel = bool(settings['hardware_acceleration'])
+                self.canvas.enable_hardware_acceleration = hardware_accel
+                updated_settings.append(f"hardware_acceleration={hardware_accel}")
+                
+            # 画布边框大小
+            if 'canvas_border' in settings:
+                old_border = self.canvas_border if hasattr(self, 'canvas_border') else 1
+                self.canvas_border = int(settings['canvas_border'])
+                updated_settings.append(f"canvas_border={self.canvas_border}")
+                
+                # 如果边框大小改变且画布已创建，则重新调整画布大小
+                if hasattr(self, 'canvas') and old_border != self.canvas_border:
+                    log.info(f"{self.file_name}重新调整画布大小: 宽 {self.screen_width - self.canvas_border*2}px, 高 {self.screen_height - self.canvas_border*2}px, 边框 {self.canvas_border}px")
+                    self.canvas.resize(self.screen_width - self.canvas_border*2, self.screen_height - self.canvas_border*2)
+                    # 更新画布位置
+                    self.canvas.move(self.canvas_border, self.canvas_border)
+
+            # 打印所有更新的设置
+            if updated_settings:
+                log.info(self.file_name + "已更新以下设置: " + ", ".join(updated_settings))
+            else:
+                log.info(self.file_name + "未更新任何设置，使用现有配置")
+                
             return True
         except Exception as e:
             log.error(self.file_name + "更新绘画设置失败: " + str(e))
+            import traceback
+            log.error(self.file_name + "错误堆栈: " + traceback.format_exc())
             return False
 
 if __name__ == "__main__":

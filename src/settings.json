@@ -1,18 +1,21 @@
 {
   "drawing": {
-    "speed_factor": 1.0,
-    "base_width": 3.0,
-    "min_width": 1.0,
-    "max_width": 5.0,
+    "speed_factor": 1.1,
+    "base_width": 9.0,
+    "min_width": 3.0,
+    "max_width": 15.0,
     "smoothing": 0.7,
     "color": "#4299E1",
-    "fade_time": 1.0,
-    "advanced_brush": false,
-    "auto_smoothing": true
-  },
-  "gesture": {
+    "fade_time": 0.5,
+    "advanced_brush": true,
+    "auto_smoothing": true,
+    "min_distance": 20,
+    "max_stroke_points": 200,
+    "max_stroke_duration": 5,
+    "hardware_acceleration": true,
+    "canvas_border": 1,
     "min_points": 10,
-    "max_pause_ms": 300,
+    "max_pause_ms": 300.0,
     "min_length": 50,
     "sensitivity": 0.8
   },
@@ -23,7 +26,5 @@
     "auto_start_recognition": false,
     "show_notifications": true,
     "log_level": "info"
-  },
-  "min_width": 2.5,
-  "max_width": 6.5
+  }
 }

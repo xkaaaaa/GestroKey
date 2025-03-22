@@ -306,6 +306,26 @@ class Sidebar(QWidget):
             log.info(f"导航到页面: {page_name}")
         else:
             log.warning(f"导航到未知页面: {page_name}")
+            
+    def set_active_page(self, page_name):
+        """仅设置活动页面，不触发页面切换
+        
+        用于在用户取消页面切换时恢复正确的选中状态
+        
+        Args:
+            page_name: 页面名称
+        """
+        if page_name in self.buttons:
+            # 静默更新按钮状态，不触发信号
+            for btn_name, btn in self.buttons.items():
+                # 直接设置按钮状态而不触发信号
+                btn.blockSignals(True)  # 阻止信号发送
+                btn.setChecked(btn_name == page_name)
+                btn.blockSignals(False)  # 恢复信号
+            
+            log.debug(f"静默更新侧边栏选中状态: {page_name}")
+        else:
+            log.warning(f"尝试设置未知页面为活动页: {page_name}")
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

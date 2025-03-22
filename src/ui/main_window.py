@@ -61,6 +61,9 @@ class MainWindow(QMainWindow):
         # 状态变量
         self.drawing_active = False
         
+        # 标记是否正在处理页面切换
+        self.is_handling_page_change = False
+        
         # 连接信号
         self.connect_signals()
         
@@ -105,7 +108,7 @@ class MainWindow(QMainWindow):
         self.init_pages()
         
         # 连接侧边栏的页面切换信号
-        self.sidebar.pageChanged.connect(self.change_page)
+        self.sidebar.pageChanged.connect(self.on_sidebar_page_changed)
         
         # 默认显示控制台页面
         self.sidebar.navigate_to("console")
@@ -131,29 +134,127 @@ class MainWindow(QMainWindow):
             "gestures": 2
         }
         
+        # 当前页面
+        self.current_page = "console"
+        
     def connect_signals(self):
         """连接信号与槽"""
         # 控制台页面的切换按钮信号
         self.console_page.toggle_button.clicked.connect(self.toggle_drawing)
         
-        # 设置页面的保存按钮信号
+        # 设置页面的信号
         self.settings_page.save_button.clicked.connect(self.save_settings)
         self.settings_page.reset_button.clicked.connect(self.reset_settings)
         
+        # 连接设置页面的未保存更改信号
+        self.settings_page.hasUnsavedChanges.connect(self.on_settings_changed)
+        
         # 将应用控制器的信号转发到控制台页面
         self.app_controller.sigStatusUpdate.connect(self.on_status_update)
+        
+        # 修改侧边栏页面切换处理方式
+        try:
+            self.sidebar.pageChanged.disconnect(self.change_page)  # 尝试断开原有连接
+        except TypeError:
+            # 如果没有连接，忽略错误
+            pass
+        self.sidebar.pageChanged.connect(self.on_sidebar_page_changed)  # 连接到新的处理方法
+        
+    def on_sidebar_page_changed(self, page_name):
+        """侧边栏页面切换请求处理
+        
+        Args:
+            page_name: 需要切换的页面名称
+            
+        Returns:
+            bool: 是否成功切换页面
+        """
+        log.debug(f"收到页面切换请求: 从 {self.current_page} 到 {page_name}")
+        
+        # 调用页面切换方法
+        success = self.change_page(page_name)
+        
+        # 如果切换失败，恢复侧边栏的选中状态
+        if not success:
+            log.debug(f"页面切换被取消，恢复侧边栏状态到: {self.current_page}")
+            # 使用标志禁止sidebar.set_active_page引发的信号
+            # 通过断开和重新连接信号来防止重复触发
+            try:
+                # 临时断开信号连接
+                self.sidebar.pageChanged.disconnect(self.on_sidebar_page_changed)
+                # 恢复侧边栏选中状态为当前页面
+                self.sidebar.set_active_page(self.current_page)
+            finally:
+                # 重新连接信号
+                self.sidebar.pageChanged.connect(self.on_sidebar_page_changed)
+                
+            log.debug(f"恢复完成，维持在页面: {self.current_page}")
+        else:
+            log.debug(f"页面成功切换到: {page_name}")
+        
+        return success
         
     def change_page(self, page_name):
         """切换页面
         
         Args:
             page_name: 页面名称
+            
+        Returns:
+            bool: 是否成功切换页面
         """
+        # 如果试图切换到当前页面，直接返回成功
+        if page_name == self.current_page:
+            log.debug(f"请求切换到当前页面 {page_name}，无需操作")
+            return True
+            
+        # 检查是否从设置页离开且有未保存的更改
+        if self.current_page == "settings" and self.settings_page.has_pending_changes():
+            log.debug(f"从设置页切换到 {page_name} 时有未保存的更改，显示确认对话框")
+            
+            # 创建消息框
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("未保存的更改")
+            msg_box.setText("您有未保存的设置更改。是否保存这些更改？")
+            msg_box.setIcon(QMessageBox.Question)
+            
+            # 添加自定义按钮
+            save_btn = msg_box.addButton("保存", QMessageBox.AcceptRole)
+            discard_btn = msg_box.addButton("放弃", QMessageBox.DestructiveRole)
+            cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
+            
+            # 显示对话框
+            msg_box.exec_()
+            
+            # 处理用户选择
+            clicked_button = msg_box.clickedButton()
+            
+            if clicked_button == save_btn:
+                # 保存设置
+                log.info("用户选择保存设置")
+                self.save_settings()
+                # 继续切换页面
+            elif clicked_button == discard_btn:
+                # 放弃更改，重新加载已保存的设置
+                log.info("用户选择放弃更改")
+                current_settings = self.settings_manager.get_settings()
+                self.settings_page.update_settings(current_settings)
+                self.settings_page.hasUnsavedChanges.emit(False)
+                # 继续切换页面
+            elif clicked_button == cancel_btn:
+                # 取消页面切换，保持在设置页面
+                log.info("用户取消页面切换，保持在设置页面")
+                return False
+        
+        # 切换页面
         if page_name in self.pages:
             self.content_stack.setCurrentIndex(self.pages[page_name])
             log.info(f"切换到页面: {page_name}")
+            self.current_page = page_name
+            return True
         else:
             log.warning(f"未知页面: {page_name}")
+            return False
             
     def toggle_drawing(self):
         """切换绘制状态"""
@@ -203,23 +304,37 @@ class MainWindow(QMainWindow):
         )
         
         if reply == QMessageBox.Yes:
-            # 重置设置
             if self.settings_manager.reset_to_defaults():
                 log.info("设置已重置为默认值")
                 
-                # 重新加载设置页面
+                # 更新UI显示
                 default_settings = self.settings_manager.get_settings()
-                self.settings_page.load_settings(default_settings)
-                
-                QMessageBox.information(self, "重置成功", "设置已重置为默认值。")
+                self.settings_page.update_settings(default_settings)
                 
                 # 应用设置到应用控制器
                 if self.app_controller:
                     self.app_controller.apply_settings(default_settings)
+                    
+                QMessageBox.information(self, "重置成功", "所有设置已重置为默认值。")
             else:
                 log.error("重置设置失败")
                 QMessageBox.warning(self, "重置失败", "重置设置时发生错误。")
                 
+    def apply_single_setting(self, key, value):
+        """处理单个设置变更
+        
+        注意: 此方法不再用于实时应用设置，仅在兼容旧代码或
+        特殊场景下使用。设置通常在save_settings方法中批量应用。
+        
+        Args:
+            key: 设置键名
+            value: 设置值
+        """
+        log.debug(f"单次设置更新请求: {key} = {value} (未立即应用)")
+        
+        # 不再立即应用设置，仅在保存按钮点击时应用
+        # 保留此方法仅用于兼容或特殊需求
+        
     def on_status_update(self, status_type, status_value):
         """状态更新处理
         
@@ -232,6 +347,55 @@ class MainWindow(QMainWindow):
         
         # 发出状态变化信号
         self.sigStatusChange.emit(status_type, status_value)
+        
+    def on_settings_changed(self, has_changes):
+        """处理设置页面未保存更改的状态变化
+        
+        Args:
+            has_changes: 是否有未保存的更改
+        """
+        # 可以在这里更新UI以指示有未保存的更改
+        # 例如修改保存按钮的样式或显示提示图标
+        if has_changes:
+            self.settings_page.save_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #F59E0B;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    padding: 8px 16px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+                
+                QPushButton:hover {
+                    background-color: #D97706;
+                }
+                
+                QPushButton:pressed {
+                    background-color: #B45309;
+                }
+            """)
+        else:
+            self.settings_page.save_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4299E1;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    padding: 8px 16px;
+                    font-size: 14px;
+                    font-weight: bold;
+                }
+                
+                QPushButton:hover {
+                    background-color: #3182CE;
+                }
+                
+                QPushButton:pressed {
+                    background-color: #2B6CB0;
+                }
+            """)
         
     def setup_tray_icon(self):
         """设置系统托盘图标"""
@@ -403,14 +567,62 @@ class MainWindow(QMainWindow):
         Args:
             event: 关闭事件
         """
-        reply = QMessageBox.question(
-            self, "确认退出", 
-            "确定要退出应用程序吗？",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+        # 检查是否有未保存的设置更改
+        if self.current_page == "settings" and self.settings_page.has_pending_changes():
+            log.debug("关闭窗口时有未保存的设置更改，显示确认对话框")
+            
+            # 创建消息框
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("未保存的更改")
+            msg_box.setText("您有未保存的设置更改。是否在退出前保存这些更改？")
+            msg_box.setIcon(QMessageBox.Question)
+            
+            # 添加自定义按钮
+            save_btn = msg_box.addButton("保存", QMessageBox.AcceptRole)
+            discard_btn = msg_box.addButton("放弃", QMessageBox.DestructiveRole)
+            cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
+            
+            # 显示对话框
+            msg_box.exec_()
+            
+            # 处理用户选择
+            clicked_button = msg_box.clickedButton()
+            
+            if clicked_button == save_btn:
+                # 保存设置
+                log.info("用户选择保存设置后退出")
+                self.save_settings()
+                # 继续关闭
+            elif clicked_button == discard_btn:
+                # 放弃更改，重新加载设置
+                log.info("用户选择放弃更改后退出")
+                current_settings = self.settings_manager.get_settings()
+                self.settings_page.update_settings(current_settings)
+                self.settings_page.hasUnsavedChanges.emit(False)
+                # 继续关闭
+            elif clicked_button == cancel_btn:
+                # 取消关闭
+                log.info("用户取消退出，保持窗口打开")
+                event.ignore()
+                return
+
+        # 创建退出确认对话框
+        log.debug("显示退出确认对话框")
+        exit_msg_box = QMessageBox(self)
+        exit_msg_box.setWindowTitle("确认退出")
+        exit_msg_box.setText("确定要退出应用程序吗？")
+        exit_msg_box.setIcon(QMessageBox.Question)
         
-        if reply == QMessageBox.Yes:
+        # 添加自定义按钮
+        yes_btn = exit_msg_box.addButton("是", QMessageBox.YesRole)
+        no_btn = exit_msg_box.addButton("否", QMessageBox.NoRole)
+        
+        # 显示对话框
+        exit_msg_box.exec_()
+        
+        # 处理用户选择
+        if exit_msg_box.clickedButton() == yes_btn:
+            log.info("用户确认退出应用程序")
             # 关闭应用前停止手势识别
             if self.drawing_active and self.app_controller:
                 self.app_controller.stop_gesture_recognition()
@@ -428,6 +640,7 @@ class MainWindow(QMainWindow):
             # 接受关闭事件
             event.accept()
         else:
+            log.info("用户取消退出应用程序")
             # 忽略关闭事件
             event.ignore()
             

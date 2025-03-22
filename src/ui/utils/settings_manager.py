@@ -42,22 +42,24 @@ class SettingsManager(QObject):
         self.default_settings = {
             # 绘制设置
             "drawing": {
-                "speed_factor": 1.0,  # 速度因子
-                "base_width": 3.0,   # 基础宽度
-                "min_width": 1.0,    # 最小宽度
-                "max_width": 5.0,    # 最大宽度
-                "smoothing": 0.7,    # 平滑度
-                "color": "#4299E1",  # 绘制颜色
-                "fade_time": 1.0,    # 淡出时间（秒）
-                "advanced_brush": False,  # 高级笔刷
-                "auto_smoothing": True,   # 自动平滑
-            },
-            # 手势设置
-            "gesture": {
-                "min_points": 10,     # 最小点数
-                "max_pause_ms": 300,  # 最大暂停时间（毫秒）
-                "min_length": 50,     # 最小手势长度
-                "sensitivity": 0.8,   # 识别灵敏度
+                "speed_factor": 1.2,    # 速度因子
+                "base_width": 6.0,      # 基础宽度
+                "min_width": 3.0,       # 最小宽度
+                "max_width": 15.0,      # 最大宽度
+                "smoothing": 0.7,       # 平滑度
+                "color": "#4299E1",     # 绘制颜色
+                "fade_time": 0.5,       # 淡出时间（秒）
+                "advanced_brush": True,  # 高级笔刷
+                "auto_smoothing": True,  # 自动平滑
+                "min_distance": 20,      # 最小触发距离（像素）
+                "max_stroke_points": 200, # 最大笔画点数
+                "max_stroke_duration": 5, # 最大笔画持续时间（秒）
+                "hardware_acceleration": True, # 硬件加速
+                "canvas_border": 1,      # 画布边框大小（像素）
+                "min_points": 10,     # 最小点数（原手势设置）
+                "max_pause_ms": 300,  # 最大暂停时间（毫秒）（原手势设置）
+                "min_length": 50,     # 最小长度（原手势设置）
+                "sensitivity": 0.8,   # 灵敏度（原手势设置）
             },
             # 应用程序设置
             "app": {
@@ -133,13 +135,25 @@ class SettingsManager(QObject):
         """
         if settings is not None:
             # 更新当前设置
+            log.debug(f"合并新设置到默认设置中")
             self.settings = self.merge_settings(self.default_settings, settings)
             
         try:
+            # 确保目录存在
+            config_dir = os.path.dirname(self.config_file)
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+                log.info(f"创建配置目录: {config_dir}")
+                
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, ensure_ascii=False, indent=2)
                 
             log.info(f"设置已保存到配置文件 {self.config_file}")
+            
+            # 读取设置以验证是否正确保存
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                saved_data = json.load(f)
+                log.debug(f"验证保存的设置: 成功读取 {len(saved_data)} 个分类")
             
             # 发出设置变更信号
             self.settingsChanged.emit(copy.deepcopy(self.settings))
@@ -148,6 +162,8 @@ class SettingsManager(QObject):
             
         except Exception as e:
             log.error(f"保存设置失败: {str(e)}")
+            import traceback
+            log.error(f"错误堆栈: {traceback.format_exc()}")
             return False
         
     def get_settings(self):
@@ -184,12 +200,35 @@ class SettingsManager(QObject):
         Returns:
             是否设置成功
         """
+        log.debug(f"设置 {category}/{key} = {value}")
+        
         # 确保类别存在
         if category not in self.settings:
             self.settings[category] = {}
             
+        # 保存旧值以便日志输出
+        old_value = self.settings[category].get(key, "None")
+            
         # 设置值
         self.settings[category][key] = value
+        
+        # 记录日志
+        log.info(f"设置已更新: {category}/{key} = {value} (原值: {old_value})")
+        
+        # 立即保存到文件
+        try:
+            # 确保目录存在
+            config_dir = os.path.dirname(self.config_file)
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+                
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.settings, f, ensure_ascii=False, indent=2)
+            log.debug(f"设置已立即保存到文件: {category}/{key} = {value}")
+        except Exception as e:
+            log.error(f"保存设置到文件失败: {str(e)}")
+            import traceback
+            log.error(f"错误堆栈: {traceback.format_exc()}")
         
         # 发出设置变更信号
         self.settingsChanged.emit(copy.deepcopy(self.settings))
@@ -222,18 +261,79 @@ class SettingsManager(QObject):
         """
         result = copy.deepcopy(defaults)
         
+        # 特殊设置键名映射 - 根级别设置到正确的类别
+        special_keys_mapping = {
+            "force_topmost": ("app", "force_topmost"),
+            "start_with_system": ("app", "start_with_windows")
+        }
+        
         # 遍历用户设置，将有效的值合并到结果中
         for category, category_settings in user_settings.items():
-            if category in result:
-                # 类别存在，合并键值
+            # 首先检查是否为特殊键名
+            if category in special_keys_mapping:
+                target_category, target_key = special_keys_mapping[category]
+                result[target_category][target_key] = category_settings
+                log.info(f"特殊设置 '{category}' 已移动到 '{target_category}/{target_key}'")
+                continue
+                
+            if category in result and isinstance(result[category], dict) and isinstance(category_settings, dict):
+                # 类别存在且是字典类型，合并键值
                 for key, value in category_settings.items():
-                    if key in result[category]:
+                    # 检查类别内特殊键名映射
+                    if category == "app" and key == "start_with_system":
+                        result[category]["start_with_windows"] = value
+                        log.debug(f"设置键名映射: {category}/start_with_system -> {category}/start_with_windows")
+                    else:
                         result[category][key] = value
+            elif category in ["drawing", "gesture", "app"]:
+                # 确保核心类别存在并是字典
+                if category not in result:
+                    result[category] = {}
+                if isinstance(category_settings, dict):
+                    for key, value in category_settings.items():
+                        # 检查类别内特殊键名映射
+                        if category == "app" and key == "start_with_system":
+                            result[category]["start_with_windows"] = value
+                            log.debug(f"设置键名映射: {category}/start_with_system -> {category}/start_with_windows")
+                        else:
+                            result[category][key] = value
             else:
-                # 类别不存在，整个添加
-                result[category] = copy.deepcopy(category_settings)
+                # 处理可能出现在根级别的设置 - 尝试找出它应该属于哪个类别
+                if isinstance(category_settings, dict) or not self._is_setting_key_in_defaults(category, defaults):
+                    # 这是一个未知的分类或复杂结构，保留它
+                    result[category] = copy.deepcopy(category_settings)
+                else:
+                    # 这可能是一个应该在已知分类中的设置
+                    category_found = False
+                    for default_category, default_settings in defaults.items():
+                        if isinstance(default_settings, dict) and category in default_settings:
+                            # 找到了应该放置的类别
+                            result[default_category][category] = category_settings
+                            category_found = True
+                            log.info(f"设置 '{category}' 已移动到 '{default_category}' 类别")
+                            break
+                    
+                    if not category_found:
+                        # 没有找到对应的类别，保留在根级别
+                        result[category] = category_settings
+                        log.warning(f"未知的设置项 '{category}' 保留在根级别")
                 
         return result
+        
+    def _is_setting_key_in_defaults(self, key, defaults):
+        """检查一个设置键是否存在于默认设置的任何类别中
+        
+        Args:
+            key: 要检查的设置键
+            defaults: 默认设置
+            
+        Returns:
+            布尔值，指示键是否存在
+        """
+        for category, settings in defaults.items():
+            if isinstance(settings, dict) and key in settings:
+                return True
+        return False
 
 if __name__ == "__main__":
     import sys

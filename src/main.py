@@ -135,22 +135,64 @@ class AppController(QObject):
         
         Args:
             settings: 要应用的设置
+            
+        Returns:
+            是否成功应用设置
         """
-        # 如果墨水绘图对象已初始化，更新其设置
-        if self.ink_painter is not None:
-            try:
-                # 获取绘图相关设置
-                drawing_settings = settings.get("drawing_settings", {})
-                if drawing_settings:
-                    log.info("更新墨水绘图器设置")
-                    self.ink_painter.update_drawing_settings(drawing_settings)
-                    log.info("墨水绘图器设置已更新")
-            except Exception as e:
-                log.error(f"更新绘图设置失败: {str(e)}")
-                import traceback
-                log.error(f"异常堆栈: {traceback.format_exc()}")
+        log.info("正在应用新设置: " + str(settings.keys()))
         
-        log.info("已应用新设置")
+        success = True
+        
+        try:
+            # 如果墨水绘图对象已初始化，更新其设置
+            if self.ink_painter is not None:
+                try:
+                    # 检查是否有绘画设置的直接更新
+                    if "drawing_settings" in settings:
+                        # 获取传递过来的绘画设置
+                        drawing_settings = settings.get("drawing_settings", {})
+                        if drawing_settings:
+                            log.info(f"更新墨水绘图器设置（通过绘画设置直接更新）: {list(drawing_settings.keys())}")
+                            if self.ink_painter.update_drawing_settings(drawing_settings):
+                                log.info("墨水绘图器设置已直接更新成功")
+                            else:
+                                log.warning("墨水绘图器设置更新可能部分失败")
+                                success = False
+                    # 或者从settings中的drawing分类获取
+                    elif "drawing" in settings:
+                        drawing_settings = settings.get("drawing", {})
+                        if drawing_settings:
+                            log.info(f"更新墨水绘图器设置（通过settings.drawing更新）: {list(drawing_settings.keys())}")
+                            if self.ink_painter.update_drawing_settings(drawing_settings):
+                                log.info("墨水绘图器设置已更新成功")
+                            else:
+                                log.warning("墨水绘图器设置更新可能部分失败")
+                                success = False
+                except Exception as e:
+                    log.error(f"更新绘图设置失败: {str(e)}")
+                    import traceback
+                    log.error(f"异常堆栈: {traceback.format_exc()}")
+                    success = False
+                    
+            # 应用其他设置
+            if "app" in settings:
+                app_settings = settings.get("app", {})
+                log.info(f"应用app设置: {list(app_settings.keys())}")
+                # 可以在此处理应用设置...
+                
+            if "gesture" in settings:
+                gesture_settings = settings.get("gesture", {})
+                log.info(f"应用gesture设置: {list(gesture_settings.keys())}")
+                # 可以在此处理手势设置...
+            
+            log.info("已应用新设置，状态: " + ("成功" if success else "部分失败"))
+            return success
+            
+        except Exception as e:
+            log.error(f"应用设置过程中发生错误: {str(e)}")
+            import traceback
+            log.error(f"异常堆栈: {traceback.format_exc()}")
+            return False
         
     def cleanup(self):
         """清理资源"""

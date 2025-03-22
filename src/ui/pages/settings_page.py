@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
                               QGroupBox, QFrame, QSpacerItem, QSizePolicy, QGridLayout,
-                              QSlider, QCheckBox, QScrollArea)
+                              QSlider, QCheckBox, QScrollArea, QColorDialog)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QColor, QPalette
 
@@ -112,8 +112,15 @@ class SliderSetting(QWidget):
         # 计算实际值
         actual_value = value * self.step
         
-        # 更新值标签
-        self.value_label.setText(str(actual_value))
+        # 更新值标签，格式化数字，限制小数位数
+        if actual_value.is_integer():
+            # 如果是整数，不显示小数部分
+            formatted_value = str(int(actual_value))
+        else:
+            # 如果是小数，最多显示2位小数，并移除尾部的0
+            formatted_value = f"{actual_value:.2f}".rstrip('0').rstrip('.')
+        
+        self.value_label.setText(formatted_value)
         
         # 发送值变更信号
         self.valueChanged.emit(self.key, actual_value)
@@ -183,6 +190,93 @@ class CheckboxSetting(QWidget):
         """设置复选框状态"""
         self.checkbox.setChecked(checked)
 
+class ColorPickerSetting(QWidget):
+    """颜色选择器设置组件"""
+    
+    # 定义信号
+    valueChanged = pyqtSignal(str, str)  # 值变更信号，参数为(键名, 颜色值)
+    
+    def __init__(self, key, title, default_value, parent=None):
+        super().__init__(parent)
+        self.key = key
+        
+        # 设置默认值
+        if default_value is None:
+            default_value = "#4299E1"  # 默认蓝色
+        self.current_color = default_value
+        
+        # 创建布局
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 10)
+        
+        # 标题
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2D3748;")
+        layout.addWidget(title_label)
+        
+        # 创建颜色预览框
+        self.color_preview = QFrame()
+        self.color_preview.setFixedSize(24, 24)
+        self.color_preview.setStyleSheet(f"background-color: {default_value}; border: 1px solid #CBD5E0; border-radius: 3px;")
+        layout.addWidget(self.color_preview)
+        
+        # 创建颜色值标签
+        self.color_value = QLabel(default_value)
+        self.color_value.setStyleSheet("font-size: 14px; color: #4A5568; margin-left: 5px;")
+        layout.addWidget(self.color_value)
+        
+        # 创建选择按钮
+        self.select_button = QPushButton("选择")
+        self.select_button.setCursor(Qt.PointingHandCursor)
+        self.select_button.setStyleSheet("""
+            QPushButton {
+                background-color: #E2E8F0;
+                color: #4A5568;
+                border: none;
+                border-radius: 3px;
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+            
+            QPushButton:hover {
+                background-color: #CBD5E0;
+            }
+            
+            QPushButton:pressed {
+                background-color: #A0AEC0;
+            }
+        """)
+        self.select_button.clicked.connect(self.show_color_dialog)
+        layout.addWidget(self.select_button)
+        
+        # 添加弹性空间
+        layout.addStretch()
+        
+    def show_color_dialog(self):
+        """显示颜色选择对话框"""
+        initial_color = QColor(self.current_color)
+        color = QColorDialog.getColor(initial_color, self, "选择颜色")
+        
+        if color.isValid():
+            # 获取十六进制颜色值
+            hex_color = color.name()
+            
+            # 更新预览和标签
+            self.color_preview.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #CBD5E0; border-radius: 3px;")
+            self.color_value.setText(hex_color)
+            
+            # 保存当前颜色
+            self.current_color = hex_color
+            
+            # 发送值变更信号
+            self.valueChanged.emit(self.key, hex_color)
+            
+    def set_color(self, color):
+        """设置颜色值"""
+        self.current_color = color
+        self.color_preview.setStyleSheet(f"background-color: {color}; border: 1px solid #CBD5E0; border-radius: 3px;")
+        self.color_value.setText(color)
+
 class SettingsPage(QWidget):
     """设置页面"""
     
@@ -190,12 +284,15 @@ class SettingsPage(QWidget):
     settingChanged = pyqtSignal(str, object)  # 单个设置变更信号，参数为(键名, 值)
     saveSettingsClicked = pyqtSignal(dict)    # 保存设置信号，参数为设置字典
     resetSettingsClicked = pyqtSignal()       # 重置设置信号
+    hasUnsavedChanges = pyqtSignal(bool)      # 未保存更改状态信号
     
     def __init__(self, settings_manager, parent=None):
         super().__init__(parent)
         self.settings_manager = settings_manager
-        self.settings = {}
+        self.settings = {}            # 当前已保存的设置
+        self.pending_settings = {}    # 未保存的临时设置
         self.settings_controls = {}
+        self.has_unsaved_changes = False
         self.init_ui()
         
     def init_ui(self):
@@ -249,8 +346,8 @@ class SettingsPage(QWidget):
         
         # 速度因子
         speed_slider = SliderSetting(
-            "speed_factor", "速度因子", 0.1, 2.0, 0.1, 
-            self.settings_manager.get_setting("drawing", "speed_factor", 1.0)
+            "speed_factor", "速度因子", 0.1, 3.0, 0.1, 
+            self.settings_manager.get_setting("drawing", "speed_factor", 1.2)
         )
         speed_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(speed_slider)
@@ -258,8 +355,8 @@ class SettingsPage(QWidget):
         
         # 基本宽度
         base_width_slider = SliderSetting(
-            "base_width", "基本宽度", 1, 10, 0.5, 
-            self.settings_manager.get_setting("drawing", "base_width", 5)
+            "base_width", "基本宽度", 1, 15, 0.5, 
+            self.settings_manager.get_setting("drawing", "base_width", 6.0)
         )
         base_width_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(base_width_slider)
@@ -268,7 +365,7 @@ class SettingsPage(QWidget):
         # 最小宽度
         min_width_slider = SliderSetting(
             "min_width", "最小宽度", 1, 10, 0.5, 
-            self.settings_manager.get_setting("drawing", "min_width", 3)
+            self.settings_manager.get_setting("drawing", "min_width", 3.0)
         )
         min_width_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(min_width_slider)
@@ -276,16 +373,70 @@ class SettingsPage(QWidget):
         
         # 最大宽度
         max_width_slider = SliderSetting(
-            "max_width", "最大宽度", 2, 20, 0.5, 
-            self.settings_manager.get_setting("drawing", "max_width", 12)
+            "max_width", "最大宽度", 5, 30, 0.5, 
+            self.settings_manager.get_setting("drawing", "max_width", 15.0)
         )
         max_width_slider.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(max_width_slider)
         self.settings_controls["drawing/max_width"] = max_width_slider
         
+        # 平滑度
+        smoothing_slider = SliderSetting(
+            "smoothing", "平滑度", 0.0, 1.0, 0.05, 
+            self.settings_manager.get_setting("drawing", "smoothing", 0.7)
+        )
+        smoothing_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(smoothing_slider)
+        self.settings_controls["drawing/smoothing"] = smoothing_slider
+        
+        # 笔画颜色
+        color_picker = ColorPickerSetting(
+            "color", "笔画颜色", 
+            self.settings_manager.get_setting("drawing", "color", "#4299E1")
+        )
+        color_picker.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(color_picker)
+        self.settings_controls["drawing/color"] = color_picker
+        
+        # 渐隐时间
+        fade_time_slider = SliderSetting(
+            "fade_time", "渐隐时间(秒)", 0.1, 2.0, 0.1, 
+            self.settings_manager.get_setting("drawing", "fade_time", 0.5)
+        )
+        fade_time_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(fade_time_slider)
+        self.settings_controls["drawing/fade_time"] = fade_time_slider
+        
+        # 最小触发距离
+        min_distance_slider = SliderSetting(
+            "min_distance", "最小触发距离(像素)", 5, 50, 1, 
+            self.settings_manager.get_setting("drawing", "min_distance", 20)
+        )
+        min_distance_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(min_distance_slider)
+        self.settings_controls["drawing/min_distance"] = min_distance_slider
+        
+        # 最大笔画点数
+        max_points_slider = SliderSetting(
+            "max_stroke_points", "最大笔画点数", 50, 500, 10, 
+            self.settings_manager.get_setting("drawing", "max_stroke_points", 200)
+        )
+        max_points_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(max_points_slider)
+        self.settings_controls["drawing/max_stroke_points"] = max_points_slider
+        
+        # 最大笔画持续时间
+        max_duration_slider = SliderSetting(
+            "max_stroke_duration", "最大笔画持续时间(秒)", 1, 10, 1, 
+            self.settings_manager.get_setting("drawing", "max_stroke_duration", 5)
+        )
+        max_duration_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(max_duration_slider)
+        self.settings_controls["drawing/max_stroke_duration"] = max_duration_slider
+        
         # 启用高级画笔
         advanced_brush_checkbox = CheckboxSetting(
-            "enable_advanced_brush", "启用高级画笔", 
+            "advanced_brush", "启用高级画笔", 
             self.settings_manager.get_setting("drawing", "advanced_brush", True)
         )
         advanced_brush_checkbox.valueChanged.connect(self.on_setting_changed)
@@ -294,12 +445,66 @@ class SettingsPage(QWidget):
         
         # 启用自动平滑
         auto_smoothing_checkbox = CheckboxSetting(
-            "enable_auto_smoothing", "启用自动平滑", 
+            "auto_smoothing", "启用自动平滑", 
             self.settings_manager.get_setting("drawing", "auto_smoothing", True)
         )
         auto_smoothing_checkbox.valueChanged.connect(self.on_setting_changed)
         drawing_layout.addWidget(auto_smoothing_checkbox)
         self.settings_controls["drawing/auto_smoothing"] = auto_smoothing_checkbox
+        
+        # 启用硬件加速
+        hardware_accel_checkbox = CheckboxSetting(
+            "hardware_acceleration", "启用硬件加速", 
+            self.settings_manager.get_setting("drawing", "hardware_acceleration", True)
+        )
+        hardware_accel_checkbox.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(hardware_accel_checkbox)
+        self.settings_controls["drawing/hardware_acceleration"] = hardware_accel_checkbox
+        
+        # 最小点数
+        min_points_slider = SliderSetting(
+            "min_points", "最小点数", 5, 30, 1, 
+            self.settings_manager.get_setting("drawing", "min_points", 10)
+        )
+        min_points_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(min_points_slider)
+        self.settings_controls["drawing/min_points"] = min_points_slider
+        
+        # 最大暂停时间
+        max_pause_slider = SliderSetting(
+            "max_pause_ms", "最大暂停时间(毫秒)", 100, 1000, 50, 
+            self.settings_manager.get_setting("drawing", "max_pause_ms", 300)
+        )
+        max_pause_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(max_pause_slider)
+        self.settings_controls["drawing/max_pause_ms"] = max_pause_slider
+        
+        # 最小长度
+        min_length_slider = SliderSetting(
+            "min_length", "最小长度(像素)", 10, 100, 5, 
+            self.settings_manager.get_setting("drawing", "min_length", 50)
+        )
+        min_length_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(min_length_slider)
+        self.settings_controls["drawing/min_length"] = min_length_slider
+        
+        # 灵敏度
+        sensitivity_slider = SliderSetting(
+            "sensitivity", "灵敏度", 0.1, 1.0, 0.05, 
+            self.settings_manager.get_setting("drawing", "sensitivity", 0.8)
+        )
+        sensitivity_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(sensitivity_slider)
+        self.settings_controls["drawing/sensitivity"] = sensitivity_slider
+        
+        # 画布边框大小
+        canvas_border_slider = SliderSetting(
+            "canvas_border", "画布边框大小(像素)", 0, 10, 1, 
+            self.settings_manager.get_setting("drawing", "canvas_border", 1)
+        )
+        canvas_border_slider.valueChanged.connect(self.on_setting_changed)
+        drawing_layout.addWidget(canvas_border_slider)
+        self.settings_controls["drawing/canvas_border"] = canvas_border_slider
         
         # 添加绘画设置组到滚动区域
         scroll_layout.addWidget(drawing_group)
@@ -446,6 +651,11 @@ class SettingsPage(QWidget):
             self.settings = self.settings_manager.get_settings()
         else:
             self.settings = settings
+            
+        # 重置未保存的设置
+        self.pending_settings = {}
+        self.has_unsaved_changes = False
+        self.hasUnsavedChanges.emit(False)
         
         # 更新控件值
         for key, control in self.settings_controls.items():
@@ -456,29 +666,84 @@ class SettingsPage(QWidget):
                         control.set_value(self.settings[category][setting_key])
                     elif isinstance(control, CheckboxSetting):
                         control.set_checked(self.settings[category][setting_key])
+                    elif isinstance(control, ColorPickerSetting):
+                        control.set_color(self.settings[category][setting_key])
 
     def on_setting_changed(self, key, value):
-        """设置变更处理"""
+        """设置值变更处理 - 仅更新临时设置，不立即应用
+        
+        Args:
+            key: 设置键名
+            value: 设置值
+        """
+        log.debug(f"设置变更(未保存): {key} = {value}")
+        
+        # 解析键名 - 格式：分类/键名，例如: "drawing/speed_factor"
         if "/" in key:
             category, setting_key = key.split("/", 1)
-            # 确保分类存在
-            if category not in self.settings:
-                self.settings[category] = {}
-            # 更新设置值
-            self.settings[category][setting_key] = value
-            self.settingChanged.emit(key, value)
+            
+            # 特殊处理某些设置键名映射
+            if category == "app" and setting_key == "start_with_system":
+                setting_key = "start_with_windows"
+                log.debug(f"设置键名映射: start_with_system -> start_with_windows")
+            
+            # 更新未保存的设置
+            if category not in self.pending_settings:
+                self.pending_settings[category] = {}
+            self.pending_settings[category][setting_key] = value
+            
+            # 标记有未保存的更改
+            self.has_unsaved_changes = True
+            self.hasUnsavedChanges.emit(True)
         else:
-            # 兼容旧的无分类设置
-            self.settings[key] = value
-            self.settingChanged.emit(key, value)
+            # 尝试确定正确的类别
+            if key == "start_with_system":
+                if "app" not in self.pending_settings:
+                    self.pending_settings["app"] = {}
+                self.pending_settings["app"]["start_with_windows"] = value
+                log.debug(f"设置键名映射: start_with_system -> app/start_with_windows")
+            else:
+                # 直接更新设置（无分类）
+                self.pending_settings[key] = value
+            
+            # 标记有未保存的更改
+            self.has_unsaved_changes = True
+            self.hasUnsavedChanges.emit(True)
         
     def on_save_clicked(self):
-        """保存按钮点击处理"""
+        """保存按钮点击处理 - 应用所有待处理的设置"""
+        if not self.has_unsaved_changes:
+            return
+            
+        # 合并待处理的设置到当前设置
+        for category, settings in self.pending_settings.items():
+            if category not in self.settings:
+                self.settings[category] = {}
+            
+            if isinstance(settings, dict):
+                # 分类设置
+                for key, value in settings.items():
+                    self.settings[category][key] = value
+            else:
+                # 根级别设置
+                self.settings[category] = settings
+        
+        # 发出保存设置信号
         self.saveSettingsClicked.emit(self.settings)
+        
+        # 清除未保存的标记
+        self.pending_settings = {}
+        self.has_unsaved_changes = False
+        self.hasUnsavedChanges.emit(False)
         
     def on_reset_clicked(self):
         """重置按钮点击处理"""
         self.resetSettingsClicked.emit()
+        
+        # 清除未保存的标记
+        self.pending_settings = {}
+        self.has_unsaved_changes = False
+        self.hasUnsavedChanges.emit(False)
         
     def get_current_settings(self):
         """获取当前设置
@@ -486,6 +751,31 @@ class SettingsPage(QWidget):
         Returns:
             当前设置字典
         """
+        # 如果有未保存的更改，返回包含未保存更改的设置
+        if self.has_unsaved_changes:
+            # 创建当前设置的副本
+            result = {}
+            
+            # 添加当前已保存的设置
+            for category, settings in self.settings.items():
+                if isinstance(settings, dict):
+                    result[category] = settings.copy()
+                else:
+                    result[category] = settings
+            
+            # 合并未保存的设置
+            for category, settings in self.pending_settings.items():
+                if isinstance(settings, dict):
+                    if category not in result:
+                        result[category] = {}
+                    for key, value in settings.items():
+                        result[category][key] = value
+                else:
+                    result[category] = settings
+                    
+            return result
+            
+        # 否则直接返回当前已保存的设置
         return self.settings
 
     def update_settings(self, settings):
@@ -496,6 +786,11 @@ class SettingsPage(QWidget):
         """
         self.settings = settings
         
+        # 清除未保存的标记
+        self.pending_settings = {}
+        self.has_unsaved_changes = False
+        self.hasUnsavedChanges.emit(False)
+        
         # 更新控件值
         for key, control in self.settings_controls.items():
             if "/" in key:
@@ -505,7 +800,15 @@ class SettingsPage(QWidget):
                         control.set_value(settings[category][setting_key])
                     elif isinstance(control, CheckboxSetting):
                         control.set_checked(settings[category][setting_key])
+                        
+    def has_pending_changes(self):
+        """检查是否有未保存的设置更改
         
+        Returns:
+            布尔值，表示是否有未保存的更改
+        """
+        return self.has_unsaved_changes
+
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
     from ui.utils.settings_manager import SettingsManager
