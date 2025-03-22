@@ -96,8 +96,13 @@ class GestureManager(QObject):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     loaded_gestures = json.load(f)
                     
-                    # 验证加载的数据是否符合格式要求
-                    if isinstance(loaded_gestures, dict):
+                    # 检查是否为新版手势库格式 (有 version 和 gestures 字段)
+                    if isinstance(loaded_gestures, dict) and 'version' in loaded_gestures and 'gestures' in loaded_gestures:
+                        log.info(f"检测到新版手势库文件格式，版本: {loaded_gestures.get('version', '未知')}")
+                        self.gestures = loaded_gestures
+                        log.info(f"从配置文件 {self.config_file} 加载了 {len(loaded_gestures.get('gestures', {}))} 个手势")
+                    # 验证加载的数据是否符合旧版格式要求
+                    elif isinstance(loaded_gestures, dict):
                         self.gestures = loaded_gestures
                         log.info(f"从配置文件 {self.config_file} 加载了 {len(self.gestures)} 个手势")
                     else:
@@ -114,16 +119,35 @@ class GestureManager(QObject):
             self.gestures = copy.deepcopy(self.default_gestures)
         
     def save_gestures(self):
-        """将手势数据保存到配置文件"""
+        """保存手势到文件
+        
+        Returns:
+            是否保存成功
+        """
         try:
+            # 确保使用新格式保存
+            if 'version' not in self.gestures:
+                self.gestures['version'] = "1.0"
+                
+            if 'gestures' not in self.gestures:
+                # 创建gestures字段并移动所有手势到此字段下
+                new_gestures = {'version': self.gestures.get('version', "1.0"), 'gestures': {}}
+                
+                # 复制所有手势
+                for key, value in self.gestures.items():
+                    if key != 'version':
+                        new_gestures['gestures'][key] = value
+                        
+                self.gestures = new_gestures
+                
+            # 转换为JSON并保存
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.gestures, f, ensure_ascii=False, indent=2)
                 
-            log.info(f"保存了 {len(self.gestures)} 个手势到配置文件 {self.config_file}")
+            log.info(f"手势已保存到 {self.config_file}")
             return True
-            
         except Exception as e:
-            log.error(f"保存手势配置失败: {str(e)}")
+            log.error(f"保存手势失败: {str(e)}")
             return False
         
     def get_all_gestures(self):
@@ -143,7 +167,61 @@ class GestureManager(QObject):
         Returns:
             手势数据字典，不存在则返回None
         """
-        return copy.deepcopy(self.gestures.get(key))
+        # 检查是否是新版手势库格式
+        if 'gestures' in self.gestures:
+            gesture = copy.deepcopy(self.gestures['gestures'].get(key))
+            
+            # 确保返回的方向是列表格式
+            if gesture and 'directions' in gesture:
+                directions = gesture['directions']
+                if not isinstance(directions, list):
+                    if isinstance(directions, str):
+                        if ',' in directions:
+                            gesture['directions'] = [d.strip() for d in directions.split(',')]
+                            log.info(f"获取手势 {key}: 将方向字符串 '{directions}' 转换为列表 {gesture['directions']}")
+                        else:
+                            gesture['directions'] = [directions] if directions else []
+                            log.info(f"获取手势 {key}: 将单个方向 '{directions}' 转换为列表 {gesture['directions']}")
+                    else:
+                        gesture['directions'] = []
+                        log.warning(f"获取手势 {key}: 无法识别的方向格式 {directions}, 转换为空列表")
+                else:
+                    log.info(f"获取手势 {key}: 方向已是列表格式 {directions}")
+                    
+            # 确保返回的手势数据包含name字段
+            if gesture and 'name' not in gesture:
+                gesture['name'] = key
+                log.debug(f"获取手势 {key}: 未找到name字段，使用键名作为默认名称")
+                        
+            log.info(f"获取手势: 键名={key}, 数据={gesture}")
+            return gesture
+        else:
+            gesture = copy.deepcopy(self.gestures.get(key))
+            
+            # 确保返回的方向是列表格式
+            if gesture and 'directions' in gesture:
+                directions = gesture['directions']
+                if not isinstance(directions, list):
+                    if isinstance(directions, str):
+                        if ',' in directions:
+                            gesture['directions'] = [d.strip() for d in directions.split(',')]
+                            log.info(f"获取手势 {key}: 将方向字符串 '{directions}' 转换为列表 {gesture['directions']}")
+                        else:
+                            gesture['directions'] = [directions] if directions else []
+                            log.info(f"获取手势 {key}: 将单个方向 '{directions}' 转换为列表 {gesture['directions']}")
+                    else:
+                        gesture['directions'] = []
+                        log.warning(f"获取手势 {key}: 无法识别的方向格式 {directions}, 转换为空列表")
+                else:
+                    log.info(f"获取手势 {key}: 方向已是列表格式 {directions}")
+                    
+            # 确保返回的手势数据包含name字段
+            if gesture and 'name' not in gesture:
+                gesture['name'] = key
+                log.debug(f"获取手势 {key}: 未找到name字段，使用键名作为默认名称")
+                    
+            log.info(f"获取手势(旧格式): 键名={key}, 数据={gesture}")
+            return gesture
         
     def add_gesture(self, key, name, directions, action):
         """添加新手势
@@ -157,8 +235,14 @@ class GestureManager(QObject):
         Returns:
             是否添加成功
         """
+        # 检查是否是新版格式
+        is_new_format = 'version' in self.gestures and 'gestures' in self.gestures
+        
+        # 根据格式确定操作的对象
+        target_gestures = self.gestures['gestures'] if is_new_format else self.gestures
+        
         # 检查键名是否已存在
-        if key in self.gestures:
+        if key in target_gestures:
             log.warning(f"添加手势失败: 键名 {key} 已存在")
             return False
             
@@ -178,7 +262,7 @@ class GestureManager(QObject):
             directions_data = []
             
         # 添加手势
-        self.gestures[key] = {
+        target_gestures[key] = {
             "name": name,
             "directions": directions_data,
             "action": action
@@ -205,13 +289,19 @@ class GestureManager(QObject):
         Returns:
             是否更新成功
         """
+        # 检查是否是新版格式
+        is_new_format = 'version' in self.gestures and 'gestures' in self.gestures
+        
+        # 根据格式确定操作的对象
+        target_gestures = self.gestures['gestures'] if is_new_format else self.gestures
+        
         # 检查原键名是否存在
-        if old_key not in self.gestures:
+        if old_key not in target_gestures:
             log.warning(f"更新手势失败: 键名 {old_key} 不存在")
             return False
             
         # 如果键名发生变化，检查新键名是否已存在
-        if old_key != new_key and new_key in self.gestures:
+        if old_key != new_key and new_key in target_gestures:
             log.warning(f"更新手势失败: 新键名 {new_key} 已存在")
             return False
             
@@ -233,9 +323,9 @@ class GestureManager(QObject):
         # 如果键名发生变化，需要删除旧键名并添加新键名
         if old_key != new_key:
             # 删除旧键名
-            gesture_data = self.gestures.pop(old_key)
+            gesture_data = target_gestures.pop(old_key)
             # 添加新键名
-            self.gestures[new_key] = {
+            target_gestures[new_key] = {
                 "name": name,
                 "directions": directions_data,
                 "action": action
@@ -243,7 +333,7 @@ class GestureManager(QObject):
             log.info(f"手势键名已从 {old_key} 更改为 {new_key}")
         else:
             # 键名未变，直接更新数据
-            self.gestures[old_key] = {
+            target_gestures[old_key] = {
                 "name": name,
                 "directions": directions_data,
                 "action": action
@@ -266,13 +356,19 @@ class GestureManager(QObject):
         Returns:
             是否删除成功
         """
+        # 检查是否是新版格式
+        is_new_format = 'version' in self.gestures and 'gestures' in self.gestures
+        
+        # 根据格式确定操作的对象
+        target_gestures = self.gestures['gestures'] if is_new_format else self.gestures
+        
         # 检查键名是否存在
-        if key not in self.gestures:
+        if key not in target_gestures:
             log.warning(f"删除手势失败: 键名 {key} 不存在")
             return False
             
         # 删除手势
-        gesture_data = self.gestures.pop(key)
+        gesture_data = target_gestures.pop(key)
         
         # 保存并发出信号
         result = self.save_gestures()

@@ -24,5 +24,6 @@
     "show_notifications": true,
     "log_level": "info"
   },
-  "min_width": 2.5
+  "min_width": 2.5,
+  "max_width": 6.5
 }

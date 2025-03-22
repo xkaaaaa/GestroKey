@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import signal
+import argparse
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt, QObject, pyqtSignal
 
@@ -170,8 +171,30 @@ class AppController(QObject):
             
         log.info("应用控制器资源已清理")
 
+def parse_arguments():
+    """解析命令行参数
+    
+    Returns:
+        解析后的参数对象
+    """
+    parser = argparse.ArgumentParser(description="GestroKey - 手势控制应用")
+    parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式，显示详细日志")
+    return parser.parse_args()
+
 def main():
     """主函数"""
+    # 解析命令行参数
+    args = parse_arguments()
+    
+    # 设置调试模式
+    debug_mode = args.debug
+    
+    # 初始化日志系统，根据命令行参数设置调试模式
+    setup_logger(debug_mode)
+    
+    if debug_mode:
+        log.debug("调试模式已启用，将显示详细日志信息")
+    
     # 设置高DPI支持
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
@@ -183,9 +206,6 @@ def main():
     
     # 创建QApplication实例
     app = QApplication(sys.argv)
-    
-    # 初始化日志
-    setup_logger()
     
     # 记录启动信息
     log.info("GestroKey启动")
@@ -220,7 +240,7 @@ def main():
         """信号处理函数"""
         log.info(f"收到信号 {signum}，准备退出")
         app.quit()
-        
+    
     signal.signal(signal.SIGINT, signal_handler)
     
     # 在主循环结束前进行清理
@@ -235,4 +255,4 @@ def main():
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
-    main() 
+    main()

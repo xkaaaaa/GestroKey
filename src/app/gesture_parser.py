@@ -421,11 +421,11 @@ class GestureParser:
                             "version": "1.0",
                             "gestures": {
                                 "示例手势1": {
-                                    "directions": "URDL",
+                                    "directions": ["↑", "→", "↓", "←"],
                                     "action": "cHlhdXRvZ3VpLmhvdGtleSgnY3RybCcsICdjJyk="  # base64编码的: pyautogui.hotkey('ctrl', 'c')
                                 },
                                 "示例手势2": {
-                                    "directions": "LR",
+                                    "directions": ["←", "→"],
                                     "action": "cHlhdXRvZ3VpLmhvdGtleSgnYWx0JywgJ3RhYicp"  # base64编码的: pyautogui.hotkey('alt', 'tab')
                                 }
                             }

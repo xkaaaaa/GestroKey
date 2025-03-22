@@ -1,13 +1,21 @@
 {
-    "version": "1.0",
-    "gestures": {
-        "示例手势1": {
-            "directions": "URDL",
-            "action": "cHlhdXRvZ3VpLmhvdGtleSgnY3RybCcsICdjJyk="
-        },
-        "示例手势2": {
-            "directions": "LR",
-            "action": "cHlhdXRvZ3VpLmhvdGtleSgnYWx0JywgJ3RhYicp"
-        }
+  "version": "1.0",
+  "gestures": {
+    "示例手势1": {
+      "directions": [
+        "↑",
+        "→",
+        "↓",
+        "←"
+      ],
+      "action": "cHlhdXRvZ3VpLmhvdGtleSgnY3RybCcsICdjJyk="
+    },
+    "示例手势2": {
+      "directions": [
+        "←",
+        "→"
+      ],
+      "action": "cHlhdXRvZ3VpLmhvdGtleSgnYWx0JywgJ3RhYicp"
     }
+  }
 }
