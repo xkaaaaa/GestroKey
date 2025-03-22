@@ -16,7 +16,7 @@ from app.log import log, setup_logger
 from ui.utils.settings_manager import SettingsManager
 
 # 导入墨水绘图类
-from app.ink_painter import InkPainter
+from app.ink_painter import InkPainter, set_debug_mode
 
 # 导入主窗口
 from ui.main_window import MainWindow
@@ -259,6 +259,9 @@ def main():
     
     # 初始化日志系统，根据命令行参数设置调试模式
     setup_logger(debug_mode)
+    
+    # 设置墨水绘图器的调试模式
+    set_debug_mode(debug_mode)
     
     if debug_mode:
         log.debug("调试模式已启用，将显示详细日志信息")

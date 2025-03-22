@@ -28,12 +28,21 @@ from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath
 
 try:
     from .gesture_parser import GestureParser
-    from .log import log
+    from .log import log, setup_logger
     from .operation_executor import execute as execute_operation
 except ImportError:
     from gesture_parser import GestureParser
-    from log import log
+    from log import log, setup_logger
     from operation_executor import execute as execute_operation
+
+# 全局变量，控制是否在调试模式
+IS_DEBUG_MODE = False
+
+# 设置调试模式的函数
+def set_debug_mode(debug=False):
+    global IS_DEBUG_MODE
+    IS_DEBUG_MODE = debug
+    setup_logger(debug)  # 设置日志记录器的级别
 
 class Canvas(QWidget):
     def __init__(self, parent=None):
@@ -203,7 +212,8 @@ class InkPainter:
         
         # 加载配置
         self.config = config if config else {}
-        log.debug(f"InkPainter初始化，配置信息：{self.config}")
+        if IS_DEBUG_MODE:
+            log.debug(f"InkPainter初始化，配置信息：{self.config}")
         
         # 状态变量
         self.is_drawing = False   # 是否处于绘画状态
@@ -216,6 +226,7 @@ class InkPainter:
         self.max_width = 15.0  # 最大线条宽度
         self.smoothing = 0.7   # 平滑度
         self._line_color = (255, 0, 0)  # 纯红色 - 如果看到这个颜色，说明设置没有生效
+        self._color_str = "rgb(255,0,0)"  # 预处理的CSS颜色字符串
         log.error(f"初始化使用临时颜色值: {self._line_color} - 应该很快被设置中的值覆盖")
         
         self.use_advanced_brush = True   # 使用高级笔刷
@@ -293,23 +304,26 @@ class InkPainter:
     def line_color(self, value):
         old_value = self._line_color
         self._line_color = value
-        log.debug(f"线条颜色已从 {old_value} 更新为: {value}")
+        
+        # 预处理并缓存CSS颜色字符串格式
+        if isinstance(value, tuple) and len(value) >= 3:
+            r, g, b = value
+            self._color_str = f"rgb({r},{g},{b})"
+        else:
+            self._color_str = value  # 如果已经是字符串格式，直接使用
+        
+        if IS_DEBUG_MODE:
+            log.debug(f"线条颜色已从 {old_value} 更新为: {value}")
         
         # 如果有活动的线条，立即更新它们的颜色
         if hasattr(self, 'active_lines') and self.active_lines:
             try:
-                # 将RGB元组转换为CSS颜色字符串
-                if isinstance(value, tuple) and len(value) >= 3:
-                    r, g, b = value
-                    color_str = f"rgb({r},{g},{b})"
-                else:
-                    color_str = value
-                
-                log.debug(f"更新现有活动线条颜色为: {color_str}")
+                if IS_DEBUG_MODE:
+                    log.debug(f"更新现有活动线条颜色为: {self._color_str}")
                 
                 # 更新所有活动线条的颜色
                 for line in self.active_lines:
-                    self.canvas.itemconfig(line, fill=color_str)
+                    self.canvas.itemconfig(line, fill=self._color_str)
             except Exception as e:
                 log.error(f"更新活动线条颜色失败: {str(e)}")
 
@@ -341,7 +355,10 @@ class InkPainter:
 
     def init_canvas(self):
         """初始化Canvas"""
-        log.info(self.file_name + "初始化画布")
+        if IS_DEBUG_MODE:
+            log.info(self.file_name + "初始化画布")
+        else:
+            log.info(self.file_name + "初始化画布")  # 保留关键初始化日志
         # 创建QApplication实例，如果不存在则创建
         if not QApplication.instance():
             self.app = QApplication(sys.argv)
@@ -406,7 +423,8 @@ class InkPainter:
                             # 解析HEX颜色
                             if color_hex.startswith('#') and len(color_hex) in [4, 7, 9]:
                                 try:
-                                    log.info(f"尝试解析HEX颜色: {color_hex}")
+                                    if IS_DEBUG_MODE:
+                                        log.info(f"尝试解析HEX颜色: {color_hex}")
                                     r, g, b = self.hex_to_rgb(color_hex)
                                     log.info(f"HEX颜色 {color_hex} 解析为RGB: ({r}, {g}, {b})")
                                     old_color = self.line_color
@@ -434,7 +452,8 @@ class InkPainter:
                     log.info(self.file_name + "成功加载绘画设置")
             else:
                 log.warning(self.file_name + "配置文件不存在，使用默认设置")
-                log.debug(f"默认线条颜色: {self.line_color}")
+                if IS_DEBUG_MODE:
+                    log.debug(f"默认线条颜色: {self.line_color}")
         except Exception as e:
             log.error(self.file_name + "加载设置失败: " + str(e))
 
@@ -655,7 +674,10 @@ class InkPainter:
             
             # 即使距离较大也进行连接，但需要处理大距离情况
             if dist > 100:
-                log.info(self.file_name + "发现距离较大的点，执行平滑连接: " + str(dist))
+                if IS_DEBUG_MODE:
+                    log.info(self.file_name + "发现距离较大的点，执行平滑连接: " + str(dist))
+                else:
+                    log.info(self.file_name + "发现距离较大的点，执行平滑连接")
                 
                 # 对于特别大的距离，插入中间点
                 if dist > 200:
@@ -751,25 +773,16 @@ class InkPainter:
         # 确保线宽值不会太小
         width = max(2.5, width)
         
-        # 记录当前使用的颜色值
-        log.info(f"绘制线条时使用的颜色: {self.line_color}")
-        
-        # 转换RGB元组为CSS格式颜色字符串
-        if isinstance(self.line_color, tuple) and len(self.line_color) >= 3:
-            r, g, b = self.line_color
-            color_str = f"rgb({r},{g},{b})"
-            log.info(f"线条颜色RGB转换为CSS: ({r},{g},{b}) → {color_str}")
-        else:
-            color_str = self.line_color
-            log.info(f"线条颜色非RGB格式，直接使用: {color_str}")
-            
-        log.info(f"最终用于绘制线条的CSS颜色: {color_str}")
+        # 直接使用预处理好的颜色字符串，避免重复转换
+        if IS_DEBUG_MODE:
+            log.info(f"绘制线条时使用的颜色: {self.line_color}")
+            log.info(f"最终用于绘制线条的CSS颜色: {self._color_str}")
         
         # 简化绘制逻辑，统一使用单个线条，减少绘制开销
         line = self.canvas.create_line(
             float(x1), float(y1), float(x2), float(y2),
             width=width,
-            fill=color_str,
+            fill=self._color_str,  # 使用预处理的颜色字符串
             capstyle=Qt.RoundCap,
             smooth=True,
             joinstyle=Qt.RoundJoin
@@ -1306,6 +1319,8 @@ class InkPainter:
 
 if __name__ == "__main__":
     print("建议通过主程序运行。")
+    # 测试时启用调试模式
+    set_debug_mode(True)
     test_painter = InkPainter()
     # 启动Qt事件循环，保持程序运行
     sys.exit(test_painter.app.exec_())
