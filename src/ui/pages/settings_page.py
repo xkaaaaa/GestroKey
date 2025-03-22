@@ -64,8 +64,14 @@ class SliderSetting(QWidget):
         title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2D3748;")
         header_layout.addWidget(title_label)
         
+        # 格式化数值显示
+        if default_value is None:
+            default_value = min_value
+        
+        formatted_value = self.format_value(default_value)
+        
         # 值
-        self.value_label = QLabel(str(default_value))
+        self.value_label = QLabel(formatted_value)
         self.value_label.setStyleSheet("font-size: 14px; color: #4A90E2; font-weight: bold;")
         self.value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         header_layout.addWidget(self.value_label)
@@ -74,8 +80,6 @@ class SliderSetting(QWidget):
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setMinimum(int(min_value / step))
         self.slider.setMaximum(int(max_value / step))
-        if default_value is None:
-            default_value = min_value
         self.slider.setValue(int(default_value / step))
         self.slider.setStyleSheet("""
             QSlider::groove:horizontal {
@@ -107,19 +111,30 @@ class SliderSetting(QWidget):
         layout.addWidget(header)
         layout.addWidget(self.slider)
         
+    def format_value(self, value):
+        """格式化数值，限制小数位数
+        
+        Args:
+            value: 要格式化的数值
+            
+        Returns:
+            str: 格式化后的字符串
+        """
+        # 检查是否为整数
+        if isinstance(value, (int, float)) and value == int(value):
+            # 如果是整数，不显示小数部分
+            return str(int(value))
+        else:
+            # 如果是小数，最多显示2位小数，并移除尾部的0
+            return f"{value:.2f}".rstrip('0').rstrip('.')
+        
     def on_slider_value_changed(self, value):
         """滑块值变更处理"""
         # 计算实际值
         actual_value = value * self.step
         
         # 更新值标签，格式化数字，限制小数位数
-        if actual_value.is_integer():
-            # 如果是整数，不显示小数部分
-            formatted_value = str(int(actual_value))
-        else:
-            # 如果是小数，最多显示2位小数，并移除尾部的0
-            formatted_value = f"{actual_value:.2f}".rstrip('0').rstrip('.')
-        
+        formatted_value = self.format_value(actual_value)
         self.value_label.setText(formatted_value)
         
         # 发送值变更信号
@@ -391,7 +406,7 @@ class SettingsPage(QWidget):
         
         # 笔画颜色
         color_picker = ColorPickerSetting(
-            "color", "笔画颜色", 
+            "color", "线条颜色", 
             self.settings_manager.get_setting("drawing", "color", "#4299E1")
         )
         color_picker.valueChanged.connect(self.on_setting_changed)

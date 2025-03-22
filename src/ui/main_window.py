@@ -334,7 +334,7 @@ class MainWindow(QMainWindow):
         
         # 不再立即应用设置，仅在保存按钮点击时应用
         # 保留此方法仅用于兼容或特殊需求
-        
+                
     def on_status_update(self, status_type, status_value):
         """状态更新处理
         

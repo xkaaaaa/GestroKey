@@ -53,7 +53,20 @@ class Canvas(QWidget):
 
     def create_line(self, x1, y1, x2, y2, width, fill, capstyle=Qt.RoundCap, smooth=True, joinstyle=Qt.RoundJoin):
         """创建一条线段"""
-        line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': fill}
+        # 确保颜色值在添加到线条字典前是有效格式
+        if isinstance(fill, str) and (fill.startswith('rgb(') or fill.startswith('#')):
+            color = fill  # 保持字符串格式
+        elif isinstance(fill, tuple) and len(fill) >= 3:
+            # 处理元组，转换为CSS字符串格式
+            r, g, b = fill[0], fill[1], fill[2]
+            color = f"rgb({r},{g},{b})"
+            log.debug(f"在create_line中将颜色元组 {fill} 转换为CSS字符串: {color}")
+        else:
+            # 无效颜色格式，使用默认值并记录
+            color = "rgb(170,85,255)"  # 默认紫色
+            log.error(f"无效的颜色格式 {fill}，使用默认紫色")
+        
+        line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': color}
         self.lines.append(line)
         # 不立即更新，而是加入批量队列
         self.batch_updates.append(line)
@@ -61,7 +74,20 @@ class Canvas(QWidget):
         return line
 
     def itemconfig(self, line, fill):
-        line['color'] = fill
+        # 确保颜色值在更新线条颜色时是有效格式
+        if isinstance(fill, str) and (fill.startswith('rgb(') or fill.startswith('#')):
+            color = fill  # 保持字符串格式
+        elif isinstance(fill, tuple) and len(fill) >= 3:
+            # 处理元组，转换为CSS字符串格式
+            r, g, b = fill[0], fill[1], fill[2]
+            color = f"rgb({r},{g},{b})"
+            log.debug(f"在itemconfig中将颜色元组 {fill} 转换为CSS字符串: {color}")
+        else:
+            # 无效颜色格式，使用默认值并记录
+            color = "rgb(170,85,255)"  # 默认紫色
+            log.error(f"itemconfig: 无效的颜色格式 {fill}，使用默认紫色")
+        
+        line['color'] = color
         self.schedule_update()
 
     def delete(self, line):
@@ -97,18 +123,44 @@ class Canvas(QWidget):
         painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
         
         for line in self.lines:
-            # 处理颜色 - 可能是元组(r,g,b)或字符串"#RRGGBB"
+            # 处理颜色 - create_line 方法已经确保 line['color'] 是有效的颜色格式
             color = line['color']
+            log.debug(f"绘制线条，使用颜色: {color}")
+            
             if isinstance(color, tuple) and len(color) >= 3:
-                # RGB元组
+                # RGB元组 - 这种情况应该不会再出现，因为在create_line已转换为字符串
                 r, g, b = color[0], color[1], color[2]
                 qcolor = QColor(r, g, b)
-            elif isinstance(color, str) and color.startswith('#'):
-                # 十六进制字符串
-                qcolor = QColor(color)
+                log.debug(f"从RGB元组创建QColor: ({r}, {g}, {b})")
+            elif isinstance(color, str):
+                if color.startswith('rgb('):
+                    # 解析RGB格式
+                    rgb_values = color.strip('rgb()').split(',')
+                    if len(rgb_values) >= 3:
+                        try:
+                            r = int(rgb_values[0].strip())
+                            g = int(rgb_values[1].strip())
+                            b = int(rgb_values[2].strip())
+                            qcolor = QColor(r, g, b)
+                            log.debug(f"从RGB字符串创建QColor: ({r}, {g}, {b})")
+                        except ValueError:
+                            qcolor = QColor(170, 85, 255)  # 默认紫色
+                            log.error(f"无法解析RGB字符串: {color}，使用默认紫色")
+                    else:
+                        qcolor = QColor(170, 85, 255)  # 默认紫色
+                        log.error(f"RGB格式不正确: {color}，使用默认紫色")
+                elif color.startswith('#'):
+                    # 十六进制字符串
+                    qcolor = QColor(color)
+                    log.debug(f"从十六进制字符串创建QColor: {color}")
+                else:
+                    # 无法识别的字符串格式，使用默认值
+                    qcolor = QColor(170, 85, 255)  # 默认紫色
+                    log.error(f"无法识别的颜色格式: {color}，使用默认紫色")
             else:
-                # 默认颜色
-                qcolor = QColor(0, 191, 255)  # 深天蓝色
+                # 默认颜色 - 使用紫色代替红色，与设置中的默认颜色一致
+                qcolor = QColor(170, 85, 255)  # 默认紫色
+                log.error(f"无效的颜色值类型: {type(color)}，使用默认紫色")
                 
             pen = QPen(qcolor)
             pen.setWidthF(line['width'])
@@ -151,6 +203,7 @@ class InkPainter:
         
         # 加载配置
         self.config = config if config else {}
+        log.debug(f"InkPainter初始化，配置信息：{self.config}")
         
         # 状态变量
         self.is_drawing = False   # 是否处于绘画状态
@@ -162,7 +215,9 @@ class InkPainter:
         self.min_width = 3.0   # 最小线条宽度
         self.max_width = 15.0  # 最大线条宽度
         self.smoothing = 0.7   # 平滑度
-        self.line_color = (0, 191, 255)  # 深天蓝色 RGB
+        self._line_color = (255, 0, 0)  # 纯红色 - 如果看到这个颜色，说明设置没有生效
+        log.error(f"初始化使用临时颜色值: {self._line_color} - 应该很快被设置中的值覆盖")
+        
         self.use_advanced_brush = True   # 使用高级笔刷
         self.auto_smoothing = True       # 自动平滑
         self.fade_duration = 0.5         # 渐隐持续时间（秒）
@@ -208,7 +263,55 @@ class InkPainter:
         self.init_gesture_parser()
         self.start_listening()
         
-        log.info("绘画模块初始化完成")
+        # 确保颜色已从配置加载（不是默认红色）
+        if self._line_color == (255, 0, 0):
+            log.error("初始化后颜色仍然是默认红色，强制重新从配置加载颜色")
+            try:
+                config_path = self.get_config_path()
+                if os.path.exists(config_path):
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                        drawing_settings = config.get('drawing', {})
+                        if drawing_settings and 'color' in drawing_settings:
+                            color_hex = drawing_settings['color']
+                            if color_hex.startswith('#') and len(color_hex) in [4, 7, 9]:
+                                log.info(f"强制加载颜色: {color_hex}")
+                                r, g, b = self.hex_to_rgb(color_hex)
+                                self._line_color = (r, g, b)
+                                log.info(f"强制加载颜色后: {self._line_color}")
+            except Exception as e:
+                log.error(f"强制加载颜色失败: {str(e)}")
+        
+        log.info(f"绘画模块初始化完成，当前颜色: {self._line_color}")
+
+    # 添加属性访问器，确保每次获取颜色时都使用最新的值
+    @property
+    def line_color(self):
+        return self._line_color
+    
+    @line_color.setter
+    def line_color(self, value):
+        old_value = self._line_color
+        self._line_color = value
+        log.debug(f"线条颜色已从 {old_value} 更新为: {value}")
+        
+        # 如果有活动的线条，立即更新它们的颜色
+        if hasattr(self, 'active_lines') and self.active_lines:
+            try:
+                # 将RGB元组转换为CSS颜色字符串
+                if isinstance(value, tuple) and len(value) >= 3:
+                    r, g, b = value
+                    color_str = f"rgb({r},{g},{b})"
+                else:
+                    color_str = value
+                
+                log.debug(f"更新现有活动线条颜色为: {color_str}")
+                
+                # 更新所有活动线条的颜色
+                for line in self.active_lines:
+                    self.canvas.itemconfig(line, fill=color_str)
+            except Exception as e:
+                log.error(f"更新活动线条颜色失败: {str(e)}")
 
     def get_config_path(self):
         """获取配置文件路径"""
@@ -265,17 +368,21 @@ class InkPainter:
 
     def load_settings(self):
         """从配置文件加载绘画设置"""
-        log.info(self.file_name + "加载绘画设置")
-        
+        log.info(self.file_name + "从配置文件加载绘画设置")
         try:
+            # 获取配置文件路径
             config_path = self.get_config_path()
+            
+            # 检查配置文件是否存在
             if os.path.exists(config_path):
+                log.info(f"配置文件存在: {config_path}")
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    drawing_settings = config.get('drawing', {})
                     
-                    # 更新绘画设置
-                    if drawing_settings:
+                    # 检查是否有drawing部分
+                    if 'drawing' in config:
+                        drawing_settings = config['drawing']
+                        
                         # 基础宽度
                         if 'base_width' in drawing_settings:
                             self.base_width = float(drawing_settings['base_width'])
@@ -291,16 +398,20 @@ class InkPainter:
                         # 平滑度
                         if 'smoothing' in drawing_settings:
                             self.smoothing = float(drawing_settings['smoothing'])
-                            
-                        # 颜色
+                        
+                        # 颜色 - 添加更详细的日志
                         if 'color' in drawing_settings:
                             color_hex = drawing_settings['color']
+                            log.info(f"从配置中读取到颜色值: {color_hex}")
                             # 解析HEX颜色
                             if color_hex.startswith('#') and len(color_hex) in [4, 7, 9]:
                                 try:
+                                    log.info(f"尝试解析HEX颜色: {color_hex}")
                                     r, g, b = self.hex_to_rgb(color_hex)
-                                    # 设置颜色
+                                    log.info(f"HEX颜色 {color_hex} 解析为RGB: ({r}, {g}, {b})")
+                                    old_color = self.line_color
                                     self.line_color = (r, g, b)
+                                    log.info(f"成功加载颜色: {color_hex} -> RGB: {self.line_color}")
                                 except Exception as e:
                                     log.error(f"颜色解析失败: {str(e)}")
                                     
@@ -323,6 +434,7 @@ class InkPainter:
                     log.info(self.file_name + "成功加载绘画设置")
             else:
                 log.warning(self.file_name + "配置文件不存在，使用默认设置")
+                log.debug(f"默认线条颜色: {self.line_color}")
         except Exception as e:
             log.error(self.file_name + "加载设置失败: " + str(e))
 
@@ -639,12 +751,19 @@ class InkPainter:
         # 确保线宽值不会太小
         width = max(2.5, width)
         
+        # 记录当前使用的颜色值
+        log.info(f"绘制线条时使用的颜色: {self.line_color}")
+        
         # 转换RGB元组为CSS格式颜色字符串
         if isinstance(self.line_color, tuple) and len(self.line_color) >= 3:
             r, g, b = self.line_color
             color_str = f"rgb({r},{g},{b})"
+            log.info(f"线条颜色RGB转换为CSS: ({r},{g},{b}) → {color_str}")
         else:
             color_str = self.line_color
+            log.info(f"线条颜色非RGB格式，直接使用: {color_str}")
+            
+        log.info(f"最终用于绘制线条的CSS颜色: {color_str}")
         
         # 简化绘制逻辑，统一使用单个线条，减少绘制开销
         line = self.canvas.create_line(
@@ -861,17 +980,22 @@ class InkPainter:
                     g = int(base_color[5:7], 16)
                     b = int(base_color[7:9], 16)
                 else:
-                    r, g, b = 0, 191, 255  # 默认值
+                    # 无法识别的颜色格式，使用默认值
+                    r, g, b = 255, 0, 0  # 纯红色
+                    log.error(f"计算渐隐颜色时使用默认纯红色 - 颜色格式识别失败: {base_color}")
             elif isinstance(base_color, str):
                 # 如果不是十六进制，假设是rgb格式
                 color_match = re.search(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', base_color)
                 if color_match:
                     r, g, b = map(int, color_match.groups())
                 else:
-                    r, g, b = 0, 191, 255  # 默认值
+                    # 无法识别的颜色格式，使用默认值
+                    r, g, b = 255, 0, 0  # 纯红色
+                    log.error(f"计算渐隐颜色时使用默认纯红色 - 颜色格式识别失败: {base_color}")
             else:
                 # 无法识别的颜色格式，使用默认值
-                r, g, b = 0, 191, 255  # 默认值
+                r, g, b = 255, 0, 0  # 纯红色
+                log.error(f"计算渐隐颜色时使用默认纯红色 - 颜色格式识别失败: {base_color}")
             
             # 计算alpha值 - 使用非线性衰减，让开始减淡更慢一些
             a = int(255 * (1 - progress**0.7))  # 降低幂次，使淡出更平滑
@@ -880,7 +1004,7 @@ class InkPainter:
             return f"#{a:02X}{r:02X}{g:02X}{b:02X}"
         except Exception as e:
             log.error("计算渐隐颜色失败: " + str(e))
-            return "#00BFFF"  # 返回默认颜色
+            return "#FF0000"  # 返回纯红色作为显式错误指示
 
     def shutdown(self):
         """安全关闭程序，释放资源"""
@@ -920,6 +1044,10 @@ class InkPainter:
         if self.is_drawing:
             log.info("绘画模式已经处于激活状态")
             return
+        
+        # 刷新设置，确保使用最新配置
+        self.reset_painter()
+        log.debug(f"绘画开始时使用的颜色设置: {self.line_color}")
         
         # 设置绘画状态为True
         self.is_drawing = True
@@ -1028,6 +1156,8 @@ class InkPainter:
         
         try:
             updated_settings = []
+            needs_redraw = False
+            old_line_color = self.line_color
             
             # 基础宽度
             if 'base_width' in settings:
@@ -1055,10 +1185,16 @@ class InkPainter:
                 # 解析HEX颜色
                 if color_hex.startswith('#') and len(color_hex) in [4, 7, 9]:
                     try:
+                        log.info(f"正在从配置文件加载颜色: {color_hex}")
                         r, g, b = self.hex_to_rgb(color_hex)
                         # 设置颜色
+                        log.debug(f"更新颜色设置: {color_hex} -> RGB: ({r},{g},{b}) 旧值: {old_line_color}")
                         self.line_color = (r, g, b)
                         updated_settings.append(f"color={color_hex}")
+                        needs_redraw = True
+                        
+                        # 额外检查颜色设置是否成功应用
+                        log.debug(f"更新后的颜色: {self.line_color}")
                     except Exception as e:
                         log.error(f"颜色解析失败: {str(e)}")
                         
@@ -1096,7 +1232,30 @@ class InkPainter:
             if 'max_stroke_duration' in settings:
                 self.max_stroke_duration = int(float(settings['max_stroke_duration']))
                 updated_settings.append(f"max_stroke_duration={self.max_stroke_duration}")
-                
+
+            # 如果颜色发生变化，立即更新已绘制的活动线条
+            if needs_redraw and hasattr(self, 'active_lines') and self.active_lines:
+                log.info("颜色设置已更改，更新活动线条颜色")
+                try:
+                    # 将RGB元组转换为CSS颜色字符串
+                    if isinstance(self.line_color, tuple) and len(self.line_color) >= 3:
+                        r, g, b = self.line_color
+                        color_str = f"rgb({r},{g},{b})"
+                    else:
+                        color_str = self.line_color
+                    
+                    log.debug(f"更新活动线条颜色为: {color_str}")
+                    
+                    # 更新所有活动线条的颜色
+                    for line in self.active_lines:
+                        self.canvas.itemconfig(line, fill=color_str)
+                    
+                    # 更新当前渐隐动画中的开始颜色
+                    for anim in self.fade_animations:
+                        anim['start_color'] = self.line_color
+                except Exception as e:
+                    log.error(f"更新活动线条颜色失败: {str(e)}")
+            
             # 硬件加速
             if 'hardware_acceleration' in settings and hasattr(self, 'canvas'):
                 hardware_accel = bool(settings['hardware_acceleration'])
@@ -1115,19 +1274,35 @@ class InkPainter:
                     self.canvas.resize(self.screen_width - self.canvas_border*2, self.screen_height - self.canvas_border*2)
                     # 更新画布位置
                     self.canvas.move(self.canvas_border, self.canvas_border)
-
+            
             # 打印所有更新的设置
             if updated_settings:
                 log.info(self.file_name + "已更新以下设置: " + ", ".join(updated_settings))
             else:
                 log.info(self.file_name + "未更新任何设置，使用现有配置")
-                
+            
             return True
         except Exception as e:
             log.error(self.file_name + "更新绘画设置失败: " + str(e))
             import traceback
             log.error(self.file_name + "错误堆栈: " + traceback.format_exc())
             return False
+
+    # 添加重置方法，确保设置被完全刷新
+    def reset_painter(self):
+        """重置绘图器状态，应用最新设置"""
+        log.info("重置绘图器状态，应用最新设置")
+        old_color = self.line_color
+        # 重新加载设置
+        self.load_settings()
+        log.info(f"重置后颜色从 {old_color} 变为 {self.line_color}")
+        
+        # 重置绘画状态变量
+        self.current_stroke = []
+        self.smoothed_stroke = []
+        self.pending_points = []
+        self.line_width_history = []
+        self.last_line_width = self.base_width
 
 if __name__ == "__main__":
     print("建议通过主程序运行。")

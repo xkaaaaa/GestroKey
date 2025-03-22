@@ -65,11 +65,33 @@ class AppController(QObject):
         if not self.gesture_recognition_active:
             log.debug("开始准备启动手势识别")
             
-            # 如果墨水绘图对象未初始化，先初始化
+            # 强制重新初始化墨水绘图对象以应用最新设置
+            if self.ink_painter is not None:
+                log.info("重置墨水绘图器以应用最新设置")
+                try:
+                    # 尝试重置现有实例来应用新设置
+                    if hasattr(self.ink_painter, 'reset_painter'):
+                        self.ink_painter.reset_painter()
+                        log.debug(f"重置后的墨水绘图器颜色设置: {self.ink_painter.line_color}")
+                    else:
+                        # 如果没有reset_painter方法，关闭现有实例并重新创建
+                        self.ink_painter.shutdown()
+                        self.ink_painter = None
+                except Exception as e:
+                    log.warning(f"重置墨水绘图器实例时出错: {str(e)}")
+                    # 失败时关闭并重新创建
+                    try:
+                        self.ink_painter.shutdown()
+                    except:
+                        pass
+                    self.ink_painter = None
+            
+            # 如果需要，创建新的墨水绘图对象
             if self.ink_painter is None:
                 try:
                     log.info("初始化墨水绘图器")
                     self.ink_painter = InkPainter()
+                    log.debug(f"墨水绘图器当前颜色设置: {self.ink_painter.line_color}")
                     log.info("墨水绘图器初始化成功")
                 except Exception as e:
                     log.error(f"初始化墨水绘图器失败: {str(e)}")
@@ -153,8 +175,10 @@ class AppController(QObject):
                         drawing_settings = settings.get("drawing_settings", {})
                         if drawing_settings:
                             log.info(f"更新墨水绘图器设置（通过绘画设置直接更新）: {list(drawing_settings.keys())}")
+                            log.debug(f"绘画颜色设置: {drawing_settings.get('color', '未设置')}")
                             if self.ink_painter.update_drawing_settings(drawing_settings):
                                 log.info("墨水绘图器设置已直接更新成功")
+                                log.debug(f"更新后的颜色: {self.ink_painter.line_color if hasattr(self.ink_painter, 'line_color') else '未知'}")
                             else:
                                 log.warning("墨水绘图器设置更新可能部分失败")
                                 success = False
@@ -163,8 +187,10 @@ class AppController(QObject):
                         drawing_settings = settings.get("drawing", {})
                         if drawing_settings:
                             log.info(f"更新墨水绘图器设置（通过settings.drawing更新）: {list(drawing_settings.keys())}")
+                            log.debug(f"绘画颜色设置: {drawing_settings.get('color', '未设置')}")
                             if self.ink_painter.update_drawing_settings(drawing_settings):
                                 log.info("墨水绘图器设置已更新成功")
+                                log.debug(f"更新后的颜色: {self.ink_painter.line_color if hasattr(self.ink_painter, 'line_color') else '未知'}")
                             else:
                                 log.warning("墨水绘图器设置更新可能部分失败")
                                 success = False
