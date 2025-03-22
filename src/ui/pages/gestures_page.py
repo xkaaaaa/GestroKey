@@ -554,15 +554,24 @@ class GesturesPage(QWidget):
             for key, gesture in gestures.items():
                 # 检查gesture的类型并相应处理
                 if isinstance(gesture, dict):
-                    name = gesture.get("name", "")
+                    name = gesture.get("name", key)  # 如果没有name字段，使用key作为默认名称
                     directions = gesture.get("directions", [])
                     action = gesture.get("action", "")
+                    
+                    # 处理directions可能是字符串的情况
+                    if isinstance(directions, str):
+                        if ',' in directions:
+                            directions = [d.strip() for d in directions.split(',')]
+                        else:
+                            directions = [directions] if directions else []
                 else:
                     # 如果gesture不是字典，则尝试将其转换为字符串
-                    name = str(gesture)
+                    name = key  # 使用key作为默认名称
                     directions = []
                     action = ""
                     log.warning(f"手势数据格式不正确: {key} -> {gesture}")
+                
+                log.debug(f"加载手势项: key={key}, name={name}, directions={directions}")
                 
                 item = GestureItem(
                     key=key,
