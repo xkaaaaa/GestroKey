@@ -181,9 +181,33 @@ class Sidebar(QWidget):
         self.header_layout = QHBoxLayout(self.header)
         self.header_layout.setContentsMargins(5, 0, 5, 0)
         
+        # 应用图标和名称容器
+        self.brand_container = QWidget()
+        self.brand_layout = QHBoxLayout(self.brand_container)
+        self.brand_layout.setContentsMargins(0, 0, 0, 0)
+        self.brand_layout.setSpacing(8)
+        
+        # 应用图标
+        self.app_icon = QLabel()
+        self.app_icon.setFixedSize(24, 24)
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
+        
+        if os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path)
+            self.app_icon.setPixmap(pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            # 如果找不到图标文件，使用文本代替
+            self.app_icon.setText("G")
+            self.app_icon.setStyleSheet("font-size: 18px; font-weight: bold; color: #4A90E2; background-color: #EDF2F7; border-radius: 4px; padding: 2px;")
+            log.warning(f"找不到应用图标: {logo_path}")
+        
         # 应用名称
         self.app_name = QLabel("GestroKey")
         self.app_name.setStyleSheet("font-size: 18px; font-weight: bold; color: #4A90E2;")
+        
+        # 添加到品牌容器
+        self.brand_layout.addWidget(self.app_icon)
+        self.brand_layout.addWidget(self.app_name)
         
         # 折叠按钮
         self.toggle_button = QPushButton()
@@ -204,7 +228,7 @@ class Sidebar(QWidget):
         self.toggle_button.clicked.connect(self.toggle_collapsed)
         
         # 添加到标题栏布局
-        self.header_layout.addWidget(self.app_name)
+        self.header_layout.addWidget(self.brand_container)
         self.header_layout.addStretch()
         self.header_layout.addWidget(self.toggle_button)
         
@@ -229,18 +253,10 @@ class Sidebar(QWidget):
         
         # 添加控制台按钮
         console_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/console.svg")
-        if not os.path.exists(console_icon):
-            # 尝试使用旧路径
-            console_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                                      "app/ui/static/img/console.svg")
         self.add_nav_button("console", "控制台", console_icon)
         
         # 添加手势管理按钮
         gestures_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/gestures.svg")
-        if not os.path.exists(gestures_icon):
-            # 尝试使用旧路径
-            gestures_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                                       "app/ui/static/img/gestures.svg")
         self.add_nav_button("gestures", "手势管理", gestures_icon)
         
         # 添加导航容器到主布局
@@ -264,10 +280,6 @@ class Sidebar(QWidget):
         
         # 添加设置按钮
         settings_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/settings.svg")
-        if not os.path.exists(settings_icon):
-            # 尝试使用旧路径
-            settings_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                                       "app/ui/static/img/settings.svg")
         settings_button = SidebarButton("设置", settings_icon, "settings", self)
         settings_button.clicked.connect(lambda: self.change_page("settings"))
         self.bottom_nav_layout.addWidget(settings_button)
@@ -309,9 +321,16 @@ class Sidebar(QWidget):
         Args:
             page_name: 要切换到的页面名称
         """
-        # 更新按钮状态
+        log.debug(f"收到页面切换请求: 从 {list(filter(lambda x: self.buttons[x].isChecked(), self.buttons.keys()))[0] if any(button.isChecked() for button in self.buttons.values()) else 'None'} 到 {page_name}")
+        
+        # 确保所有按钮都取消选中状态，然后只将当前页面的按钮设为选中
         for name, button in self.buttons.items():
+            # 先取消所有按钮的自动互斥
+            button.setAutoExclusive(False)
+            # 然后设置正确的状态
             button.setActive(name == page_name)
+            # 恢复自动互斥
+            button.setAutoExclusive(True)
             
         # 发送页面切换信号
         self.pageChanged.emit(page_name)
@@ -335,8 +354,17 @@ class Sidebar(QWidget):
         # 更新折叠按钮文本
         self.toggle_button.setText("▶" if collapsed else "◀")
         
-        # 更新应用名称显示
-        self.app_name.setVisible(not collapsed)
+        # 更新应用名称和图标显示
+        if collapsed:
+            # 折叠状态：只显示图标，隐藏应用名称
+            self.app_name.setVisible(False)
+            self.app_icon.setVisible(True)
+            self.brand_container.setToolTip("GestroKey")  # 添加工具提示
+        else:
+            # 展开状态：显示图标和应用名称
+            self.app_name.setVisible(True)
+            self.app_icon.setVisible(True)
+            self.brand_container.setToolTip("")  # 移除工具提示
         
         # 更新导航按钮显示
         for button in self.buttons.values():

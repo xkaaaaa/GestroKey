@@ -1082,6 +1082,9 @@ class InkPainter:
             
             # 重置笔画保护计时器
             self.stroke_start_time = current_time
+            # 确保不存在last_drawn_point，避免连接到之前的笔画
+            if hasattr(self, 'last_drawn_point'):
+                delattr(self, 'last_drawn_point')
             return
         
         # 防止与前一个点完全重合造成的零长度线段
@@ -1142,9 +1145,18 @@ class InkPainter:
             dy = curr_y - prev_y
             squared_dist = dx*dx + dy*dy
             
+            # 检查是否有last_drawn_point属性，如果没有则设置它
+            # 这有助于确保笔画连续性，特别是在使用一段时间后
+            if not hasattr(self, 'last_drawn_point'):
+                self.last_drawn_point = (prev_x, prev_y)
+                
+            # 获取实际的绘制起点
+            last_drawn_x, last_drawn_y = self.last_drawn_point
+            
             # 即使距离较大也进行连接，但需要处理大距离情况
-            # 10000 = 100*100, 40000 = 200*200
-            if squared_dist > 10000:  # 距离大于100像素
+            # 降低距离判断阈值，从10000降到6400，以增加中间点插入的可能性，提高连续性
+            # 6400 = 80*80，原来是10000 = 100*100
+            if squared_dist > 6400:  # 距离大于80像素
                 # 只在调试模式下输出详细日志
                 if IS_DEBUG_MODE:
                     log.info(self.file_name + f"发现距离较大的点，执行平滑连接: {math.sqrt(squared_dist):.2f}像素")
@@ -1153,13 +1165,16 @@ class InkPainter:
                     log.info(self.file_name + "发现距离较大的点，执行平滑连接")
                 
                 # 对于特别大的距离，插入中间点
-                if squared_dist > 40000:  # 距离大于200像素
+                # 降低特大距离判断阈值，从40000降到22500，以提高中间点插入的频率
+                # 22500 = 150*150，原来是40000 = 200*200
+                if squared_dist > 22500:  # 距离大于150像素
                     # 计算需要插入多少个中间点 - 基于实际距离
                     dist = math.sqrt(squared_dist)  # 这里需要开平方
-                    insert_count = min(10, int(dist / 30))
+                    # 增加中间点的数量，每20像素插入一个点，而不是原来的30像素
+                    insert_count = min(15, int(dist / 20))
                     
                     # 最后绘制的坐标点
-                    last_drawn_x, last_drawn_y = prev_x, prev_y
+                    last_drawn_x, last_drawn_y = self.last_drawn_point
                     
                     # 计算高级画笔的线宽 - 只计算一次
                     line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
@@ -1182,15 +1197,21 @@ class InkPainter:
                     new_lines = self.draw_single_line(
                         last_drawn_x, last_drawn_y, curr_x, curr_y, line_width)
                     self.active_lines.extend(new_lines)
+                    
+                    # 更新最后绘制的点
+                    self.last_drawn_point = (curr_x, curr_y)
                     return
             
             # 计算并应用高级画笔线宽
             line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
             
             # 绘制线段
-            new_lines = self.draw_single_line(prev_x, prev_y, curr_x, curr_y, line_width)
+            new_lines = self.draw_single_line(last_drawn_x, last_drawn_y, curr_x, curr_y, line_width)
             self.active_lines.extend(new_lines)
             
+            # 更新最后绘制的点
+            self.last_drawn_point = (curr_x, curr_y)
+
     def calculate_line_width(self, prev_x, prev_y, curr_x, curr_y, prev_time, curr_time):
         """根据绘制速度计算线宽"""
         # 如果高级画笔功能被禁用，直接返回基础线宽
@@ -1625,6 +1646,23 @@ class InkPainter:
             except Exception as e:
                 log.error(f"关闭画布窗口时出错: {e}")
         
+        # 清空绘制状态和变量
+        self.current_stroke = []
+        self.smoothed_stroke = []
+        self.active_lines = []
+        self.fade_animations = []
+        self.point_buffer = []
+        
+        # 清除临时变量，防止笔画断开
+        if hasattr(self, 'last_drawn_point'):
+            delattr(self, 'last_drawn_point')
+        
+        # 清理全局线条对象池，防止资源泄漏
+        global _LINE_OBJECT_POOL
+        if len(_LINE_OBJECT_POOL) > 0:
+            log.info(f"清空线条对象池，释放 {len(_LINE_OBJECT_POOL)} 个线条对象")
+            _LINE_OBJECT_POOL.clear()
+        
         log.info("绘画模块已安全关闭")
 
     def start_drawing(self, points):
@@ -1893,6 +1931,10 @@ class InkPainter:
         self.pending_points = []
         self.line_width_history = []
         self.last_line_width = self.base_width
+        
+        # 强制清除最后绘制点记录，避免连线bug
+        if hasattr(self, 'last_drawn_point'):
+            delattr(self, 'last_drawn_point')
 
 if __name__ == "__main__":
     print("建议通过主程序运行。")

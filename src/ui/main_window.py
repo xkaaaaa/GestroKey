@@ -47,7 +47,16 @@ class MainWindow(QMainWindow):
         # 窗口基本设置
         self.setWindowTitle("GestroKey")
         self.setMinimumSize(1000, 600)
-        self.setWindowIcon(QIcon("ui/assets/icons/app_icon.png"))
+        
+        # 设置应用图标
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+            # 如果有系统托盘，也设置托盘图标
+            if hasattr(self, 'tray_icon') and self.tray_icon:
+                self.tray_icon.setIcon(QIcon(icon_path))
+        else:
+            log.warning(f"找不到应用图标: {icon_path}")
         
         # 初始化系统托盘
         self.setup_tray_icon()
@@ -422,11 +431,17 @@ class MainWindow(QMainWindow):
         
     def setup_tray_icon(self):
         """设置系统托盘图标"""
-        # 创建托盘图标
+        # 创建系统托盘图标
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon("ui/assets/icons/app_icon.png"))
         
-        # 创建托盘菜单
+        # 设置图标
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
+        if os.path.exists(icon_path):
+            self.tray_icon.setIcon(QIcon(icon_path))
+        else:
+            log.warning(f"找不到托盘图标: {icon_path}")
+        
+        # 设置托盘菜单
         tray_menu = QMenu()
         
         # 显示主窗口

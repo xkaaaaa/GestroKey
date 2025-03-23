@@ -262,6 +262,10 @@ pyautogui.hotkey('alt', 'tab')""")
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         
+        # 将按钮文本改为中文
+        button_box.button(QDialogButtonBox.Ok).setText("确认")
+        button_box.button(QDialogButtonBox.Cancel).setText("取消")
+        
         # 设置按钮样式
         for button in button_box.buttons():
             if button_box.buttonRole(button) == QDialogButtonBox.AcceptRole:

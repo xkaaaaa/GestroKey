@@ -41,19 +41,15 @@ class SplashScreen(QWidget):
         
         # 应用图标
         icon_label = QLabel(self)
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app/ui/static/img/logo.svg")
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
         if os.path.exists(icon_path):
-            icon_pixmap = QPixmap(icon_path).scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            icon_label.setPixmap(icon_pixmap)
-        elif os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")):
-            # 尝试新路径
-            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
             icon_pixmap = QPixmap(icon_path).scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             icon_label.setPixmap(icon_pixmap)
         else:
             # 如果找不到图标，使用文本替代
             icon_label.setText("G")
             icon_label.setStyleSheet("font-size: 48px; font-weight: bold; color: #4A90E2;")
+            log.warning(f"找不到启动画面图标: {icon_path}")
         
         icon_label.setAlignment(Qt.AlignCenter)
         
@@ -67,17 +63,10 @@ class SplashScreen(QWidget):
         self.loading_label.setFixedSize(40, 40)
         self.loading_label.setAlignment(Qt.AlignCenter)
         
-        loading_gif_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app/ui/static/img/loading.gif")
+        loading_gif_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/loading.gif")
         
         # 检查加载动画文件是否存在，不存在则使用文本替代
         if os.path.exists(loading_gif_path):
-            self.loading_movie = QMovie(loading_gif_path)
-            self.loading_movie.setScaledSize(QSize(40, 40))
-            self.loading_label.setMovie(self.loading_movie)
-            self.loading_movie.start()
-        elif os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/loading.gif")):
-            # 尝试新路径
-            loading_gif_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/loading.gif")
             self.loading_movie = QMovie(loading_gif_path)
             self.loading_movie.setScaledSize(QSize(40, 40))
             self.loading_label.setMovie(self.loading_movie)
