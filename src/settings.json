@@ -6,11 +6,7 @@
     "stay_on_top": false,
     "language": "zh_CN",
     "theme": "light",
-    "ask_on_close": true,
-    "close_to_tray": false,
-    "version": "1.0.0",
-    "close_behavior": "minimize",
-    "force_topmost": false
+    "version": "1.0.0"
   },
   "drawing": {
     "speed_factor": 1.2,
@@ -23,7 +19,7 @@
     "advanced_brush": true,
     "auto_smoothing": true,
     "min_distance": 20,
-    "max_stroke_points": 200.0,
+    "max_stroke_points": 200,
     "max_stroke_duration": 5,
     "hardware_acceleration": true,
     "canvas_border": 1,

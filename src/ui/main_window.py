@@ -1,11 +1,13 @@
 import os
 import sys
 import time
+import logging
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
                               QStackedWidget, QLabel, QSizePolicy, QGraphicsDropShadowEffect,
-                              QSystemTrayIcon, QMenu, QAction, QMessageBox)
-from PyQt5.QtCore import Qt, QSize, QTimer, pyqtSignal, QPoint
-from PyQt5.QtGui import QIcon, QColor, QFont, QPalette
+                              QSystemTrayIcon, QMenu, QAction, QMessageBox, QPushButton,
+                              QFrame, QToolButton, QApplication, QStyleFactory)
+from PyQt5.QtCore import Qt, QSize, QTimer, pyqtSignal, QPoint, QRect
+from PyQt5.QtGui import QIcon, QColor, QFont, QPalette, QPixmap, QCursor, QPainter, QPen, QBrush
 
 # 导入自定义组件
 from ui.sidebar import Sidebar
@@ -25,6 +27,245 @@ try:
 except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from version import __version__, __title__, __copyright__, get_about_text
+
+# 设置日志
+log = logging.getLogger(__name__)
+
+class TitleBar(QFrame):
+    """自定义标题栏"""
+    
+    # 定义信号
+    windowClose = pyqtSignal()  # 窗口关闭信号
+    windowMinimize = pyqtSignal()  # 窗口最小化信号
+    windowMaximize = pyqtSignal()  # 窗口最大化信号
+    
+    def __init__(self, parent=None):
+        """初始化标题栏
+        
+        Args:
+            parent: 父部件
+        """
+        super().__init__(parent)
+        
+        # 设置固定高度
+        self.setFixedHeight(48)
+        
+        # 设置标题栏样式
+        self.setStyleSheet("""
+            TitleBar {
+                background-color: #F8F9FA;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                border-bottom: 1px solid #E0E4E8;
+            }
+            
+            QLabel {
+                font-size: 14px;
+                font-weight: bold;
+                color: #2D3748;
+            }
+            
+            QToolButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            
+            QToolButton:hover {
+                background-color: rgba(0, 0, 0, 0.05);
+            }
+            
+            QToolButton:pressed {
+                background-color: rgba(0, 0, 0, 0.1);
+            }
+            
+            #closeButton:hover {
+                background-color: #FD5D5D;
+                color: white;
+            }
+            
+            #closeButton:pressed {
+                background-color: #CF4545;
+            }
+        """)
+        
+        # 初始化UI
+        self.init_ui()
+        
+        # 鼠标跟踪标志
+        self._is_tracking = False
+        self._start_pos = QPoint(0, 0)
+        self._window_pos = QPoint(0, 0)
+        
+        # 设置鼠标跟踪
+        self.setMouseTracking(True)
+        
+        log.debug("自定义标题栏初始化完成")
+        
+    def init_ui(self):
+        """初始化UI组件"""
+        # 主布局
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 0, 10, 0)
+        layout.setSpacing(0)
+        
+        # 应用图标
+        self.icon_label = QLabel()
+        self.icon_label.setFixedSize(24, 24)
+        
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
+        if os.path.exists(icon_path):
+            pixmap = QPixmap(icon_path)
+            self.icon_label.setPixmap(pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            log.warning(f"找不到应用图标: {icon_path}")
+        
+        # 版本标签
+        try:
+            version_text = f"v{__version__}"
+            self.version_label = QLabel(version_text)
+            self.version_label.setStyleSheet("color: #718096; font-size: 12px; font-weight: normal;")
+        except:
+            self.version_label = QLabel()
+            
+        # 添加图标和版本号
+        layout.addWidget(self.icon_label)
+        layout.addSpacing(8)
+        layout.addWidget(self.version_label)
+        
+        # 弹性空间
+        layout.addStretch()
+        
+        # 窗口控制按钮
+        btn_size = QSize(32, 32)
+        
+        # 最小化按钮
+        self.minimize_button = QToolButton()
+        self.minimize_button.setFixedSize(btn_size)
+        self.minimize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMinButton))
+        self.minimize_button.setIconSize(QSize(16, 16))
+        self.minimize_button.setCursor(Qt.PointingHandCursor)
+        self.minimize_button.setToolTip("最小化")
+        self.minimize_button.clicked.connect(self.windowMinimize.emit)
+        
+        # 最大化/还原按钮
+        self.maximize_button = QToolButton()
+        self.maximize_button.setFixedSize(btn_size)
+        self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMaxButton))
+        self.maximize_button.setIconSize(QSize(16, 16))
+        self.maximize_button.setCursor(Qt.PointingHandCursor)
+        self.maximize_button.setToolTip("最大化")
+        self.maximize_button.clicked.connect(self.windowMaximize.emit)
+        
+        # 关闭按钮
+        self.close_button = QToolButton()
+        self.close_button.setFixedSize(btn_size)
+        self.close_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarCloseButton))
+        self.close_button.setIconSize(QSize(16, 16))
+        self.close_button.setCursor(Qt.PointingHandCursor)
+        self.close_button.setToolTip("关闭")
+        self.close_button.setObjectName("closeButton")
+        self.close_button.clicked.connect(self.windowClose.emit)
+        
+        # 添加控制按钮
+        layout.addWidget(self.minimize_button)
+        layout.addWidget(self.maximize_button)
+        layout.addWidget(self.close_button)
+        
+    def update_maximized_state(self, is_maximized):
+        """更新最大化状态
+        
+        Args:
+            is_maximized: 是否最大化
+        """
+        if is_maximized:
+            self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarNormalButton))
+            self.maximize_button.setToolTip("还原")
+            self.setStyleSheet(self.styleSheet().replace("border-top-left-radius: 10px;", "border-top-left-radius: 0px;")
+                               .replace("border-top-right-radius: 10px;", "border-top-right-radius: 0px;"))
+        else:
+            self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMaxButton))
+            self.maximize_button.setToolTip("最大化")
+            self.setStyleSheet(self.styleSheet().replace("border-top-left-radius: 0px;", "border-top-left-radius: 10px;")
+                               .replace("border-top-right-radius: 0px;", "border-top-right-radius: 10px;"))
+        
+        # 确保样式更新
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
+        
+        log.debug(f"标题栏最大化状态已更新: {is_maximized}")
+            
+    def mouseDoubleClickEvent(self, event):
+        """处理鼠标双击事件
+        
+        Args:
+            event: 鼠标事件
+        """
+        if event.button() == Qt.LeftButton:
+            self.windowMaximize.emit()
+            log.debug("标题栏双击: 触发最大化/还原")
+        
+    def mousePressEvent(self, event):
+        """处理鼠标按下事件
+        
+        Args:
+            event: 鼠标事件
+        """
+        if event.button() == Qt.LeftButton:
+            self._is_tracking = True
+            self._start_pos = event.globalPos()
+            self._window_pos = self.window().pos()
+            
+    def mouseMoveEvent(self, event):
+        """处理鼠标移动事件
+        
+        Args:
+            event: 鼠标事件
+        """
+        if self._is_tracking and (event.buttons() == Qt.LeftButton):
+            # 如果窗口最大化，移动时先恢复正常大小
+            if self.window().isMaximized():
+                # 恢复正常大小后，根据鼠标点击位置计算新的窗口位置
+                relative_pos = event.pos()
+                width_ratio = relative_pos.x() / self.width()
+                
+                log.debug("窗口从最大化状态拖动: 正在还原")
+                self.windowMaximize.emit()  # 还原窗口
+                
+                # 计算新的起始位置，使鼠标保持在点击的相对位置
+                new_width = self.window().width()
+                new_x = event.globalPos().x() - (new_width * width_ratio)
+                new_y = event.globalPos().y() - (relative_pos.y())
+                
+                self.window().move(int(new_x), int(new_y))
+                self._window_pos = self.window().pos()
+                self._start_pos = event.globalPos()
+            else:
+                # 计算移动距离
+                delta = event.globalPos() - self._start_pos
+                # 移动窗口
+                self.window().move(self._window_pos + delta)
+                
+    def mouseReleaseEvent(self, event):
+        """处理鼠标释放事件
+        
+        Args:
+            event: 鼠标事件
+        """
+        if event.button() == Qt.LeftButton:
+            self._is_tracking = False
+            
+    def update_title(self, title):
+        """更新标题文本
+        
+        Args:
+            title: 新标题
+        """
+        # 直接返回，不再更新标题（因为标题标签已移除）
+        log.debug(f"标题更新请求被忽略: {title}")
+        return
 
 class MainWindow(QMainWindow):
     """主窗口类，包含侧边栏和主要内容区域"""
@@ -54,6 +295,25 @@ class MainWindow(QMainWindow):
         # 状态变量 - 移动到这里，确保在setup_tray_icon之前初始化
         self.drawing_active = False
         
+        # 标记是否正在处理页面切换
+        self.is_handling_page_change = False
+        
+        # 保存窗口原始几何信息（用于从最大化状态恢复）
+        self.normal_geometry = None
+        
+        # 窗口调整大小相关变量
+        self.resizing = False
+        self.resize_direction = None
+        self.drag_position = None
+        self.border_width = 5  # 边框宽度，用于调整大小
+        
+        # 设置无边框窗口
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        
+        # 启用鼠标跟踪
+        self.setMouseTracking(True)
+        
         # 窗口基本设置
         self.setWindowTitle("GestroKey")
         self.setMinimumSize(1000, 600)
@@ -78,11 +338,11 @@ class MainWindow(QMainWindow):
         # 应用样式
         self.apply_styles()
         
-        # 标记是否正在处理页面切换
-        self.is_handling_page_change = False
-        
         # 连接信号
         self.connect_signals()
+        
+        # 恢复窗口状态
+        self.restore_window_state()
         
         # 记录启动时间
         self.start_time = time.time()
@@ -93,42 +353,171 @@ class MainWindow(QMainWindow):
         """初始化UI组件"""
         # 创建中央窗口部件
         central_widget = QWidget()
+        central_widget.setObjectName("mainContainer")
         self.setCentralWidget(central_widget)
         
         # 创建主布局
-        main_layout = QHBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # 创建侧边栏
-        self.sidebar = Sidebar()
-        main_layout.addWidget(self.sidebar)
+        # 创建标题栏
+        self.title_bar = TitleBar()
+        self.title_bar.windowClose.connect(self.close)
+        self.title_bar.windowMinimize.connect(self.showMinimized)
+        self.title_bar.windowMaximize.connect(self.toggle_maximize)
+        main_layout.addWidget(self.title_bar)
         
-        # 创建内容区容器
-        self.content_container = QWidget()
-        content_layout = QHBoxLayout(self.content_container)
+        log.debug("添加标题栏到主布局")
+        
+        # 创建内容容器
+        content_container = QWidget()
+        content_container.setObjectName("contentContainer")
+        content_layout = QHBoxLayout(content_container)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
         
+        # 创建侧边栏
+        self.sidebar = Sidebar()
+        content_layout.addWidget(self.sidebar)
+        
+        log.debug("添加侧边栏到内容布局")
+        
+        # 创建内容区容器
+        self.content_container = QWidget()
+        inner_content_layout = QHBoxLayout(self.content_container)
+        inner_content_layout.setContentsMargins(0, 0, 0, 0)
+        inner_content_layout.setSpacing(0)
+        
         # 创建堆叠窗口部件用于页面切换
         self.content_stack = QStackedWidget()
-        content_layout.addWidget(self.content_stack)
+        inner_content_layout.addWidget(self.content_stack)
         
         # 添加内容区到主布局
-        main_layout.addWidget(self.content_container)
+        content_layout.addWidget(self.content_container)
         
         # 设置布局的拉伸因子，使内容区自动填充
-        main_layout.setStretch(0, 0)  # 侧边栏不拉伸
-        main_layout.setStretch(1, 1)  # 内容区填充剩余空间
+        content_layout.setStretch(0, 0)  # 侧边栏不拉伸
+        content_layout.setStretch(1, 1)  # 内容区填充剩余空间
+        
+        # 添加内容容器到主布局
+        main_layout.addWidget(content_container)
         
         # 创建各个页面
         self.init_pages()
         
         # 连接侧边栏的页面切换信号
-        self.sidebar.pageChanged.connect(self.on_sidebar_page_changed)
+        self.sidebar.pageChanged.connect(self.handle_page_change_request)
         
         # 默认显示控制台页面
         self.sidebar.navigate_to("console")
+        
+        # 设置阴影效果
+        self.apply_shadow()
+        
+        log.debug("UI组件初始化完成")
+        
+    def apply_shadow(self):
+        """应用阴影效果"""
+        if not self.isMaximized():
+            shadow = QGraphicsDropShadowEffect(self)
+            shadow.setBlurRadius(20)
+            shadow.setColor(QColor(0, 0, 0, 80))
+            shadow.setOffset(0, 0)
+            self.centralWidget().setGraphicsEffect(shadow)
+            log.debug("应用阴影效果")
+        else:
+            self.centralWidget().setGraphicsEffect(None)
+            log.debug("移除阴影效果")
+            
+    def toggle_maximize(self):
+        """切换最大化/还原状态"""
+        if self.isMaximized():
+            # 取消窗口置顶
+            self.setWindowFlags(Qt.FramelessWindowHint)
+            # 必须先调用show()显示窗口，否则窗口会消失
+            self.show()
+            # 恢复到之前保存的窗口大小
+            if self.normal_geometry:
+                self.setGeometry(self.normal_geometry)
+                log.debug(f"还原到保存的窗口几何信息: {self.normal_geometry}")
+            else:
+                self.showNormal()
+            self.apply_shadow()
+            # 强制重绘窗口以恢复圆角
+            self.update()
+            log.debug("窗口已还原，取消置顶")
+        else:
+            # 保存当前窗口几何信息
+            self.normal_geometry = self.geometry()
+            log.debug(f"保存窗口几何信息: {self.normal_geometry}")
+            # 最大化窗口并设置置顶
+            self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+            self.showMaximized()
+            self.centralWidget().setGraphicsEffect(None)
+            log.debug("窗口已最大化并置顶")
+            
+        self.title_bar.update_maximized_state(self.isMaximized())
+        
+    def paintEvent(self, event):
+        """绘制窗口背景
+        
+        Args:
+            event: 绘制事件
+        """
+        # 只在非最大化状态下绘制圆角
+        if not self.isMaximized():
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            
+            # 设置背景色
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor("#FFFFFF")))
+            
+            # 绘制圆角矩形
+            rect = self.rect()
+            painter.drawRoundedRect(rect, 10, 10)
+            
+    def changeEvent(self, event):
+        """处理窗口状态变化事件
+        
+        Args:
+            event: 状态变化事件
+        """
+        if event.type() == event.WindowStateChange:
+            is_maximized = self.isMaximized()
+            self.title_bar.update_maximized_state(is_maximized)
+            
+            if is_maximized:
+                # 确保最大化状态时窗口置顶
+                if not (self.windowFlags() & Qt.WindowStaysOnTopHint):
+                    self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+                    self.showMaximized()
+                self.centralWidget().setGraphicsEffect(None)
+                log.debug("窗口状态改变：最大化，确保置顶")
+            else:
+                # 确保非最大化状态时取消置顶
+                if (self.windowFlags() & Qt.WindowStaysOnTopHint):
+                    self.setWindowFlags(Qt.FramelessWindowHint)
+                    self.show()
+                self.apply_shadow()
+                # 强制重绘以恢复圆角
+                self.update()
+                log.debug("窗口状态改变：非最大化，取消置顶")
+                
+        super().changeEvent(event)
+        
+    def resizeEvent(self, event):
+        """处理窗口调整大小事件
+        
+        Args:
+            event: 调整大小事件
+        """
+        super().resizeEvent(event)
+            
+        # 只在非最大化状态下应用阴影
+        if not self.isMaximized() and hasattr(self, 'centralWidget'):
+            self.apply_shadow()
         
     def init_pages(self):
         """初始化各个页面"""
@@ -169,109 +558,99 @@ class MainWindow(QMainWindow):
         # 将应用控制器的信号转发到控制台页面
         self.app_controller.sigStatusUpdate.connect(self.on_status_update)
         
-        # 修改侧边栏页面切换处理方式
-        try:
-            self.sidebar.pageChanged.disconnect(self.change_page)  # 尝试断开原有连接
-        except TypeError:
-            # 如果没有连接，忽略错误
-            pass
-        self.sidebar.pageChanged.connect(self.on_sidebar_page_changed)  # 连接到新的处理方法
+        # 完全断开并重连侧边栏信号
+        self.sidebar.pageChanged.disconnect()  # 断开所有现有连接
+        self.sidebar.pageChanged.connect(self.handle_page_change_request)  # 使用新的处理方法
         
-    def on_sidebar_page_changed(self, page_name):
-        """侧边栏页面切换请求处理
+    def handle_page_change_request(self, page_name):
+        """处理页面切换请求
         
         Args:
-            page_name: 需要切换的页面名称
-            
-        Returns:
-            bool: 是否成功切换页面
+            page_name: 请求切换到的页面名称
         """
-        log.debug(f"收到页面切换请求: 从 {self.current_page} 到 {page_name}")
+        log.debug(f"收到页面切换请求: {self.current_page} -> {page_name}")
         
-        # 调用页面切换方法
-        success = self.change_page(page_name)
+        # 如果是相同页面，忽略请求
+        if page_name == self.current_page:
+            return
+            
+        # 防止重复请求
+        if hasattr(self, '_changing_page') and self._changing_page:
+            log.debug("正在处理另一个页面切换请求，忽略此请求")
+            return
+            
+        self._changing_page = True
         
-        # 如果切换失败，恢复侧边栏的选中状态
-        if not success:
-            log.debug(f"页面切换被取消，恢复侧边栏状态到: {self.current_page}")
-            # 使用标志禁止sidebar.set_active_page引发的信号
-            # 通过断开和重新连接信号来防止重复触发
-            try:
-                # 临时断开信号连接
-                self.sidebar.pageChanged.disconnect(self.on_sidebar_page_changed)
-                # 恢复侧边栏选中状态为当前页面
-                self.sidebar.set_active_page(self.current_page)
-            finally:
-                # 重新连接信号
-                self.sidebar.pageChanged.connect(self.on_sidebar_page_changed)
+        # 判断是否可以切换页面
+        can_change = True
+        
+        try:
+            # 检查设置页面是否有未保存更改
+            if self.current_page == "settings" and hasattr(self, 'settings_page'):
+                if self.settings_page.has_pending_changes():
+                    # 创建消息框
+                    msg_box = QMessageBox(self)
+                    msg_box.setWindowTitle("未保存的更改")
+                    msg_box.setText("您有未保存的设置更改。是否保存这些更改？")
+                    msg_box.setIcon(QMessageBox.Question)
+                    
+                    # 添加自定义按钮
+                    save_btn = msg_box.addButton("保存", QMessageBox.AcceptRole)
+                    discard_btn = msg_box.addButton("放弃", QMessageBox.DestructiveRole)
+                    cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
+                    
+                    # 显示对话框
+                    msg_box.exec_()
+                    
+                    clicked_button = msg_box.clickedButton()
+                    
+                    if clicked_button == save_btn:
+                        # 保存设置
+                        if not self.save_settings():
+                            can_change = False  # 保存失败，不切换
+                    elif clicked_button == cancel_btn:
+                        can_change = False  # 用户取消，不切换
+                    else:  # discard_btn
+                        # 放弃更改
+                        current_settings = self.settings_manager.get_settings()
+                        self.settings_page.update_settings(current_settings)
+                        self.settings_page.hasUnsavedChanges.emit(False)
+            
+            # 如果可以切换，执行切换
+            if can_change:
+                self._actually_change_page(page_name)
+            else:
+                log.debug(f"页面切换被取消，保持当前页面: {self.current_page}")
                 
-            log.debug(f"恢复完成，维持在页面: {self.current_page}")
-        else:
-            log.debug(f"页面成功切换到: {page_name}")
-        
-        return success
-        
-    def change_page(self, page_name):
-        """切换页面
+                # 临时禁用信号，确保不会再次触发切换
+                self.sidebar.blockSignals(True)
+                
+                try:
+                    # 调用侧边栏的方法，直接设置正确的选中状态
+                    self.sidebar.set_active_page(self.current_page)
+                finally:
+                    # 恢复信号处理
+                    self.sidebar.blockSignals(False)
+                    
+                # 强制刷新UI，确保视觉状态更新
+                self.sidebar.repaint()
+                    
+        finally:
+            self._changing_page = False
+            
+    def _actually_change_page(self, page_name):
+        """实际执行页面切换
         
         Args:
             page_name: 页面名称
-            
-        Returns:
-            bool: 是否成功切换页面
         """
-        # 如果试图切换到当前页面，直接返回成功
-        if page_name == self.current_page:
-            log.debug(f"请求切换到当前页面 {page_name}，无需操作")
-            return True
-            
-        # 检查是否从设置页离开且有未保存的更改
-        if self.current_page == "settings" and self.settings_page.has_pending_changes():
-            log.debug(f"从设置页切换到 {page_name} 时有未保存的更改，显示确认对话框")
-            
-            # 创建消息框
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("未保存的更改")
-            msg_box.setText("您有未保存的设置更改。是否保存这些更改？")
-            msg_box.setIcon(QMessageBox.Question)
-            
-            # 添加自定义按钮
-            save_btn = msg_box.addButton("保存", QMessageBox.AcceptRole)
-            discard_btn = msg_box.addButton("放弃", QMessageBox.DestructiveRole)
-            cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
-            
-            # 显示对话框
-            msg_box.exec_()
-            
-            # 处理用户选择
-            clicked_button = msg_box.clickedButton()
-            
-            if clicked_button == save_btn:
-                # 保存设置
-                log.info("用户选择保存设置")
-                self.save_settings()
-                # 继续切换页面
-            elif clicked_button == discard_btn:
-                # 放弃更改，重新加载已保存的设置
-                log.info("用户选择放弃更改")
-                current_settings = self.settings_manager.get_settings()
-                self.settings_page.update_settings(current_settings)
-                self.settings_page.hasUnsavedChanges.emit(False)
-                # 继续切换页面
-            elif clicked_button == cancel_btn:
-                # 取消页面切换，保持在设置页面
-                log.info("用户取消页面切换，保持在设置页面")
-                return False
-        
-        # 切换页面
         if page_name in self.pages:
-            self.content_stack.setCurrentIndex(self.pages[page_name])
-            log.info(f"切换到页面: {page_name}")
+            page_index = self.pages[page_name]
+            self.content_stack.setCurrentIndex(page_index)
             self.current_page = page_name
-            return True
+            log.info(f"已切换到页面: {page_name}")
         else:
             log.warning(f"未知页面: {page_name}")
-            return False
             
     def toggle_drawing(self):
         """切换绘制状态"""
@@ -283,10 +662,8 @@ class MainWindow(QMainWindow):
         # 发出绘制状态变化信号
         self.sigDrawingStateChange.emit(self.drawing_active)
         
-        # 更新托盘图标菜单文本
-        if hasattr(self, 'toggle_drawing_action'):
-            action_text = "停止手势识别" if self.drawing_active else "启动手势识别"
-            self.toggle_drawing_action.setText(action_text)
+        # 更新托盘菜单
+        self.update_tray_menu()
         
         # 记录日志
         state_text = "启动" if self.drawing_active else "停止"
@@ -364,7 +741,7 @@ class MainWindow(QMainWindow):
             else:
                 log.error("重置设置失败")
                 QMessageBox.warning(self, "重置失败", "重置设置时发生错误。")
-            
+                
     def apply_single_setting(self, key, value):
         """处理单个设置变更
         
@@ -453,11 +830,18 @@ class MainWindow(QMainWindow):
             # 如果找不到图标，使用默认图标
             self.tray_icon.setIcon(self.windowIcon())
         
+        try:
+            # 设置托盘图标的工具提示
+            from version import __title__, __version__
+            self.tray_icon.setToolTip(f"{__title__} v{__version__}")
+        except ImportError:
+            self.tray_icon.setToolTip("GestroKey")
+        
         # 创建托盘菜单
         self.tray_menu = QMenu()
         
         # 添加显示/隐藏动作
-        self.toggle_visibility_action = QAction("显示窗口", self)
+        self.toggle_visibility_action = QAction("显示窗口" if not self.isVisible() else "隐藏窗口", self)
         self.toggle_visibility_action.triggered.connect(self.toggle_visibility)
         self.tray_menu.addAction(self.toggle_visibility_action)
         
@@ -470,14 +854,22 @@ class MainWindow(QMainWindow):
         # 添加分隔线
         self.tray_menu.addSeparator()
         
+        # 添加设置操作
+        settings_action = QAction("设置", self)
+        settings_action.triggered.connect(self.show_settings_page)
+        self.tray_menu.addAction(settings_action)
+        
         # 添加关于操作
         about_action = QAction("关于", self)
         about_action.triggered.connect(self.show_about_dialog)
         self.tray_menu.addAction(about_action)
         
+        # 添加分隔线
+        self.tray_menu.addSeparator()
+        
         # 添加退出动作
         exit_action = QAction("退出", self)
-        exit_action.triggered.connect(self.close)
+        exit_action.triggered.connect(self.force_exit)
         self.tray_menu.addAction(exit_action)
         
         # 设置托盘菜单
@@ -488,35 +880,96 @@ class MainWindow(QMainWindow):
         
         # 显示托盘图标
         self.tray_icon.show()
-        log.info("系统托盘图标已设置")
-
+        
+        log.debug("系统托盘图标已设置")
+        
+    def update_tray_menu(self):
+        """更新托盘菜单项文本"""
+        if hasattr(self, 'toggle_visibility_action'):
+            self.toggle_visibility_action.setText("显示窗口" if not self.isVisible() else "隐藏窗口")
+            
+        if hasattr(self, 'toggle_drawing_action'):
+            action_text = "停止手势识别" if self.drawing_active else "启动手势识别"
+            self.toggle_drawing_action.setText(action_text)
+            
+    def toggle_visibility(self):
+        """切换窗口显示/隐藏状态"""
+        if self.isVisible() and not self.isMinimized():
+            self.hide()
+        else:
+            self.showNormal()  # 使用showNormal替代show以确保从最小化状态恢复
+            self.activateWindow()  # 确保窗口被激活（在前台显示）
+            self.raise_()  # 确保窗口置于最前
+            
+        # 更新菜单文本
+        self.update_tray_menu()
+        
+    def _tray_icon_activated(self, reason):
+        """托盘图标激活事件处理
+        
+        Args:
+            reason: 激活原因，例如单击、双击等
+        """
+        # QSystemTrayIcon.Trigger是单击，DoubleClick是双击
+        if reason == QSystemTrayIcon.DoubleClick or reason == QSystemTrayIcon.Trigger:
+            # 如果窗口已最小化，恢复窗口
+            if self.isMinimized():
+                self.showNormal()
+                self.activateWindow()
+                self.raise_()
+            else:
+                self.toggle_visibility()
+                
     def show_about_dialog(self):
         """显示关于对话框"""
-        about_text = get_about_text()
-        # 使用自定义消息框代替QMessageBox.about以设置中文按钮
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(f"关于 {__title__}")
-        msg_box.setText(about_text)
-        msg_box.setIcon(QMessageBox.Information)
+        try:
+            from version import get_about_text
+            about_text = get_about_text()
+        except ImportError:
+            about_text = f"GestroKey\n版本：1.0.0\n© 2023 All Rights Reserved"
+            
+        # 使用QMessageBox显示关于信息
+        about_box = QMessageBox(self)
+        about_box.setWindowTitle("关于")
+        about_box.setText(about_text)
+        about_box.setIconPixmap(self.windowIcon().pixmap(64, 64))
+        about_box.setStandardButtons(QMessageBox.Ok)
         
-        # 添加确认按钮(中文)
-        confirm_btn = msg_box.addButton("确认", QMessageBox.AcceptRole)
-        msg_box.setDefaultButton(confirm_btn)
+        # 自定义按钮文本
+        about_box.button(QMessageBox.Ok).setText("确定")
         
-        # 显示对话框
-        msg_box.exec_()
-        log.debug("显示关于对话框")
+        # 设置对话框样式
+        about_box.setWindowFlags(about_box.windowFlags() | Qt.FramelessWindowHint)
         
+        about_box.exec_()
+            
     def apply_styles(self):
         """应用样式"""
         # 设置全局字体
         font = QFont("Microsoft YaHei", 10)
         self.app.setFont(font)
         
+        # 尝试使用Fusion风格
+        if 'Fusion' in QStyleFactory.keys():
+            self.app.setStyle(QStyleFactory.create('Fusion'))
+            log.debug("应用Fusion风格")
+        
         # 设置应用程序级别的样式表
         self.app.setStyleSheet("""
             QMainWindow {
+                background-color: transparent;
+                border: none;
+            }
+            
+            #mainContainer {
+                background-color: transparent;
+                border: none;
+            }
+            
+            #contentContainer {
                 background-color: #F9FAFB;
+                border-bottom-left-radius: 10px;
+                border-bottom-right-radius: 10px;
             }
             
             QLabel {
@@ -608,6 +1061,7 @@ class MainWindow(QMainWindow):
             
             QMessageBox {
                 background-color: #FFFFFF;
+                border-radius: 10px;
             }
             
             QMessageBox QLabel {
@@ -620,129 +1074,18 @@ class MainWindow(QMainWindow):
                 min-height: 30px;
                 font-size: 13px;
             }
+            
+            QToolTip {
+                background-color: #F8F9FA;
+                color: #1A202C;
+                border: 1px solid #E2E8F0;
+                border-radius: 4px;
+                padding: 4px;
+            }
         """)
         
-    def closeEvent(self, event):
-        """关闭窗口事件处理
+        log.debug("应用样式表完成")
         
-        Args:
-            event: 关闭事件
-        """
-        # 检查是否有未保存的更改
-        if self.has_unsaved_changes():
-            # 创建消息框
-            log.debug("检测到未保存的更改，显示确认对话框")
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("未保存的更改")
-            msg_box.setText("你有未保存的更改，确定要退出吗？")
-            msg_box.setInformativeText("退出前是否保存更改？")
-            msg_box.setIcon(QMessageBox.Warning)
-            
-            # 添加自定义按钮
-            save_btn = msg_box.addButton("保存并退出", QMessageBox.AcceptRole)
-            discard_btn = msg_box.addButton("放弃更改", QMessageBox.DestructiveRole)
-            cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
-            
-            # 显示对话框
-            msg_box.exec_()
-            
-            # 处理用户选择
-            clicked_button = msg_box.clickedButton()
-            if clicked_button == save_btn:
-                log.info("保存更改并退出")
-                self.save_settings()
-                # 继续关闭处理...
-            elif clicked_button == discard_btn:
-                log.info("放弃更改并退出")
-                # 继续关闭处理...
-            else:  # cancel_btn
-                log.info("取消关闭操作")
-                event.ignore()
-                return
-
-        # 创建退出确认对话框
-        log.debug("显示退出确认对话框")
-        exit_msg_box = QMessageBox(self)
-        exit_msg_box.setWindowTitle("确认退出")
-        exit_msg_box.setText("确定要退出应用程序吗？")
-        exit_msg_box.setIcon(QMessageBox.Question)
-        
-        # 添加自定义按钮
-        yes_btn = exit_msg_box.addButton("是", QMessageBox.YesRole)
-        no_btn = exit_msg_box.addButton("否", QMessageBox.NoRole)
-        
-        # 显示对话框
-        exit_msg_box.exec_()
-        
-        # 处理用户选择
-        if exit_msg_box.clickedButton() == yes_btn:
-            log.info("用户确认退出应用程序")
-            # 关闭应用前停止手势识别
-            if self.drawing_active and self.app_controller:
-                self.app_controller.stop_gesture_recognition()
-                
-            # 保存设置
-            current_settings = self.settings_page.get_current_settings()
-            self.settings_manager.save_settings(current_settings)
-            
-            # 关闭系统托盘图标
-            self.tray_icon.hide()
-            
-            # 记录日志
-            log.info("应用程序关闭")
-            
-            # 接受关闭事件
-            event.accept()
-        else:
-            log.info("用户取消退出应用程序")
-            # 忽略关闭事件
-            event.ignore()
-            
-    def hideEvent(self, event):
-        """窗口隐藏事件处理
-        
-        Args:
-            event: 隐藏事件
-        """
-        # 隐藏窗口，不显示通知
-        log.debug("窗口已隐藏到系统托盘")
-        
-    def showEvent(self, event):
-        """窗口显示事件处理
-        
-        Args:
-            event: 显示事件
-        """
-        # 更新托盘菜单的状态
-        action_text = "停止手势识别" if self.drawing_active else "启动手势识别"
-        self.toggle_drawing_action.setText(action_text)
-
-    def toggle_visibility(self):
-        """切换窗口显示/隐藏状态"""
-        if self.isVisible():
-            # 当前窗口可见，隐藏到托盘
-            self.hide()
-            # 更新托盘菜单显示
-            if hasattr(self, 'toggle_visibility_action'):
-                self.toggle_visibility_action.setText("显示窗口")
-        else:
-            # 当前窗口隐藏，显示窗口
-            self.show()
-            self.activateWindow()  # 确保窗口被激活（在前台显示）
-            # 更新托盘菜单显示
-            if hasattr(self, 'toggle_visibility_action'):
-                self.toggle_visibility_action.setText("隐藏到托盘")
-                
-    def _tray_icon_activated(self, reason):
-        """托盘图标激活事件处理
-        
-        Args:
-            reason: 激活原因
-        """
-        if reason == QSystemTrayIcon.DoubleClick:
-            # 双击托盘图标切换主窗口可见性
-            self.toggle_visibility()
-
     def has_unsaved_changes(self):
         """检查是否有未保存的更改
         
@@ -750,14 +1093,409 @@ class MainWindow(QMainWindow):
             bool: 是否有未保存的更改
         """
         # 检查设置页面是否有未保存的更改
-        if self.current_page == "settings" and self.settings_page.has_pending_changes():
+        if hasattr(self, 'settings_page') and self.settings_page.has_pending_changes():
             log.debug("设置页面有未保存的更改")
             return True
             
-        # 检查其他页面的未保存更改（如果有的话）
-        # 例如，可以在这里添加对手势页面等的检查
+        # 检查手势页面是否有未保存的更改
+        if hasattr(self, 'gestures_page') and hasattr(self.gestures_page, 'has_unsaved_changes') and self.gestures_page.has_unsaved_changes:
+            log.debug("手势页面有未保存的更改")
+            return True
+        
+        # 检查其他可能有未保存更改的页面
+        # 根据需要添加其他页面的检查
         
         return False
+        
+    def closeEvent(self, event):
+        """窗口关闭事件处理
+        
+        Args:
+            event: 关闭事件对象
+        """
+        # 保存窗口状态
+        self.save_window_state()
+        
+        # 在窗口关闭前移除透明背景和阴影效果，避免UpdateLayeredWindowIndirect失败
+        self.centralWidget().setGraphicsEffect(None)
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        
+        # 判断是否是真正的退出操作
+        from PyQt5.QtWidgets import QSystemTrayIcon
+        if not hasattr(self, 'tray_icon') or not self.tray_icon or not QSystemTrayIcon.isSystemTrayAvailable():
+            # 如果没有系统托盘或托盘不可用，执行正常关闭
+            log.info("系统托盘不可用，执行正常关闭流程")
+            self._handle_real_close(event)
+            return
+            
+        # 如果是普通的关闭操作，则只是最小化到托盘
+        if not self.app.property("force_exit"):
+            log.info("最小化到系统托盘而不是关闭")
+            event.ignore()
+            self.hide()
+            
+            # 不使用系统通知，仅更新托盘菜单状态
+            self.update_tray_menu()
+            return
+        
+        # 如果已设置force_exit属性，执行真正的关闭
+        self._handle_real_close(event)
+        
+    def _handle_real_close(self, event):
+        """处理真正的窗口关闭逻辑
+        
+        Args:
+            event: 关闭事件对象
+        """
+        # 检查是否有未保存的更改
+        if self.has_unsaved_changes():
+            # 创建确认对话框
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("确认退出")
+            msg_box.setText("有未保存的更改，确定要退出吗？")
+            msg_box.setIcon(QMessageBox.Question)
+            
+            # 添加自定义按钮
+            save_btn = msg_box.addButton("保存", QMessageBox.AcceptRole)
+            discard_btn = msg_box.addButton("不保存", QMessageBox.DestructiveRole)
+            cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
+            
+            # 设置对话框样式
+            msg_box.setWindowFlags(msg_box.windowFlags() | Qt.FramelessWindowHint)
+            
+            # 显示对话框
+            msg_box.exec_()
+            
+            clicked_button = msg_box.clickedButton()
+            
+            if clicked_button == save_btn:
+                # 保存更改
+                saved = False
+                
+                # 根据当前页面保存相应的内容
+                if self.current_page == "settings" and self.settings_page.has_pending_changes():
+                    saved = self.settings_page.save_settings()
+                elif self.current_page == "gestures" and hasattr(self.gestures_page, 'save_gestures'):
+                    saved = self.gestures_page.save_gestures()
+                
+                # 如果保存失败，取消关闭
+                if not saved:
+                    event.ignore()
+                    return
+            elif clicked_button == cancel_btn:
+                # 取消关闭
+                event.ignore()
+                return
+            # 如果选择丢弃更改，则继续关闭
+            
+        # 处理关闭前的清理工作
+        try:
+            # 停止手势识别
+            if self.drawing_active and self.app_controller:
+                self.app_controller.stop_gesture_recognition()
+                log.info("已停止手势识别")
+            
+            # 如果有系统托盘图标，隐藏它
+            if hasattr(self, 'tray_icon') and self.tray_icon:
+                self.tray_icon.hide()
+                
+            # 记录应用程序关闭
+            log.info("应用程序正在关闭")
+            
+        except Exception as e:
+            # 记录异常但不阻止关闭
+            log.error(f"关闭时发生错误: {str(e)}")
+            
+        # 允许关闭窗口
+        event.accept()
+
+    def show_settings_page(self):
+        """显示设置页面"""
+        # 切换到设置页面
+        self.handle_page_change_request("settings")
+        # 如果窗口是隐藏的，显示窗口
+        if not self.isVisible():
+            self.show()
+            self.activateWindow()
+            
+    def force_exit(self):
+        """强制退出应用程序"""
+        # 设置force_exit属性，使closeEvent知道这是真正的退出请求
+        self.app.setProperty("force_exit", True)
+        # 调用close方法来触发closeEvent
+        self.close()
+
+    def restore_window_state(self):
+        """恢复窗口状态"""
+        try:
+            # 尝试从设置中恢复窗口位置和大小
+            if self.settings_manager and hasattr(self.settings_manager, 'get_ui_settings'):
+                ui_settings = self.settings_manager.get_ui_settings()
+                if ui_settings and 'window_geometry' in ui_settings:
+                    self.restoreGeometry(ui_settings['window_geometry'])
+                    log.debug("已恢复窗口几何信息")
+                if ui_settings and 'window_state' in ui_settings:
+                    self.restoreState(ui_settings['window_state'])
+                    log.debug("已恢复窗口状态")
+                # 确保窗口不会超出屏幕范围
+                self.ensure_on_screen()
+            else:
+                # 如果没有保存的状态，居中显示窗口
+                self.center_window()
+        except Exception as e:
+            log.error(f"恢复窗口状态失败: {str(e)}")
+            # 出错时居中显示窗口
+            self.center_window()
+            
+    def ensure_on_screen(self):
+        """确保窗口在屏幕范围内"""
+        desktop = QApplication.desktop()
+        screen_rect = desktop.availableGeometry(self)
+        window_rect = self.frameGeometry()
+        
+        # 如果窗口完全在屏幕外，将其移至屏幕中央
+        if not screen_rect.intersects(window_rect):
+            self.center_window()
+        else:
+            # 如果窗口部分超出屏幕，调整位置
+            if window_rect.left() < screen_rect.left():
+                self.move(screen_rect.left(), self.y())
+            if window_rect.top() < screen_rect.top():
+                self.move(self.x(), screen_rect.top())
+            if window_rect.right() > screen_rect.right():
+                self.move(screen_rect.right() - window_rect.width(), self.y())
+            if window_rect.bottom() > screen_rect.bottom():
+                self.move(self.x(), screen_rect.bottom() - window_rect.height())
+                
+        log.debug("已确保窗口在屏幕范围内")
+            
+    def center_window(self):
+        """将窗口居中显示"""
+        frame_geo = self.frameGeometry()
+        screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
+        center_point = QApplication.desktop().screenGeometry(screen).center()
+        frame_geo.moveCenter(center_point)
+        self.move(frame_geo.topLeft())
+        log.debug("窗口已居中显示")
+        
+    def save_window_state(self):
+        """保存窗口状态"""
+        try:
+            if self.settings_manager and hasattr(self.settings_manager, 'save_ui_settings'):
+                ui_settings = {
+                    'window_geometry': self.saveGeometry(),
+                    'window_state': self.saveState()
+                }
+                self.settings_manager.save_ui_settings(ui_settings)
+                log.debug("已保存窗口状态")
+        except Exception as e:
+            log.error(f"保存窗口状态失败: {str(e)}")
+
+    def mousePressEvent(self, event):
+        """处理鼠标按下事件
+        
+        Args:
+            event: 鼠标事件
+        """
+        if self.isMaximized():
+            return super().mousePressEvent(event)
+            
+        # 如果鼠标在边框区域，开始调整大小
+        if self._is_resize_area(event.pos()):
+            self.resizing = True
+            self.resize_direction = self._get_resize_direction(event.pos())
+            self.setCursor(self._get_resize_cursor(self.resize_direction))
+            event.accept()
+        # 如果点击在标题栏区域外，则将事件传递给父类
+        else:
+            super().mousePressEvent(event)
+            
+    def mouseMoveEvent(self, event):
+        """处理鼠标移动事件
+        
+        Args:
+            event: 鼠标事件
+        """
+        if self.isMaximized():
+            self.setCursor(Qt.ArrowCursor)
+            return super().mouseMoveEvent(event)
+            
+        # 如果正在调整大小，调整窗口大小
+        if self.resizing:
+            self._resize_window(event.globalPos())
+            event.accept()
+        # 如果鼠标在边框区域，更改光标形状
+        elif self._is_resize_area(event.pos()):
+            direction = self._get_resize_direction(event.pos())
+            self.setCursor(self._get_resize_cursor(direction))
+            event.accept()
+        # 否则恢复默认光标
+        else:
+            self.setCursor(Qt.ArrowCursor)
+            super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """处理鼠标释放事件
+        
+        Args:
+            event: 鼠标事件
+        """
+        # 结束调整大小
+        if self.resizing:
+            self.resizing = False
+            self.resize_direction = None
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+    
+    def _is_resize_area(self, pos):
+        """判断位置是否在调整大小的区域内
+        
+        Args:
+            pos: 鼠标位置
+            
+        Returns:
+            bool: 是否在调整大小区域
+        """
+        return (self._is_top_edge(pos) or self._is_bottom_edge(pos) or 
+                self._is_left_edge(pos) or self._is_right_edge(pos))
+    
+    def _is_top_edge(self, pos):
+        """判断位置是否在顶部边缘
+        
+        Args:
+            pos: 鼠标位置
+            
+        Returns:
+            bool: 是否在顶部边缘
+        """
+        return 0 <= pos.y() <= self.border_width
+    
+    def _is_bottom_edge(self, pos):
+        """判断位置是否在底部边缘
+        
+        Args:
+            pos: 鼠标位置
+            
+        Returns:
+            bool: 是否在底部边缘
+        """
+        return self.height() - self.border_width <= pos.y() <= self.height()
+    
+    def _is_left_edge(self, pos):
+        """判断位置是否在左侧边缘
+        
+        Args:
+            pos: 鼠标位置
+            
+        Returns:
+            bool: 是否在左侧边缘
+        """
+        return 0 <= pos.x() <= self.border_width
+    
+    def _is_right_edge(self, pos):
+        """判断位置是否在右侧边缘
+        
+        Args:
+            pos: 鼠标位置
+            
+        Returns:
+            bool: 是否在右侧边缘
+        """
+        return self.width() - self.border_width <= pos.x() <= self.width()
+    
+    def _get_resize_direction(self, pos):
+        """获取调整大小的方向
+        
+        Args:
+            pos: 鼠标位置
+            
+        Returns:
+            tuple: 水平和垂直方向的调整
+        """
+        horizontal = 0  # -1 左, 0 中间, 1 右
+        vertical = 0    # -1 上, 0 中间, 1 下
+        
+        if self._is_left_edge(pos):
+            horizontal = -1
+        elif self._is_right_edge(pos):
+            horizontal = 1
+            
+        if self._is_top_edge(pos):
+            vertical = -1
+        elif self._is_bottom_edge(pos):
+            vertical = 1
+            
+        return (horizontal, vertical)
+    
+    def _get_resize_cursor(self, direction):
+        """获取调整大小方向对应的光标
+        
+        Args:
+            direction: 调整方向元组
+            
+        Returns:
+            QCursor: 对应的光标
+        """
+        horizontal, vertical = direction
+        
+        if horizontal == -1 and vertical == -1:
+            return Qt.SizeFDiagCursor
+        elif horizontal == 1 and vertical == -1:
+            return Qt.SizeBDiagCursor
+        elif horizontal == -1 and vertical == 1:
+            return Qt.SizeBDiagCursor
+        elif horizontal == 1 and vertical == 1:
+            return Qt.SizeFDiagCursor
+        elif horizontal == 0 and vertical == -1:
+            return Qt.SizeVerCursor
+        elif horizontal == 0 and vertical == 1:
+            return Qt.SizeVerCursor
+        elif horizontal == -1 and vertical == 0:
+            return Qt.SizeHorCursor
+        elif horizontal == 1 and vertical == 0:
+            return Qt.SizeHorCursor
+        else:
+            return Qt.ArrowCursor
+    
+    def _resize_window(self, global_pos):
+        """调整窗口大小
+        
+        Args:
+            global_pos: 全局鼠标位置
+        """
+        if not self.resize_direction:
+            return
+            
+        horizontal, vertical = self.resize_direction
+        current_rect = self.geometry()
+        
+        left = current_rect.left()
+        top = current_rect.top()
+        right = current_rect.right()
+        bottom = current_rect.bottom()
+        
+        min_width = self.minimumWidth()
+        min_height = self.minimumHeight()
+        
+        if horizontal == -1:  # 左边
+            left = min(global_pos.x(), right - min_width)
+        elif horizontal == 1:  # 右边
+            right = max(global_pos.x(), left + min_width)
+            
+        if vertical == -1:  # 上边
+            top = min(global_pos.y(), bottom - min_height)
+        elif vertical == 1:  # 下边
+            bottom = max(global_pos.y(), top + min_height)
+            
+        self.setGeometry(left, top, right - left, bottom - top)
+
+    def showMinimized(self):
+        """重写showMinimized方法，确保最小化的窗口可以被恢复"""
+        super().showMinimized()
+        log.debug("窗口已最小化")
+        # 更新托盘菜单文本
+        self.update_tray_menu()
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

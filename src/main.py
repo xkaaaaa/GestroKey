@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from version import __version__, __title__, __copyright__, get_about_text
 
 # 导入应用日志模块
-from app.log import log, setup_logger
+from app.log import log, setup_logger, shutdown_logger
 
 # 导入设置管理器
 from ui.utils.settings_manager import SettingsManager
@@ -225,22 +225,51 @@ class AppController(QObject):
         
     def cleanup(self):
         """清理资源"""
+        log.info("应用控制器正在清理资源...")
+        
         # 停止手势识别
         if self.gesture_recognition_active:
-            self.stop_gesture_recognition()
+            try:
+                self.stop_gesture_recognition()
+                log.debug("已停止手势识别")
+            except Exception as e:
+                log.error(f"停止手势识别失败: {str(e)}")
         
         # 释放墨水绘图器资源
         if self.ink_painter is not None:
             try:
-                log.info("关闭墨水绘图器")
+                log.info("正在关闭墨水绘图器...")
                 self.ink_painter.shutdown()
-                log.info("墨水绘图器已关闭")
+                self.ink_painter = None
+                log.info("墨水绘图器已成功关闭")
             except Exception as e:
                 log.error(f"关闭墨水绘图器失败: {str(e)}")
-                import traceback
-                log.error(f"异常堆栈: {traceback.format_exc()}")
+                try:
+                    import traceback
+                    log.error(f"异常详情: {traceback.format_exc()}")
+                except:
+                    pass
+        
+        # 断开所有信号连接
+        try:
+            # 断开状态更新信号
+            if hasattr(self, 'sigStatusUpdate'):
+                try:
+                    # 使用QObject的方法断开所有连接
+                    self.sigStatusUpdate.disconnect()
+                except:
+                    pass
+                    
+            # 其他需要断开的信号可以在这里添加
             
-        log.info("应用控制器资源已清理")
+            log.debug("已断开信号连接")
+        except Exception as e:
+            log.error(f"断开信号连接失败: {str(e)}")
+        
+        # 释放其他资源
+        # ...
+            
+        log.info("应用控制器资源已完全清理")
 
 def parse_arguments():
     """解析命令行参数
@@ -287,6 +316,37 @@ def main():
     # 初始化应用控制器
     app_controller = AppController(settings_manager)
     
+    # 定义清理函数，用于关闭资源
+    def cleanup():
+        """清理函数"""
+        try:
+            # 确保控制器资源被正确释放
+            app_controller.cleanup()
+                  
+            # 在调试模式下弹出问题解决情况反馈对话框
+            if debug_mode:
+                from PyQt5.QtWidgets import QInputDialog, QLineEdit
+                
+                feedback, ok = QInputDialog.getText(
+                    None, 
+                    "调试反馈", 
+                    "请输入问题解决情况（取消则不记录）:", 
+                    QLineEdit.Normal, 
+                    ""
+                )
+                
+                if ok and feedback:
+                    log.info(f"调试反馈: {feedback}")
+                    print(f"已记录调试反馈: {feedback}")
+            
+            # 确保日志系统正确关闭
+            shutdown_logger()
+            
+        except Exception as e:
+            print(f"清理资源时出错: {str(e)}")
+            
+        log.info("GestroKey正常退出")
+    
     # 创建主窗口
     main_window = MainWindow(app, settings_manager, app_controller)
     
@@ -316,32 +376,15 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     
     # 在主循环结束前进行清理
-    def cleanup():
-        """清理函数"""
-        app_controller.cleanup()
-        
-        # 在调试模式下弹出问题解决情况反馈对话框
-        if debug_mode:
-            from PyQt5.QtWidgets import QInputDialog, QLineEdit
-            
-            feedback, ok = QInputDialog.getText(
-                None, 
-                "调试反馈", 
-                "请输入问题解决情况（取消则不记录）:", 
-                QLineEdit.Normal, 
-                ""
-            )
-            
-            if ok and feedback:
-                log.info(f"调试反馈: {feedback}")
-                print(f"已记录调试反馈: {feedback}")
-        
-        log.info("GestroKey正常退出")
-        
     app.aboutToQuit.connect(cleanup)
     
-    # 运行应用程序主循环
-    sys.exit(app.exec_())
+    # 启动应用程序主循环
+    ret = app.exec_()
+    
+    # 确保在返回退出码前执行清理
+    cleanup()
+    
+    return ret
 
 if __name__ == "__main__":
     main()

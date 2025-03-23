@@ -20,7 +20,7 @@ class SidebarButton(QPushButton):
         
         Args:
             text: 按钮文本
-            icon_path: 图标路径
+            icon_path: 图标路径（不再使用）
             page_name: 页面名称，用于导航
             parent: 父部件
         """
@@ -32,10 +32,6 @@ class SidebarButton(QPushButton):
         # 保存图标路径和文本
         self.icon_path = icon_path
         self.button_text = text
-        
-        # 设置图标
-        self.setIcon(QIcon(icon_path))
-        self.setIconSize(QSize(24, 24))
         
         # 设置文本
         self.setText(text)
@@ -76,17 +72,36 @@ class SidebarButton(QPushButton):
         # 设置固定高度
         self.setFixedHeight(48)
         
-        # 设置图标和文本对齐
+        # 设置文本对齐
         self.setLayoutDirection(Qt.LeftToRight)
+        
+        log.debug(f"侧边栏按钮已创建: {text} ({page_name})")
+        
+    def setChecked(self, checked):
+        """重写setChecked方法，确保视觉状态正确更新
+        
+        Args:
+            checked: 是否选中
+        """
+        # 调用父类方法设置选中状态
+        super().setChecked(checked)
+        
+        # 强制更新样式，确保视觉效果正确
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
         
     def setActive(self, active):
         """设置按钮活动状态"""
         self.setChecked(active)
         
+        # 确保更新视觉状态
+        self.update()
+        
     def setCollapsed(self, collapsed):
         """设置折叠状态"""
         if collapsed:
-            # 折叠状态：只显示图标，不显示文本
+            # 折叠状态：不显示文本
             self.setText("")
             self.setToolTip(self.button_text)  # 添加工具提示
             self.setStyleSheet("""
@@ -111,7 +126,7 @@ class SidebarButton(QPushButton):
                 }
             """)
         else:
-            # 展开状态：显示图标和文本
+            # 展开状态：显示文本
             self.setText(self.button_text)
             self.setToolTip("")  # 清除工具提示
             self.setStyleSheet("""
@@ -140,6 +155,8 @@ class SidebarButton(QPushButton):
                     color: white;
                 }
             """)
+            
+        log.debug(f"按钮 '{self.button_text}' 折叠状态已更新: {collapsed}")
 
 class Sidebar(QWidget):
     """侧边栏组件"""
@@ -187,26 +204,22 @@ class Sidebar(QWidget):
         self.brand_layout.setContentsMargins(0, 0, 0, 0)
         self.brand_layout.setSpacing(8)
         
-        # 应用图标
-        self.app_icon = QLabel()
-        self.app_icon.setFixedSize(24, 24)
-        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
-        
-        if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path)
-            self.app_icon.setPixmap(pixmap.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        else:
-            # 如果找不到图标文件，使用文本代替
-            self.app_icon.setText("G")
-            self.app_icon.setStyleSheet("font-size: 18px; font-weight: bold; color: #4A90E2; background-color: #EDF2F7; border-radius: 4px; padding: 2px;")
-            log.warning(f"找不到应用图标: {logo_path}")
-        
         # 应用名称
         self.app_name = QLabel("GestroKey")
         self.app_name.setStyleSheet("font-size: 18px; font-weight: bold; color: #4A90E2;")
         
+        # 折叠状态下显示的"G"标签
+        self.collapsed_label = QLabel("G")
+        self.collapsed_label.setAlignment(Qt.AlignCenter)
+        self.collapsed_label.setStyleSheet("""
+            font-size: 26px;
+            font-weight: bold;
+            color: #4A90E2;
+            background-color: transparent;
+        """)
+        self.collapsed_label.setVisible(False)
+        
         # 添加到品牌容器
-        self.brand_layout.addWidget(self.app_icon)
         self.brand_layout.addWidget(self.app_name)
         
         # 折叠按钮
@@ -235,58 +248,32 @@ class Sidebar(QWidget):
         # 添加标题栏到主布局
         self.layout.addWidget(self.header)
         
-        # 添加分割线
-        self.divider = QFrame()
-        self.divider.setFrameShape(QFrame.HLine)
-        self.divider.setFrameShadow(QFrame.Sunken)
-        self.divider.setStyleSheet("background-color: #E2E8F0;")
-        self.layout.addWidget(self.divider)
-        
-        # 主导航按钮容器
-        self.nav_container = QWidget()
-        self.nav_layout = QVBoxLayout(self.nav_container)
-        self.nav_layout.setContentsMargins(0, 10, 0, 10)
-        self.nav_layout.setSpacing(5)
+        # 添加分隔线
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #E2E8F0;")
+        self.layout.addWidget(separator)
         
         # 添加导航按钮
-        self.buttons = {}
+        self.nav_buttons = {}
         
-        # 添加控制台按钮
-        console_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/console.svg")
-        self.add_nav_button("console", "控制台", console_icon)
+        # 按钮容器，用于组织布局
+        self.button_container = QWidget()
+        self.button_layout = QVBoxLayout(self.button_container)
+        self.button_layout.setContentsMargins(0, 0, 0, 0)
+        self.button_layout.setSpacing(6)
         
-        # 添加手势管理按钮
-        gestures_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/gestures.svg")
-        self.add_nav_button("gestures", "手势管理", gestures_icon)
+        # 添加导航按钮
+        self.add_nav_button("console", "控制台", "ui/assets/icons/console.svg")
+        self.add_nav_button("gestures", "手势管理", "ui/assets/icons/gestures.svg")
+        self.add_nav_button("settings", "设置", "ui/assets/icons/settings.svg")
         
-        # 添加导航容器到主布局
-        self.layout.addWidget(self.nav_container)
+        # 添加按钮容器到主布局
+        self.layout.addWidget(self.button_container)
         
-        # 添加弹性空间，将设置按钮推到底部
+        # 在按钮容器下方添加伸缩项，使按钮靠上对齐
         self.layout.addStretch()
-        
-        # 底部导航容器 (用于设置按钮)
-        self.bottom_nav_container = QWidget()
-        self.bottom_nav_layout = QVBoxLayout(self.bottom_nav_container)
-        self.bottom_nav_layout.setContentsMargins(0, 0, 0, 0)
-        self.bottom_nav_layout.setSpacing(5)
-        
-        # 添加分割线
-        bottom_divider = QFrame()
-        bottom_divider.setFrameShape(QFrame.HLine)
-        bottom_divider.setFrameShadow(QFrame.Sunken)
-        bottom_divider.setStyleSheet("background-color: #E2E8F0;")
-        self.bottom_nav_layout.addWidget(bottom_divider)
-        
-        # 添加设置按钮
-        settings_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/settings.svg")
-        settings_button = SidebarButton("设置", settings_icon, "settings", self)
-        settings_button.clicked.connect(lambda: self.change_page("settings"))
-        self.bottom_nav_layout.addWidget(settings_button)
-        self.buttons["settings"] = settings_button
-        
-        # 添加底部导航容器到主布局
-        self.layout.addWidget(self.bottom_nav_container)
         
         # 设置背景样式
         self.setStyleSheet("""
@@ -296,11 +283,13 @@ class Sidebar(QWidget):
             }
         """)
         
-        # 默认激活第一个按钮
-        if self.buttons:
-            first_button = self.buttons.get("console")
-            if first_button:
-                first_button.setActive(True)
+        # 默认激活控制台按钮
+        first_button = self.nav_buttons.get("console")
+        if first_button:
+            first_button.setActive(True)
+            log.debug("默认激活控制台按钮")
+        
+        log.debug("侧边栏UI组件初始化完成")
         
     def add_nav_button(self, page_name, text, icon_path):
         """添加导航按钮
@@ -308,12 +297,14 @@ class Sidebar(QWidget):
         Args:
             page_name: 页面名称
             text: 按钮文本
-            icon_path: 图标路径
+            icon_path: 图标路径（不再使用，保留参数兼容性）
         """
         button = SidebarButton(text, icon_path, page_name, self)
         button.clicked.connect(lambda: self.change_page(page_name))
-        self.nav_layout.addWidget(button)
-        self.buttons[page_name] = button
+        self.button_layout.addWidget(button)
+        self.nav_buttons[page_name] = button
+        
+        log.debug(f"添加导航按钮: {text} ({page_name})")
         
     def change_page(self, page_name):
         """切换页面
@@ -321,15 +312,22 @@ class Sidebar(QWidget):
         Args:
             page_name: 要切换到的页面名称
         """
-        log.debug(f"收到页面切换请求: 从 {list(filter(lambda x: self.buttons[x].isChecked(), self.buttons.keys()))[0] if any(button.isChecked() for button in self.buttons.values()) else 'None'} 到 {page_name}")
+        log.debug(f"收到页面切换请求: 从 {list(filter(lambda x: self.nav_buttons[x].isChecked(), self.nav_buttons.keys()))[0] if any(button.isChecked() for button in self.nav_buttons.values()) else 'None'} 到 {page_name}")
         
-        # 确保所有按钮都取消选中状态，然后只将当前页面的按钮设为选中
-        for name, button in self.buttons.items():
-            # 先取消所有按钮的自动互斥
+        # 禁用所有按钮的autoExclusive属性，确保能完全控制选中状态
+        for button in self.nav_buttons.values():
             button.setAutoExclusive(False)
-            # 然后设置正确的状态
-            button.setActive(name == page_name)
-            # 恢复自动互斥
+        
+        # 确保所有按钮都处于未选中状态
+        for button in self.nav_buttons.values():
+            button.setChecked(False)
+            
+        # 然后只将要切换到的页面的按钮设为选中
+        if page_name in self.nav_buttons:
+            self.nav_buttons[page_name].setChecked(True)
+        
+        # 重新启用autoExclusive属性，确保今后的按钮点击能正确互斥
+        for button in self.nav_buttons.values():
             button.setAutoExclusive(True)
             
         # 发送页面切换信号
@@ -346,47 +344,53 @@ class Sidebar(QWidget):
         Args:
             collapsed: 是否折叠
         """
-        if self.is_collapsed == collapsed:
-            return  # 状态未变，不需要处理
+        if collapsed == self.is_collapsed:
+            return
             
         self.is_collapsed = collapsed
         
-        # 更新折叠按钮文本
-        self.toggle_button.setText("▶" if collapsed else "◀")
+        # 保存当前宽度
+        current_width = self.width()
+        target_width = self.collapsed_width if collapsed else self.expanded_width
         
-        # 更新应用名称和图标显示
+        # 更新折叠按钮文本和工具提示
         if collapsed:
-            # 折叠状态：只显示图标，隐藏应用名称
+            self.toggle_button.setText("▶")
+            self.toggle_button.setToolTip("展开侧边栏")
+            
+            # 隐藏应用名称，显示折叠标签
             self.app_name.setVisible(False)
-            self.app_icon.setVisible(True)
-            self.brand_container.setToolTip("GestroKey")  # 添加工具提示
+            if hasattr(self, 'collapsed_label'):
+                self.collapsed_label.setVisible(True)
+                self.brand_layout.addWidget(self.collapsed_label)
         else:
-            # 展开状态：显示图标和应用名称
+            self.toggle_button.setText("◀")
+            self.toggle_button.setToolTip("折叠侧边栏")
+            
+            # 显示应用名称，隐藏折叠标签
             self.app_name.setVisible(True)
-            self.app_icon.setVisible(True)
-            self.brand_container.setToolTip("")  # 移除工具提示
+            if hasattr(self, 'collapsed_label'):
+                self.collapsed_label.setVisible(False)
+                self.brand_layout.removeWidget(self.collapsed_label)
         
-        # 更新导航按钮显示
-        for button in self.buttons.values():
+        # 更新按钮样式
+        for button in self.nav_buttons.values():
             button.setCollapsed(collapsed)
             
-        # 动画切换宽度
+        # 创建动画
         self.animation = QPropertyAnimation(self, b"minimumWidth")
-        self.animation.setDuration(300)
-        self.animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.animation.setDuration(200)
+        self.animation.setStartValue(current_width)
+        self.animation.setEndValue(target_width)
+        self.animation.setEasingCurve(QEasingCurve.InOutQuad)
         
-        if collapsed:
-            self.animation.setStartValue(self.expanded_width)
-            self.animation.setEndValue(self.collapsed_width)
-        else:
-            self.animation.setStartValue(self.collapsed_width)
-            self.animation.setEndValue(self.expanded_width)
-            
+        # 连接动画结束信号
+        self.animation.finished.connect(lambda: self.collapsedChanged.emit(collapsed))
+        
+        # 开始动画
         self.animation.start()
         
-        # 发送折叠状态变更信号
-        self.collapsedChanged.emit(collapsed)
-        log.info(f"侧边栏折叠状态变更: {'已折叠' if collapsed else '已展开'}")
+        log.info(f"侧边栏折叠状态已变更: {'已折叠' if collapsed else '已展开'}")
         
     def isCollapsed(self):
         """获取折叠状态
@@ -402,9 +406,9 @@ class Sidebar(QWidget):
         Args:
             page_name: 页面名称
         """
-        if page_name in self.buttons:
+        if page_name in self.nav_buttons:
             # 设置按钮为选中状态
-            self.buttons[page_name].setChecked(True)
+            self.nav_buttons[page_name].setChecked(True)
             
             # 发出页面切换信号
             self.pageChanged.emit(page_name)
@@ -421,15 +425,25 @@ class Sidebar(QWidget):
         Args:
             page_name: 页面名称
         """
-        if page_name in self.buttons:
-            # 静默更新按钮状态，不触发信号
-            for btn_name, btn in self.buttons.items():
-                # 直接设置按钮状态而不触发信号
+        if page_name in self.nav_buttons:
+            # 禁用所有按钮的autoExclusive属性，确保能完全控制选中状态
+            for btn in self.nav_buttons.values():
                 btn.blockSignals(True)  # 阻止信号发送
-                btn.setChecked(btn_name == page_name)
-                btn.blockSignals(False)  # 恢复信号
+                btn.setAutoExclusive(False)
             
-            log.debug(f"静默更新侧边栏选中状态: {page_name}")
+            # 先取消所有按钮的选中状态
+            for btn in self.nav_buttons.values():
+                btn.setChecked(False)
+                
+            # 只选中指定页面的按钮
+            self.nav_buttons[page_name].setChecked(True)
+            
+            # 恢复所有按钮的autoExclusive属性和信号
+            for btn in self.nav_buttons.values():
+                btn.setAutoExclusive(True)
+                btn.blockSignals(False)
+            
+            log.debug(f"侧边栏选择状态已重置并设置为: {page_name}")
         else:
             log.warning(f"尝试设置未知页面为活动页: {page_name}")
 
