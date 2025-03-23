@@ -927,9 +927,16 @@ class MainWindow(QMainWindow):
             about_text = get_about_text()
         except ImportError:
             about_text = f"GestroKey\n版本：1.0.0\n© 2023 All Rights Reserved"
+        
+        # 强制显示主窗口(但保持最小化状态)，确保应用程序不会因为缺少可见窗口而退出
+        was_visible = self.isVisible()
+        if not was_visible:
+            self.setVisible(True)
+            self.setWindowState(Qt.WindowMinimized)
+            log.debug("临时显示最小化窗口以确保应用不会退出")
             
         # 使用QMessageBox显示关于信息
-        about_box = QMessageBox(self)
+        about_box = QMessageBox(self)  # 使用self作为父窗口
         about_box.setWindowTitle("关于")
         about_box.setText(about_text)
         about_box.setIconPixmap(self.windowIcon().pixmap(64, 64))
@@ -938,10 +945,17 @@ class MainWindow(QMainWindow):
         # 自定义按钮文本
         about_box.button(QMessageBox.Ok).setText("确定")
         
-        # 设置对话框样式
-        about_box.setWindowFlags(about_box.windowFlags() | Qt.FramelessWindowHint)
+        # 设置对话框样式，确保窗口保持在前台
+        about_box.setWindowFlags(Qt.Dialog | Qt.WindowStaysOnTopHint)
         
+        log.debug("显示关于对话框")
+        # 使用模态对话框显示
         about_box.exec_()
+        
+        # 如果窗口之前是隐藏的，恢复隐藏状态
+        if not was_visible:
+            self.setVisible(False)
+            log.debug("恢复窗口隐藏状态")
             
     def apply_styles(self):
         """应用样式"""
