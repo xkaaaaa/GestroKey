@@ -318,6 +318,23 @@ def main():
     def cleanup():
         """清理函数"""
         app_controller.cleanup()
+        
+        # 在调试模式下弹出问题解决情况反馈对话框
+        if debug_mode:
+            from PyQt5.QtWidgets import QInputDialog, QLineEdit
+            
+            feedback, ok = QInputDialog.getText(
+                None, 
+                "调试反馈", 
+                "请输入问题解决情况（取消则不记录）:", 
+                QLineEdit.Normal, 
+                ""
+            )
+            
+            if ok and feedback:
+                log.info(f"调试反馈: {feedback}")
+                print(f"已记录调试反馈: {feedback}")
+        
         log.info("GestroKey正常退出")
         
     app.aboutToQuit.connect(cleanup)
