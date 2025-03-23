@@ -29,6 +29,10 @@ class SidebarButton(QPushButton):
         # 保存页面名称
         self.page_name = page_name
         
+        # 保存图标路径和文本
+        self.icon_path = icon_path
+        self.button_text = text
+        
         # 设置图标
         self.setIcon(QIcon(icon_path))
         self.setIconSize(QSize(24, 24))
@@ -81,7 +85,61 @@ class SidebarButton(QPushButton):
         
     def setCollapsed(self, collapsed):
         """设置折叠状态"""
-        self.setVisible(not collapsed)
+        if collapsed:
+            # 折叠状态：只显示图标，不显示文本
+            self.setText("")
+            self.setToolTip(self.button_text)  # 添加工具提示
+            self.setStyleSheet("""
+                QPushButton {
+                    border: none;
+                    padding: 12px;
+                    text-align: center;
+                    background-color: transparent;
+                    border-radius: 8px;
+                }
+                
+                QPushButton:hover {
+                    background-color: #EDF2F7;
+                }
+                
+                QPushButton:pressed {
+                    background-color: #E2E8F0;
+                }
+                
+                QPushButton:checked {
+                    background-color: #4299E1;
+                }
+            """)
+        else:
+            # 展开状态：显示图标和文本
+            self.setText(self.button_text)
+            self.setToolTip("")  # 清除工具提示
+            self.setStyleSheet("""
+                QPushButton {
+                    border: none;
+                    padding: 12px;
+                    text-align: left;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #4A5568;
+                    background-color: transparent;
+                    border-radius: 8px;
+                }
+                
+                QPushButton:hover {
+                    background-color: #EDF2F7;
+                    color: #2D3748;
+                }
+                
+                QPushButton:pressed {
+                    background-color: #E2E8F0;
+                }
+                
+                QPushButton:checked {
+                    background-color: #4299E1;
+                    color: white;
+                }
+            """)
 
 class Sidebar(QWidget):
     """侧边栏组件"""
@@ -160,7 +218,7 @@ class Sidebar(QWidget):
         self.divider.setStyleSheet("background-color: #E2E8F0;")
         self.layout.addWidget(self.divider)
         
-        # 导航按钮容器
+        # 主导航按钮容器
         self.nav_container = QWidget()
         self.nav_layout = QVBoxLayout(self.nav_container)
         self.nav_layout.setContentsMargins(0, 10, 0, 10)
@@ -185,19 +243,38 @@ class Sidebar(QWidget):
                                        "app/ui/static/img/gestures.svg")
         self.add_nav_button("gestures", "手势管理", gestures_icon)
         
-        # 添加设置按钮（放在最后）
+        # 添加导航容器到主布局
+        self.layout.addWidget(self.nav_container)
+        
+        # 添加弹性空间，将设置按钮推到底部
+        self.layout.addStretch()
+        
+        # 底部导航容器 (用于设置按钮)
+        self.bottom_nav_container = QWidget()
+        self.bottom_nav_layout = QVBoxLayout(self.bottom_nav_container)
+        self.bottom_nav_layout.setContentsMargins(0, 0, 0, 0)
+        self.bottom_nav_layout.setSpacing(5)
+        
+        # 添加分割线
+        bottom_divider = QFrame()
+        bottom_divider.setFrameShape(QFrame.HLine)
+        bottom_divider.setFrameShadow(QFrame.Sunken)
+        bottom_divider.setStyleSheet("background-color: #E2E8F0;")
+        self.bottom_nav_layout.addWidget(bottom_divider)
+        
+        # 添加设置按钮
         settings_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/settings.svg")
         if not os.path.exists(settings_icon):
             # 尝试使用旧路径
             settings_icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
                                        "app/ui/static/img/settings.svg")
-        self.add_nav_button("settings", "设置", settings_icon)
+        settings_button = SidebarButton("设置", settings_icon, "settings", self)
+        settings_button.clicked.connect(lambda: self.change_page("settings"))
+        self.bottom_nav_layout.addWidget(settings_button)
+        self.buttons["settings"] = settings_button
         
-        # 添加导航容器到主布局
-        self.layout.addWidget(self.nav_container)
-        
-        # 添加底部空白
-        self.layout.addStretch()
+        # 添加底部导航容器到主布局
+        self.layout.addWidget(self.bottom_nav_container)
         
         # 设置背景样式
         self.setStyleSheet("""
@@ -209,8 +286,9 @@ class Sidebar(QWidget):
         
         # 默认激活第一个按钮
         if self.buttons:
-            first_button = list(self.buttons.values())[0]
-            first_button.setActive(True)
+            first_button = self.buttons.get("console")
+            if first_button:
+                first_button.setActive(True)
         
     def add_nav_button(self, page_name, text, icon_path):
         """添加导航按钮

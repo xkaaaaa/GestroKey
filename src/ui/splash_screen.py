@@ -1,6 +1,6 @@
 import os
 import sys
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QApplication
 from PyQt5.QtCore import Qt, QTimer, QSize
 from PyQt5.QtGui import QPixmap, QMovie
 
@@ -136,7 +136,6 @@ class SplashScreen(QWidget):
         
     def center(self):
         """窗口居中显示"""
-        from PyQt5.QtWidgets import QApplication
         screen_geometry = QApplication.desktop().screenGeometry()
         x = (screen_geometry.width() - self.width()) // 2
         y = (screen_geometry.height() - self.height()) // 2
