@@ -20,7 +20,7 @@ class SidebarButton(QPushButton):
         
         Args:
             text: 按钮文本
-            icon_path: 图标路径（不再使用）
+            icon_path: 图标路径
             page_name: 页面名称，用于导航
             parent: 父部件
         """
@@ -35,6 +35,14 @@ class SidebarButton(QPushButton):
         
         # 设置文本
         self.setText(text)
+        
+        # 加载图标
+        if self.icon_path and os.path.exists(self.icon_path):
+            log.debug(f"加载按钮图标: {self.icon_path}")
+            self.setIcon(QIcon(self.icon_path))
+            self.setIconSize(QSize(20, 20))
+        else:
+            log.warning(f"按钮图标路径不存在: {self.icon_path}")
         
         # 设置样式
         self.setStyleSheet("""
@@ -101,9 +109,14 @@ class SidebarButton(QPushButton):
     def setCollapsed(self, collapsed):
         """设置折叠状态"""
         if collapsed:
-            # 折叠状态：不显示文本
+            # 折叠状态：不显示文本，只显示图标
             self.setText("")
             self.setToolTip(self.button_text)  # 添加工具提示
+            
+            # 确保图标显示正确尺寸
+            if self.icon_path and os.path.exists(self.icon_path):
+                self.setIconSize(QSize(24, 24))
+            
             self.setStyleSheet("""
                 QPushButton {
                     border: none;
@@ -126,8 +139,9 @@ class SidebarButton(QPushButton):
                 }
             """)
         else:
-            # 展开状态：显示文本
+            # 展开状态：显示文本，隐藏图标
             self.setText(self.button_text)
+            self.setIconSize(QSize(0, 0))  # 将图标尺寸设为0，实际隐藏图标
             self.setToolTip("")  # 清除工具提示
             self.setStyleSheet("""
                 QPushButton {
@@ -297,14 +311,18 @@ class Sidebar(QWidget):
         Args:
             page_name: 页面名称
             text: 按钮文本
-            icon_path: 图标路径（不再使用，保留参数兼容性）
+            icon_path: 图标路径
         """
+        # 确保图标路径是绝对路径
+        if not os.path.isabs(icon_path):
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), icon_path)
+        
         button = SidebarButton(text, icon_path, page_name, self)
         button.clicked.connect(lambda: self.change_page(page_name))
         self.button_layout.addWidget(button)
         self.nav_buttons[page_name] = button
         
-        log.debug(f"添加导航按钮: {text} ({page_name})")
+        log.debug(f"添加导航按钮: {text} ({page_name}), 图标: {icon_path}")
         
     def change_page(self, page_name):
         """切换页面
