@@ -874,11 +874,6 @@ class InkPainter:
             # 按下右键，记录起始点
             self.start_point = (x, y)
             self.pending_points = [(x, y)]
-            # 重置点处理相关的状态变量，确保每次新的绘制会话都是干净的
-            if hasattr(self, 'last_point_time'):
-                delattr(self, 'last_point_time')
-            if hasattr(self, 'last_drawn_point'):
-                delattr(self, 'last_drawn_point')
             log.info(self.file_name + f"右键按下，记录起始点: {self.start_point}")
         elif right_pressed and self.last_right_state:
             # 持续按下右键，处理移动
@@ -938,25 +933,19 @@ class InkPainter:
         dy = new_point[1] - last_point[1]
         squared_dist = dx*dx + dy*dy
         
-        # 降低最小距离阈值，确保曲线更平滑，减少断开的可能性
-        min_record_dist_squared = 4  # 从9减少到4 (2*2=4，2像素的最小距离)
+        # 如果距离太小，不添加新点，阈值可根据需要调整
+        # 使用3像素作为最小距离，平方后为9
+        min_record_dist_squared = 9
         
         # 如果绘制速度很快，可以适当增加记录点的频率
         if hasattr(self, 'last_point_time'):
             time_diff = time.time() - self.last_point_time
             # 如果移动速度快（时间短距离大），降低阈值
-            if time_diff < 0.03 and squared_dist > 16:  # 4*4=16，4像素且小于30ms
-                self.last_point_time = time.time()
-                return True
-            
-            # 添加新的条件：如果距离上次记录点的时间太长，即使距离不够也记录点
-            # 这可以防止绘画时出现停顿导致线条断开
-            if time_diff > 0.05:  # 超过50ms没记录点，强制记录
+            if time_diff < 0.03 and squared_dist > 25:  # 5*5=25，5像素且小于30ms
                 self.last_point_time = time.time()
                 return True
         else:
             self.last_point_time = time.time()
-            return True  # 第一个点肯定记录
         
         # 正常判断
         if squared_dist >= min_record_dist_squared:
@@ -967,56 +956,24 @@ class InkPainter:
 
     def process_points(self):
         """处理积累的点数据"""
-        if not self.is_drawing:
+        if not self.is_drawing or not self.point_buffer:
             return
         
-        # 如果缓冲点太少，等待更多点积累，但不要等待太久
+        # 如果缓冲点太少，等待更多点积累
         if len(self.point_buffer) < 2:
-            # 如果点缓冲为空但距离上次处理时间过长，尝试维持连续性
-            if hasattr(self, 'last_process_time') and not self.point_buffer:
-                current_time = time.time()
-                if current_time - self.last_process_time > 0.1:  # 超过100ms没有新点
-                    if self.current_stroke and len(self.current_stroke) > 0:
-                        # 使用最后一个记录点作为当前位置，维持绘画连续性
-                        last_x, last_y, _ = self.current_stroke[-1]
-                        current_cursor_x, current_cursor_y = win32api.GetCursorPos()
-                        
-                        # 如果鼠标位置与最后记录点有明显差异，添加一个中间点
-                        dx = current_cursor_x - last_x
-                        dy = current_cursor_y - last_y
-                        if dx*dx + dy*dy > 25:  # 距离超过5像素
-                            # 创建中间点以维持连续性
-                            mid_x = last_x + dx * 0.5
-                            mid_y = last_y + dy * 0.5
-                            self.update_drawing(mid_x, mid_y)
-                            self.update_drawing(current_cursor_x, current_cursor_y)
             return
         
         # 创建缓冲区副本并清空原缓冲区
         buffer_copy = self.point_buffer.copy()
         self.point_buffer = []
         
-        # 对缓冲中的点进行平滑和简化处理
+        # 对缓冲中的点进行平滑和简化，减少不必要的点
         smoothed_points = self._smooth_and_simplify_points(buffer_copy)
-        
-        # 添加当前鼠标位置作为最后一个点，确保绘制到当前位置
-        if smoothed_points and len(smoothed_points) > 0:
-            current_cursor_x, current_cursor_y = win32api.GetCursorPos()
-            last_x, last_y = smoothed_points[-1]
-            
-            # 检查最后一个平滑点和当前鼠标位置的距离
-            dx = current_cursor_x - last_x
-            dy = current_cursor_y - last_y
-            if dx*dx + dy*dy > 25:  # 距离超过5像素，加上当前鼠标位置
-                smoothed_points.append((current_cursor_x, current_cursor_y))
         
         # 处理精简后的点
         for x, y in smoothed_points:
             current_time = time.time()
             self.update_drawing(x, y)
-        
-        # 记录最后处理时间
-        self.last_process_time = time.time()
 
     def _smooth_and_simplify_points(self, points):
         """平滑和简化点序列，减少冗余点"""
@@ -1123,9 +1080,6 @@ class InkPainter:
             self.line_width_history = []
             self.last_line_width = self.base_width
             
-            # 保存最后绘制点，用于后续维持连续性
-            self.last_drawn_point = (x, y)
-            
             # 重置笔画保护计时器
             self.stroke_start_time = current_time
             return
@@ -1137,9 +1091,7 @@ class InkPainter:
             dx = x - prev_x
             dy = y - prev_y
             squared_dist = dx*dx + dy*dy
-            
-            # 如果距离太小但时间间隔已经较大，仍然添加点以确保连续性
-            if squared_dist < 0.01 and current_time - prev_time < 0.05:  # 0.1 * 0.1 = 0.01，时间小于50ms
+            if squared_dist < 0.01:  # 0.1 * 0.1 = 0.01
                 return
         
         # 更新笔画数据
@@ -1147,9 +1099,6 @@ class InkPainter:
         
         # 添加新点
         self.current_stroke.append((x, y, current_time))
-        
-        # 保存最后绘制点
-        self.last_drawn_point = (x, y)
         
         # 笔画点数保护
         if len(self.current_stroke) > self.max_stroke_points:
@@ -1193,7 +1142,8 @@ class InkPainter:
             dy = curr_y - prev_y
             squared_dist = dx*dx + dy*dy
             
-            # 处理可能导致线条断开的情况
+            # 即使距离较大也进行连接，但需要处理大距离情况
+            # 10000 = 100*100, 40000 = 200*200
             if squared_dist > 10000:  # 距离大于100像素
                 # 只在调试模式下输出详细日志
                 if IS_DEBUG_MODE:
@@ -1202,35 +1152,37 @@ class InkPainter:
                     # 非调试模式下只记录一次日志，使用非精确值
                     log.info(self.file_name + "发现距离较大的点，执行平滑连接")
                 
-                # 对于特别大的距离，插入更多中间点
-                dist = math.sqrt(squared_dist)  # 这里需要开平方
-                insert_count = min(20, max(3, int(dist / 20)))  # 增加点数，至少3个，最多20个
-                
-                # 最后绘制的坐标点
-                last_drawn_x, last_drawn_y = prev_x, prev_y
-                
-                # 计算高级画笔的线宽 - 只计算一次
-                line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
-                
-                # 创建插值点绘制线条
-                for i in range(1, insert_count + 1):
-                    t = i / (insert_count + 1)
-                    mid_x = prev_x + t * (curr_x - prev_x)
-                    mid_y = prev_y + t * (curr_y - prev_y)
+                # 对于特别大的距离，插入中间点
+                if squared_dist > 40000:  # 距离大于200像素
+                    # 计算需要插入多少个中间点 - 基于实际距离
+                    dist = math.sqrt(squared_dist)  # 这里需要开平方
+                    insert_count = min(10, int(dist / 30))
                     
-                    # 绘制连接线段
+                    # 最后绘制的坐标点
+                    last_drawn_x, last_drawn_y = prev_x, prev_y
+                    
+                    # 计算高级画笔的线宽 - 只计算一次
+                    line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
+                    
+                    # 创建插值点绘制线条
+                    for i in range(1, insert_count + 1):
+                        t = i / (insert_count + 1)
+                        mid_x = prev_x + t * (curr_x - prev_x)
+                        mid_y = prev_y + t * (curr_y - prev_y)
+                        
+                        # 绘制连接线段
+                        new_lines = self.draw_single_line(
+                            last_drawn_x, last_drawn_y, mid_x, mid_y, line_width)
+                        self.active_lines.extend(new_lines)
+                        
+                        # 更新最后绘制点
+                        last_drawn_x, last_drawn_y = mid_x, mid_y
+                    
+                    # 绘制最后一段到实际点
                     new_lines = self.draw_single_line(
-                        last_drawn_x, last_drawn_y, mid_x, mid_y, line_width)
+                        last_drawn_x, last_drawn_y, curr_x, curr_y, line_width)
                     self.active_lines.extend(new_lines)
-                    
-                    # 更新最后绘制点
-                    last_drawn_x, last_drawn_y = mid_x, mid_y
-                
-                # 绘制最后一段到实际点
-                new_lines = self.draw_single_line(
-                    last_drawn_x, last_drawn_y, curr_x, curr_y, line_width)
-                self.active_lines.extend(new_lines)
-                return
+                    return
             
             # 计算并应用高级画笔线宽
             line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
@@ -1238,7 +1190,7 @@ class InkPainter:
             # 绘制线段
             new_lines = self.draw_single_line(prev_x, prev_y, curr_x, curr_y, line_width)
             self.active_lines.extend(new_lines)
-
+            
     def calculate_line_width(self, prev_x, prev_y, curr_x, curr_y, prev_time, curr_time):
         """根据绘制速度计算线宽"""
         # 如果高级画笔功能被禁用，直接返回基础线宽
@@ -1308,30 +1260,18 @@ class InkPainter:
             log.info(f"绘制线条时使用的颜色: {self.line_color}")
             log.info(f"最终用于绘制线条的CSS颜色: {self._color_str}")
         
-        try:
-            # 确保坐标为浮点数并且有效
-            x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
-            
-            # 检查坐标是否有效
-            if math.isnan(x1) or math.isnan(y1) or math.isnan(x2) or math.isnan(y2):
-                log.error(f"检测到无效的坐标值: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
-                return []
-                
-            # 简化绘制逻辑，统一使用单个线条，减少绘制开销
-            line = self.canvas.create_line(
-                x1, y1, x2, y2,
-                width=width,
-                fill=self._color_str,  # 使用预处理的颜色字符串
-                capstyle=Qt.RoundCap,
-                smooth=True,
-                joinstyle=Qt.RoundJoin
-            )
-            
-            # 将线添加到活动线条列表中 - 这对渐隐效果很重要
-            return [line]
-        except Exception as e:
-            log.error(f"绘制线条失败: {str(e)}, 坐标: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
-            return []
+        # 简化绘制逻辑，统一使用单个线条，减少绘制开销
+        line = self.canvas.create_line(
+            float(x1), float(y1), float(x2), float(y2),
+            width=width,
+            fill=self._color_str,  # 使用预处理的颜色字符串
+            capstyle=Qt.RoundCap,
+            smooth=True,
+            joinstyle=Qt.RoundJoin
+        )
+        
+        # 将线添加到活动线条列表中 - 这对渐隐效果很重要
+        return [line]
 
     def finish_drawing(self):
         """结束绘画过程并启动渐隐效果"""
@@ -1344,13 +1284,6 @@ class InkPainter:
         
         # 重置绘画状态 - 放在前面以防止循环调用
         self.is_drawing = False
-        
-        # 清除点缓冲区和相关状态，确保下次绘制开始是清洁的
-        self.point_buffer = []
-        if hasattr(self, 'last_point_time'):
-            delattr(self, 'last_point_time')
-        if hasattr(self, 'last_process_time'):
-            delattr(self, 'last_process_time')
         
         # 如果是强制结束，则跳过手势识别
         is_forced_end = getattr(self, 'forced_end', False)
