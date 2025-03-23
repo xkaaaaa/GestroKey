@@ -37,12 +37,66 @@ except ImportError:
 
 # 全局变量，控制是否在调试模式
 IS_DEBUG_MODE = False
+# 添加手势解析器懒加载标志
+_GESTURE_PARSER_INITIALIZED = False
+# 添加配置文件缓存
+_CONFIG_CACHE = {}
+_CONFIG_CACHE_TIME = 0
+_GESTURES_CACHE = {}
+_GESTURES_CACHE_TIME = 0
+# 添加线条对象池，减少内存分配
+_LINE_OBJECT_POOL = []
+_MAX_POOL_SIZE = 1000  # 最大对象池大小
 
 # 设置调试模式的函数
 def set_debug_mode(debug=False):
     global IS_DEBUG_MODE
     IS_DEBUG_MODE = debug
     setup_logger(debug)  # 设置日志记录器的级别
+
+# 线条对象池管理函数
+def get_line_from_pool():
+    """从对象池获取一个线条对象"""
+    global _LINE_OBJECT_POOL
+    if _LINE_OBJECT_POOL:
+        line = _LINE_OBJECT_POOL.pop()
+        # 确保对象是完全空的，没有残留属性
+        line.clear()
+        # 预初始化所有必需的键，设置默认值
+        line['x1'] = 0
+        line['y1'] = 0
+        line['x2'] = 0 
+        line['y2'] = 0
+        line['width'] = 1.0
+        line['color'] = "rgb(0,0,0)"
+        return line
+    else:
+        # 池为空，创建新对象，包含所有必需的键
+        return {
+            'x1': 0, 'y1': 0, 'x2': 0, 'y2': 0,
+            'width': 1.0, 'color': "rgb(0,0,0)"
+        }
+
+def return_line_to_pool(line):
+    """将线条对象归还到对象池"""
+    global _LINE_OBJECT_POOL, _MAX_POOL_SIZE
+    # 安全检查：确保是有效的线条对象
+    if not isinstance(line, dict):
+        return
+    
+    # 清空对象数据，但保留基本结构
+    line.clear()
+    # 重新初始化基本键，防止下次使用时出现KeyError
+    line['x1'] = 0
+    line['y1'] = 0
+    line['x2'] = 0
+    line['y2'] = 0
+    line['width'] = 1.0
+    line['color'] = "rgb(0,0,0)"
+    
+    # 如果池未满，归还对象
+    if len(_LINE_OBJECT_POOL) < _MAX_POOL_SIZE:
+        _LINE_OBJECT_POOL.append(line)
 
 class Canvas(QWidget):
     def __init__(self, parent=None):
@@ -62,6 +116,9 @@ class Canvas(QWidget):
 
     def create_line(self, x1, y1, x2, y2, width, fill, capstyle=Qt.RoundCap, smooth=True, joinstyle=Qt.RoundJoin):
         """创建一条线段"""
+        # 从对象池获取线条对象
+        line = get_line_from_pool()
+        
         # 确保颜色值在添加到线条字典前是有效格式
         if isinstance(fill, str) and (fill.startswith('rgb(') or fill.startswith('#')):
             color = fill  # 保持字符串格式
@@ -75,7 +132,14 @@ class Canvas(QWidget):
             color = "rgb(170,85,255)"  # 默认紫色
             log.error(f"无效的颜色格式 {fill}，使用默认紫色")
         
-        line = {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'width': width, 'color': color}
+        # 设置线条属性
+        line['x1'] = x1
+        line['y1'] = y1
+        line['x2'] = x2
+        line['y2'] = y2
+        line['width'] = width
+        line['color'] = color
+        
         self.lines.append(line)
         # 不立即更新，而是加入批量队列
         self.batch_updates.append(line)
@@ -102,8 +166,78 @@ class Canvas(QWidget):
     def delete(self, line):
         try:
             self.lines.remove(line)
+            # 归还对象到池
+            return_line_to_pool(line)
         except ValueError:
             pass
+        self.schedule_update()
+    
+    def batch_update_lines(self, line_updates):
+        """批量更新多条线的颜色
+        
+        Args:
+            line_updates: 包含(line, color)元组的列表
+        """
+        if not line_updates:
+            return
+            
+        for line, color in line_updates:
+            self.itemconfig(line, color)
+        
+        # 一次性触发更新，而不是为每条线单独更新
+        self.schedule_update()
+    
+    def batch_delete_lines(self, lines_to_delete):
+        """批量删除多条线
+        
+        Args:
+            lines_to_delete: 要删除的线条对象列表
+        """
+        if not lines_to_delete:
+            return
+            
+        # 记录删除前的线条数量
+        lines_count_before = len(self.lines)
+        
+        # 字典是不可哈希的，不能直接使用集合
+        # 使用列表推导式直接过滤掉要删除的线条
+        # 这种方法对于少量线条高效，对大量线条可能性能较低
+        if len(lines_to_delete) < 10:
+            # 过滤并记录要返回池的对象
+            to_delete = []
+            self.lines = [line for line in self.lines if (line not in lines_to_delete or to_delete.append(line) is None)]
+            
+            # 归还删除的对象到池
+            for line in to_delete:
+                return_line_to_pool(line)
+        else:
+            # 对于大量线条，使用id作为标识符进行高效过滤
+            # 创建一个删除列表中对象的id集合
+            lines_to_delete_ids = {id(line) for line in lines_to_delete}
+            
+            # 创建保留和删除的两个列表
+            lines_to_keep = []
+            actual_deleted = []
+            
+            for line in self.lines:
+                if id(line) not in lines_to_delete_ids:
+                    lines_to_keep.append(line)
+                else:
+                    actual_deleted.append(line)
+                    
+            # 更新线条列表
+            self.lines = lines_to_keep
+            
+            # 归还删除的对象到池
+            for line in actual_deleted:
+                return_line_to_pool(line)
+        
+        # 记录实际删除的线条数量
+        deleted_count = lines_count_before - len(self.lines)
+        if IS_DEBUG_MODE and deleted_count > 0:
+            log.debug(f"批量删除了 {deleted_count} 条线")
+        
+        # 一次性触发更新
         self.schedule_update()
     
     def schedule_update(self):
@@ -120,83 +254,171 @@ class Canvas(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        # 始终开启完整抗锯齿
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
         
-        # 仅绘制可见区域内的线条
+        # 根据硬件加速设置调整渲染选项
+        if hasattr(self, 'enable_hardware_acceleration') and self.enable_hardware_acceleration:
+            # 启用完整硬件加速渲染选项
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            painter.setRenderHint(QPainter.HighQualityAntialiasing, True)
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            
+            # 使用更适合硬件加速的合成模式
+            painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        else:
+            # 在软件渲染模式下，只使用基本抗锯齿以提高性能
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        
+        # 仅渲染可见区域内的线条以提高性能
         visible_rect = event.rect()
         
-        # 使用更适合线条绘制的合成模式
-        painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        # 使用视口裁剪来进一步优化渲染
+        painter.setClipRect(visible_rect)
+        
+        # 计算屏幕上需要渲染的线条
+        visible_lines = []
         
         for line in self.lines:
-            # 处理颜色 - create_line 方法已经确保 line['color'] 是有效的颜色格式
-            color = line['color']
-            log.debug(f"绘制线条，使用颜色: {color}")
+            # 添加安全检查，确保线条包含所有必需的键
+            required_keys = ['x1', 'y1', 'x2', 'y2', 'width', 'color']
+            if not all(key in line for key in required_keys):
+                # 跳过无效线条，并记录错误
+                if IS_DEBUG_MODE:
+                    log.error(f"发现无效线条对象: {line}")
+                continue
             
-            if isinstance(color, tuple) and len(color) >= 3:
-                # RGB元组 - 这种情况应该不会再出现，因为在create_line已转换为字符串
-                r, g, b = color[0], color[1], color[2]
-                qcolor = QColor(r, g, b)
-                log.debug(f"从RGB元组创建QColor: ({r}, {g}, {b})")
-            elif isinstance(color, str):
-                if color.startswith('rgb('):
-                    # 解析RGB格式
-                    rgb_values = color.strip('rgb()').split(',')
-                    if len(rgb_values) >= 3:
-                        try:
-                            r = int(rgb_values[0].strip())
-                            g = int(rgb_values[1].strip())
-                            b = int(rgb_values[2].strip())
-                            qcolor = QColor(r, g, b)
-                            log.debug(f"从RGB字符串创建QColor: ({r}, {g}, {b})")
-                        except ValueError:
-                            qcolor = QColor(170, 85, 255)  # 默认紫色
-                            log.error(f"无法解析RGB字符串: {color}，使用默认紫色")
-                    else:
-                        qcolor = QColor(170, 85, 255)  # 默认紫色
-                        log.error(f"RGB格式不正确: {color}，使用默认紫色")
-                elif color.startswith('#'):
-                    # 十六进制字符串
-                    qcolor = QColor(color)
-                    log.debug(f"从十六进制字符串创建QColor: {color}")
-                else:
-                    # 无法识别的字符串格式，使用默认值
-                    qcolor = QColor(170, 85, 255)  # 默认紫色
-                    log.error(f"无法识别的颜色格式: {color}，使用默认紫色")
-            else:
-                # 默认颜色 - 使用紫色代替红色，与设置中的默认颜色一致
-                qcolor = QColor(170, 85, 255)  # 默认紫色
-                log.error(f"无效的颜色值类型: {type(color)}，使用默认紫色")
-                
-            pen = QPen(qcolor)
-            pen.setWidthF(line['width'])
-            pen.setCapStyle(Qt.RoundCap)
-            pen.setJoinStyle(Qt.RoundJoin)
+            # 提取线条坐标
+            try:
+                x1, y1 = float(line['x1']), float(line['y1'])
+                x2, y2 = float(line['x2']), float(line['y2'])
+            except (ValueError, KeyError) as e:
+                # 捕获所有可能的转换错误
+                log.error(f"处理线条坐标时出错: {e}, 线条: {line}")
+                continue
             
-            # 将坐标转换为浮点数以实现更平滑的线条
-            x1, y1 = float(line['x1']), float(line['y1'])
-            x2, y2 = float(line['x2']), float(line['y2'])
-            
-            # 粗略判断线条是否在可见区域内（边界框检测）
+            # 快速边界框检测，跳过不在可见区域的线条
             if (max(x1, x2) < visible_rect.left() or min(x1, x2) > visible_rect.right() or
                 max(y1, y2) < visible_rect.top() or min(y1, y2) > visible_rect.bottom()):
                 continue  # 不在可见区域内，跳过绘制
-                
-            painter.setPen(pen)
             
-            # 使用路径绘制实现更平滑的线条效果
-            path = QPainterPath()
-            path.moveTo(x1, y1)
+            visible_lines.append(line)
+        
+        # 如果启用了硬件加速并且有足够多的线条，使用批量绘制优化
+        if hasattr(self, 'enable_hardware_acceleration') and self.enable_hardware_acceleration and len(visible_lines) > 10:
+            # 按颜色分组线条，减少画笔切换次数
+            color_groups = {}
+            for line in visible_lines:
+                color = line['color']
+                if color not in color_groups:
+                    color_groups[color] = []
+                color_groups[color].append(line)
             
-            # 始终使用贝塞尔曲线绘制，提高平滑度
-            mid_x = (x1 + x2) / 2
-            mid_y = (y1 + y2) / 2
-            path.quadTo(mid_x, mid_y, x2, y2)
+            # 对每个颜色组批量绘制
+            for color, lines in color_groups.items():
+                # 处理颜色
+                if isinstance(color, str):
+                    if color.startswith('rgb('):
+                        rgb_values = color.strip('rgb()').split(',')
+                        if len(rgb_values) >= 3:
+                            try:
+                                r = int(rgb_values[0].strip())
+                                g = int(rgb_values[1].strip())
+                                b = int(rgb_values[2].strip())
+                                qcolor = QColor(r, g, b)
+                            except ValueError:
+                                qcolor = QColor(170, 85, 255)  # 默认紫色
+                        else:
+                            qcolor = QColor(170, 85, 255)  # 默认紫色
+                    elif color.startswith('#'):
+                        qcolor = QColor(color)
+                    else:
+                        qcolor = QColor(170, 85, 255)  # 默认紫色
+                else:
+                    qcolor = QColor(170, 85, 255)  # 默认紫色
                 
-            painter.drawPath(path)
+                # 设置画笔 - 只设置一次颜色
+                pen = QPen(qcolor)
+                pen.setCapStyle(Qt.RoundCap)
+                pen.setJoinStyle(Qt.RoundJoin)
+                painter.setPen(pen)
+                
+                # 批量绘制相同颜色的线条
+                for line in lines:
+                    try:
+                        x1, y1 = float(line['x1']), float(line['y1'])
+                        x2, y2 = float(line['x2']), float(line['y2'])
+                        pen.setWidthF(line['width'])
+                        painter.setPen(pen)
+                        
+                        # 使用路径绘制实现更平滑的线条效果
+                        path = QPainterPath()
+                        path.moveTo(x1, y1)
+                        
+                        # 使用贝塞尔曲线绘制，提高平滑度
+                        mid_x = (x1 + x2) / 2
+                        mid_y = (y1 + y2) / 2
+                        path.quadTo(mid_x, mid_y, x2, y2)
+                        painter.drawPath(path)
+                    except (ValueError, KeyError) as e:
+                        # 捕获所有可能的绘制错误
+                        log.error(f"批量绘制线条时出错: {e}, 线条: {line}")
+                        continue
+        else:
+            # 普通逐条绘制模式
+            for line in visible_lines:
+                try:
+                    # 处理颜色 - create_line 方法已经确保 line['color'] 是有效的颜色格式
+                    color = line['color']
+                    
+                    if isinstance(color, str):
+                        if color.startswith('rgb('):
+                            # 解析RGB格式
+                            rgb_values = color.strip('rgb()').split(',')
+                            if len(rgb_values) >= 3:
+                                try:
+                                    r = int(rgb_values[0].strip())
+                                    g = int(rgb_values[1].strip())
+                                    b = int(rgb_values[2].strip())
+                                    qcolor = QColor(r, g, b)
+                                except ValueError:
+                                    qcolor = QColor(170, 85, 255)  # 默认紫色
+                            else:
+                                qcolor = QColor(170, 85, 255)  # 默认紫色
+                        elif color.startswith('#'):
+                            # 十六进制字符串
+                            qcolor = QColor(color)
+                        else:
+                            # 无法识别的字符串格式，使用默认值
+                            qcolor = QColor(170, 85, 255)  # 默认紫色
+                    else:
+                        # 默认颜色 - 使用紫色代替红色，与设置中的默认颜色一致
+                        qcolor = QColor(170, 85, 255)  # 默认紫色
+                        
+                    pen = QPen(qcolor)
+                    pen.setWidthF(line['width'])
+                    pen.setCapStyle(Qt.RoundCap)
+                    pen.setJoinStyle(Qt.RoundJoin)
+                    
+                    # 将坐标转换为浮点数以实现更平滑的线条
+                    x1, y1 = float(line['x1']), float(line['y1'])
+                    x2, y2 = float(line['x2']), float(line['y2'])
+                        
+                    painter.setPen(pen)
+                    
+                    # 使用路径绘制实现更平滑的线条效果
+                    path = QPainterPath()
+                    path.moveTo(x1, y1)
+                    
+                    # 贝塞尔曲线绘制，提高平滑度
+                    mid_x = (x1 + x2) / 2
+                    mid_y = (y1 + y2) / 2
+                    path.quadTo(mid_x, mid_y, x2, y2)
+                        
+                    painter.drawPath(path)
+                except (ValueError, KeyError) as e:
+                    # 捕获所有可能的绘制错误
+                    log.error(f"绘制线条时出错: {e}, 线条: {line}")
+                    continue
 
 class InkPainter:
     def __init__(self, config=None):
@@ -271,7 +493,8 @@ class InkPainter:
         self.init_canvas()
         self.load_settings()
         self.load_gestures()
-        self.init_gesture_parser()
+        # 不再立即初始化手势解析器，而是在需要时才初始化
+        # self.init_gesture_parser()  
         self.start_listening()
         
         # 确保颜色已从配置加载（不是默认红色）
@@ -302,30 +525,72 @@ class InkPainter:
     
     @line_color.setter
     def line_color(self, value):
-        old_value = self._line_color
-        self._line_color = value
-        
-        # 预处理并缓存CSS颜色字符串格式
-        if isinstance(value, tuple) and len(value) >= 3:
-            r, g, b = value
-            self._color_str = f"rgb({r},{g},{b})"
-        else:
-            self._color_str = value  # 如果已经是字符串格式，直接使用
-        
-        if IS_DEBUG_MODE:
-            log.debug(f"线条颜色已从 {old_value} 更新为: {value}")
-        
-        # 如果有活动的线条，立即更新它们的颜色
-        if hasattr(self, 'active_lines') and self.active_lines:
-            try:
-                if IS_DEBUG_MODE:
-                    log.debug(f"更新现有活动线条颜色为: {self._color_str}")
-                
-                # 更新所有活动线条的颜色
-                for line in self.active_lines:
-                    self.canvas.itemconfig(line, fill=self._color_str)
-            except Exception as e:
-                log.error(f"更新活动线条颜色失败: {str(e)}")
+        """设置线条颜色，并同时更新CSS颜色字符串缓存"""
+        try:
+            old_value = self._line_color
+            self._line_color = value
+            
+            # 预处理并缓存CSS颜色字符串格式
+            if isinstance(value, tuple) and len(value) >= 3:
+                r, g, b = value
+                # 确保RGB值在有效范围内
+                r = max(0, min(255, int(r)))
+                g = max(0, min(255, int(g)))
+                b = max(0, min(255, int(b)))
+                self._color_str = f"rgb({r},{g},{b})"
+            elif isinstance(value, str) and (value.startswith('rgb(') or value.startswith('#')):
+                self._color_str = value  # 如果已经是字符串格式，直接使用
+            else:
+                # 无效颜色格式，使用默认紫色
+                log.error(f"无效的颜色格式: {value}，使用默认紫色")
+                self._line_color = (170, 85, 255)  # 默认紫色
+                self._color_str = "rgb(170,85,255)"
+            
+            if IS_DEBUG_MODE:
+                log.debug(f"线条颜色已从 {old_value} 更新为: {value}")
+            
+            # 如果有活动的线条，批量更新它们的颜色
+            if hasattr(self, 'active_lines') and self.active_lines:
+                self._update_active_lines_color()
+        except Exception as e:
+            log.error(f"设置线条颜色时出错: {e}")
+            import traceback
+            log.error(f"设置线条颜色错误堆栈: {traceback.format_exc()}")
+            # 确保有有效的默认值
+            self._line_color = (170, 85, 255)  # 默认紫色
+            self._color_str = "rgb(170,85,255)"
+    
+    def _update_active_lines_color(self):
+        """更新所有活动线条的颜色 - 抽取为单独方法以提高可维护性"""
+        try:
+            if IS_DEBUG_MODE:
+                log.debug(f"批量更新 {len(self.active_lines)} 条活动线条颜色为: {self._color_str}")
+            
+            # 收集要更新的线条，一次性批量更新
+            batch_updates = []
+            for line in self.active_lines:
+                if isinstance(line, dict):  # 确保是有效的线条对象
+                    batch_updates.append((line, self._color_str))
+            
+            # 如果有Canvas实例且支持批量操作，使用批量更新
+            if hasattr(self, 'canvas'):
+                if hasattr(self.canvas, 'batch_update_lines') and batch_updates:
+                    self.canvas.batch_update_lines(batch_updates)
+                else:
+                    # 否则使用普通更新方式
+                    for line, color in batch_updates:
+                        try:
+                            self.canvas.itemconfig(line, fill=color)
+                        except Exception as e:
+                            log.error(f"更新单个线条颜色失败: {e}")
+                            continue
+            
+            if IS_DEBUG_MODE:
+                log.debug(f"批量更新完成，共 {len(batch_updates)} 条线")
+        except Exception as e:
+            log.error(f"更新活动线条颜色整体失败: {e}")
+            import traceback
+            log.error(f"更新线条颜色错误堆栈: {traceback.format_exc()}")
 
     def get_config_path(self):
         """获取配置文件路径"""
@@ -352,6 +617,70 @@ class InkPainter:
         # 使用用户主目录下的.gestrokey文件夹
         config_dir = os.path.expanduser("~/.gestrokey")
         return os.path.join(config_dir, "gestures.json")
+
+    def get_cached_config(self):
+        """获取缓存的配置，如果配置文件有变化则重新读取"""
+        global _CONFIG_CACHE, _CONFIG_CACHE_TIME
+        
+        config_path = self.get_config_path()
+        
+        # 检查文件是否存在
+        if not os.path.exists(config_path):
+            log.warning(f"配置文件不存在: {config_path}")
+            return {}
+        
+        # 获取文件的最后修改时间
+        mod_time = os.path.getmtime(config_path)
+        
+        # 如果缓存为空或文件有更新，则重新读取
+        if not _CONFIG_CACHE or mod_time > _CONFIG_CACHE_TIME:
+            try:
+                if IS_DEBUG_MODE:
+                    log.debug(f"配置文件已变化或未缓存，重新读取: {config_path}")
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    _CONFIG_CACHE = json.load(f)
+                    _CONFIG_CACHE_TIME = mod_time
+                    log.info(f"已重新加载配置文件: {config_path}")
+            except Exception as e:
+                log.error(f"读取配置文件失败: {str(e)}")
+                return {}
+        else:
+            if IS_DEBUG_MODE:
+                log.debug(f"使用缓存的配置文件: {config_path}")
+            
+        return _CONFIG_CACHE
+
+    def get_cached_gestures(self):
+        """获取缓存的手势库，如果手势库文件有变化则重新读取"""
+        global _GESTURES_CACHE, _GESTURES_CACHE_TIME
+        
+        gesture_path = self.get_gesture_path()
+        
+        # 检查文件是否存在
+        if not os.path.exists(gesture_path):
+            log.warning(f"手势库文件不存在: {gesture_path}")
+            return {}
+        
+        # 获取文件的最后修改时间
+        mod_time = os.path.getmtime(gesture_path)
+        
+        # 如果缓存为空或文件有更新，则重新读取
+        if not _GESTURES_CACHE or mod_time > _GESTURES_CACHE_TIME:
+            try:
+                if IS_DEBUG_MODE:
+                    log.debug(f"手势库文件已变化或未缓存，重新读取: {gesture_path}")
+                with open(gesture_path, 'r', encoding='utf-8') as f:
+                    _GESTURES_CACHE = json.load(f)
+                    _GESTURES_CACHE_TIME = mod_time
+                    log.info(f"已重新加载手势库文件: {gesture_path}")
+            except Exception as e:
+                log.error(f"读取手势库文件失败: {str(e)}")
+                return {}
+        else:
+            if IS_DEBUG_MODE:
+                log.debug(f"使用缓存的手势库文件: {gesture_path}")
+            
+        return _GESTURES_CACHE
 
     def init_canvas(self):
         """初始化Canvas"""
@@ -387,71 +716,65 @@ class InkPainter:
         """从配置文件加载绘画设置"""
         log.info(self.file_name + "从配置文件加载绘画设置")
         try:
-            # 获取配置文件路径
-            config_path = self.get_config_path()
+            # 使用缓存获取配置
+            config = self.get_cached_config()
             
-            # 检查配置文件是否存在
-            if os.path.exists(config_path):
-                log.info(f"配置文件存在: {config_path}")
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
+            # 检查是否有drawing部分
+            if 'drawing' in config:
+                drawing_settings = config['drawing']
+                
+                # 基础宽度
+                if 'base_width' in drawing_settings:
+                    self.base_width = float(drawing_settings['base_width'])
                     
-                    # 检查是否有drawing部分
-                    if 'drawing' in config:
-                        drawing_settings = config['drawing']
-                        
-                        # 基础宽度
-                        if 'base_width' in drawing_settings:
-                            self.base_width = float(drawing_settings['base_width'])
+                # 最小宽度
+                if 'min_width' in drawing_settings:
+                    self.min_width = float(drawing_settings['min_width'])
+                    
+                # 最大宽度
+                if 'max_width' in drawing_settings:
+                    self.max_width = float(drawing_settings['max_width'])
+                    
+                # 平滑度
+                if 'smoothing' in drawing_settings:
+                    self.smoothing = float(drawing_settings['smoothing'])
+                
+                # 颜色 - 添加更详细的日志
+                if 'color' in drawing_settings:
+                    color_hex = drawing_settings['color']
+                    log.info(f"从配置中读取到颜色值: {color_hex}")
+                    # 解析HEX颜色
+                    if color_hex.startswith('#') and len(color_hex) in [4, 7, 9]:
+                        try:
+                            if IS_DEBUG_MODE:
+                                log.info(f"尝试解析HEX颜色: {color_hex}")
+                            r, g, b = self.hex_to_rgb(color_hex)
+                            log.info(f"HEX颜色 {color_hex} 解析为RGB: ({r}, {g}, {b})")
+                            old_color = self.line_color
+                            self.line_color = (r, g, b)
+                            log.info(f"成功加载颜色: {color_hex} -> RGB: {self.line_color}")
+                        except Exception as e:
+                            log.error(f"颜色解析失败: {str(e)}")
                             
-                        # 最小宽度
-                        if 'min_width' in drawing_settings:
-                            self.min_width = float(drawing_settings['min_width'])
-                            
-                        # 最大宽度
-                        if 'max_width' in drawing_settings:
-                            self.max_width = float(drawing_settings['max_width'])
-                            
-                        # 平滑度
-                        if 'smoothing' in drawing_settings:
-                            self.smoothing = float(drawing_settings['smoothing'])
-                        
-                        # 颜色 - 添加更详细的日志
-                        if 'color' in drawing_settings:
-                            color_hex = drawing_settings['color']
-                            log.info(f"从配置中读取到颜色值: {color_hex}")
-                            # 解析HEX颜色
-                            if color_hex.startswith('#') and len(color_hex) in [4, 7, 9]:
-                                try:
-                                    if IS_DEBUG_MODE:
-                                        log.info(f"尝试解析HEX颜色: {color_hex}")
-                                    r, g, b = self.hex_to_rgb(color_hex)
-                                    log.info(f"HEX颜色 {color_hex} 解析为RGB: ({r}, {g}, {b})")
-                                    old_color = self.line_color
-                                    self.line_color = (r, g, b)
-                                    log.info(f"成功加载颜色: {color_hex} -> RGB: {self.line_color}")
-                                except Exception as e:
-                                    log.error(f"颜色解析失败: {str(e)}")
-                                    
-                        # 高级笔刷
-                        if 'advanced_brush' in drawing_settings:
-                            self.use_advanced_brush = bool(drawing_settings['advanced_brush'])
-                            
-                        # 自动平滑
-                        if 'auto_smoothing' in drawing_settings:
-                            self.auto_smoothing = bool(drawing_settings['auto_smoothing'])
-                            
-                        # 淡出时间
-                        if 'fade_time' in drawing_settings:
-                            self.fade_duration = float(drawing_settings['fade_time'])
-                            
-                        # 速度因子
-                        if 'speed_factor' in drawing_settings:
-                            self.speed_factor = float(drawing_settings['speed_factor'])
-                            
-                    log.info(self.file_name + "成功加载绘画设置")
+                # 高级笔刷
+                if 'advanced_brush' in drawing_settings:
+                    self.use_advanced_brush = bool(drawing_settings['advanced_brush'])
+                    
+                # 自动平滑
+                if 'auto_smoothing' in drawing_settings:
+                    self.auto_smoothing = bool(drawing_settings['auto_smoothing'])
+                    
+                # 淡出时间
+                if 'fade_time' in drawing_settings:
+                    self.fade_duration = float(drawing_settings['fade_time'])
+                    
+                # 速度因子
+                if 'speed_factor' in drawing_settings:
+                    self.speed_factor = float(drawing_settings['speed_factor'])
+                    
+                log.info(self.file_name + "成功加载绘画设置")
             else:
-                log.warning(self.file_name + "配置文件不存在，使用默认设置")
+                log.warning(self.file_name + "配置文件中无绘画设置部分，使用默认设置")
                 if IS_DEBUG_MODE:
                     log.debug(f"默认线条颜色: {self.line_color}")
         except Exception as e:
@@ -461,45 +784,49 @@ class InkPainter:
         """加载手势库"""
         log.info(self.file_name + "加载手势库")
         self.gestures = {}
-        gesture_path = self.get_gesture_path()
         
         try:
-            if os.path.exists(gesture_path):
-                with open(gesture_path, 'r', encoding='utf-8') as f:
-                    gesture_data = json.load(f)
-                    gestures_dict = gesture_data.get('gestures', {})
+            # 使用缓存获取手势库
+            gesture_data = self.get_cached_gestures()
+            gestures_dict = gesture_data.get('gestures', {})
+            
+            # 处理手势数据
+            for name, gesture in gestures_dict.items():
+                directions = gesture.get('directions', '')
+                action_base64 = gesture.get('action', '')
+                
+                try:
+                    # Base64解码操作
+                    action = base64.b64decode(action_base64).decode('utf-8')
                     
-                    # 处理手势数据
-                    for name, gesture in gestures_dict.items():
-                        directions = gesture.get('directions', '')
-                        action_base64 = gesture.get('action', '')
-                        
-                        try:
-                            # Base64解码操作
-                            action = base64.b64decode(action_base64).decode('utf-8')
-                            
-                            # 添加到手势库
-                            self.gestures[directions] = {
-                    'name': name,
-                                'action': action
-                            }
-                            log.info(self.file_name + "成功加载手势: " + name + " - " + directions)
-                        except Exception as e:
-                            log.error("解析手势 " + name + " 失败: " + str(e))
-                    
-                    log.info(self.file_name + "成功加载手势库，共 " + str(len(self.gestures)) + " 个手势")
-            else:
-                log.warning(self.file_name + "手势库文件不存在，使用空手势库")
+                    # 添加到手势库
+                    self.gestures[directions] = {
+                        'name': name,
+                        'action': action
+                    }
+                    log.info(self.file_name + "成功加载手势: " + name + " - " + directions)
+                except Exception as e:
+                    log.error("解析手势 " + name + " 失败: " + str(e))
+            
+            log.info(self.file_name + "成功加载手势库，共 " + str(len(self.gestures)) + " 个手势")
         except Exception as e:
             log.error("加载手势库失败: " + str(e))
             print("加载手势库失败: " + str(e))
 
     def init_gesture_parser(self):
         """初始化手势解析器"""
+        # 仅在真正需要时才初始化，使用懒加载模式
+        global _GESTURE_PARSER_INITIALIZED
+        if _GESTURE_PARSER_INITIALIZED:
+            if IS_DEBUG_MODE:
+                log.debug(self.file_name + "手势解析器已初始化，跳过重复初始化")
+            return
+        
         log.info(self.file_name + "初始化手势解析器")
         # 使用空列表作为trail_points初始化
         # 这里只是初始化一个解析器实例，实际手势识别时会创建新的实例
         self.parser = GestureParser(trail_points=[])
+        _GESTURE_PARSER_INITIALIZED = True
         log.info(self.file_name + "手势解析器初始化完成")
 
     def start_listening(self):
@@ -526,6 +853,18 @@ class InkPainter:
         if not self.is_listening:
             return
             
+        # 记录当前时间，用于实现事件节流
+        current_time = time.time()
+        
+        # 节流逻辑：每次处理至少间隔3ms
+        if hasattr(self, 'last_mouse_event_time') and current_time - self.last_mouse_event_time < 0.003:
+            # 如果距离上次处理不足3ms，稍后再尝试
+            QTimer.singleShot(1, self.listen_mouse)
+            return
+        
+        # 更新最后处理时间
+        self.last_mouse_event_time = current_time
+        
         # 获取鼠标状态
         right_pressed = win32api.GetKeyState(win32con.VK_RBUTTON) < 0
         x, y = win32api.GetCursorPos()
@@ -539,25 +878,32 @@ class InkPainter:
         elif right_pressed and self.last_right_state:
             # 持续按下右键，处理移动
             if self.start_point:
-                # 计算距离
+                # 计算距离（使用平方距离，避免开平方）
                 dx = x - self.start_point[0]
                 dy = y - self.start_point[1]
-                distance = math.sqrt(dx*dx + dy*dy)
+                squared_distance = dx*dx + dy*dy
                 
                 # 未开始绘画时，检查是否达到触发距离
-                if not self.is_drawing and distance >= self.min_distance:
+                # 400 = 20*20 (最小触发距离的平方)
+                min_distance_squared = self.min_distance * self.min_distance
+                if not self.is_drawing and squared_distance >= min_distance_squared:
                     # 启动绘画
                     self.start_drawing(self.pending_points)
                 
                 # 已开始绘画或未达到触发距离，记录点
                 if self.is_drawing:
-                    # 添加到绘画缓冲
-                    self.point_buffer.append((x, y))
+                    # 添加到绘画缓冲 - 使用点过滤减少冗余点
+                    last_point = self.point_buffer[-1] if self.point_buffer else None
+                    if not last_point or self._should_add_point(last_point, (x, y)):
+                        self.point_buffer.append((x, y))
                 else:
-                    # 添加到待处理点
-                    self.pending_points.append((x, y))
+                    # 添加到待处理点，也使用过滤
+                    last_point = self.pending_points[-1] if self.pending_points else None
+                    if not last_point or self._should_add_point(last_point, (x, y)):
+                        self.pending_points.append((x, y))
                     
-                if len(self.point_buffer) % 10 == 0:
+                # 减少不必要的日志
+                if len(self.point_buffer) % 50 == 0 and IS_DEBUG_MODE:
                     log.debug(f"绘画中，已缓冲 {len(self.point_buffer)} 个点")
         elif not right_pressed and self.last_right_state:
             # 松开右键，结束绘画
@@ -575,24 +921,142 @@ class InkPainter:
         # 更新上一次右键状态
         self.last_right_state = right_pressed
         
-        # 继续监听
-        QTimer.singleShot(5, self.listen_mouse)  # 5ms更新一次，保证响应灵敏
+        # 继续监听，使用自适应间隔
+        # 如果正在绘画，使用更短的间隔以提高响应性
+        interval = 3 if self.is_drawing else 5
+        QTimer.singleShot(interval, self.listen_mouse)  # 间隔时间，保证响应灵敏
+
+    def _should_add_point(self, last_point, new_point):
+        """判断是否应该添加新点，避免记录过于密集的点"""
+        # 计算点之间的平方距离
+        dx = new_point[0] - last_point[0]
+        dy = new_point[1] - last_point[1]
+        squared_dist = dx*dx + dy*dy
+        
+        # 如果距离太小，不添加新点，阈值可根据需要调整
+        # 使用3像素作为最小距离，平方后为9
+        min_record_dist_squared = 9
+        
+        # 如果绘制速度很快，可以适当增加记录点的频率
+        if hasattr(self, 'last_point_time'):
+            time_diff = time.time() - self.last_point_time
+            # 如果移动速度快（时间短距离大），降低阈值
+            if time_diff < 0.03 and squared_dist > 25:  # 5*5=25，5像素且小于30ms
+                self.last_point_time = time.time()
+                return True
+        else:
+            self.last_point_time = time.time()
+        
+        # 正常判断
+        if squared_dist >= min_record_dist_squared:
+            self.last_point_time = time.time()
+            return True
+            
+        return False
 
     def process_points(self):
         """处理积累的点数据"""
         if not self.is_drawing or not self.point_buffer:
             return
         
+        # 如果缓冲点太少，等待更多点积累
+        if len(self.point_buffer) < 2:
+            return
+        
         # 创建缓冲区副本并清空原缓冲区
         buffer_copy = self.point_buffer.copy()
         self.point_buffer = []
         
-        # 处理缓冲区中的点
-        for x, y in buffer_copy:
+        # 对缓冲中的点进行平滑和简化，减少不必要的点
+        smoothed_points = self._smooth_and_simplify_points(buffer_copy)
+        
+        # 处理精简后的点
+        for x, y in smoothed_points:
             current_time = time.time()
-            
-            # 添加到当前笔画
             self.update_drawing(x, y)
+
+    def _smooth_and_simplify_points(self, points):
+        """平滑和简化点序列，减少冗余点"""
+        if len(points) <= 2:
+            return points
+            
+        # 结果列表，始终包含起点
+        result = [points[0]]
+        
+        # 使用道格拉斯-普克算法简化点序列
+        # 这是一个递归算法，找到一系列点中最大偏差点
+        def douglas_peucker(start_index, end_index, epsilon_squared):
+            # 找到距离start和end连线最远的点
+            max_dist_squared = 0
+            max_index = start_index
+            
+            start_point = points[start_index]
+            end_point = points[end_index]
+            
+            # 如果起点和终点相邻，无需简化
+            if end_index - start_index <= 1:
+                return
+                
+            # 计算线段
+            line_dx = end_point[0] - start_point[0]
+            line_dy = end_point[1] - start_point[1]
+            line_length_squared = line_dx*line_dx + line_dy*line_dy
+            
+            # 如果线段长度为0，所有点都共线
+            if line_length_squared == 0:
+                max_dist_squared = 0
+                for i in range(start_index+1, end_index):
+                    point = points[i]
+                    dx = point[0] - start_point[0]
+                    dy = point[1] - start_point[1]
+                    dist_squared = dx*dx + dy*dy
+                    if dist_squared > max_dist_squared:
+                        max_dist_squared = dist_squared
+                        max_index = i
+            else:
+                # 计算每个点到线段的距离
+                for i in range(start_index+1, end_index):
+                    point = points[i]
+                    
+                    # 计算点到线的距离
+                    px = point[0] - start_point[0]
+                    py = point[1] - start_point[1]
+                    
+                    # 计算投影比例
+                    proj = (px*line_dx + py*line_dy) / line_length_squared
+                    
+                    # 限制投影在线段范围内
+                    proj = max(0, min(1, proj))
+                    
+                    # 计算投影点
+                    proj_x = start_point[0] + proj * line_dx
+                    proj_y = start_point[1] + proj * line_dy
+                    
+                    # 计算距离的平方
+                    dx = point[0] - proj_x
+                    dy = point[1] - proj_y
+                    dist_squared = dx*dx + dy*dy
+                    
+                    if dist_squared > max_dist_squared:
+                        max_dist_squared = dist_squared
+                        max_index = i
+            
+            # 如果最大距离大于阈值，递归处理两个子部分
+            if max_dist_squared > epsilon_squared:
+                douglas_peucker(start_index, max_index, epsilon_squared)
+                result.append(points[max_index])
+                douglas_peucker(max_index, end_index, epsilon_squared)
+            
+        # 调用递归函数简化点序列
+        # 使用3像素作为阈值 (3*3=9)
+        epsilon_squared = 9
+        douglas_peucker(0, len(points)-1, epsilon_squared)
+        
+        # 确保终点被包含
+        if result[-1] != points[-1]:
+            result.append(points[-1])
+        
+        return result
 
     def update_drawing(self, x, y):
         """更新绘画状态"""
@@ -623,7 +1087,11 @@ class InkPainter:
         # 防止与前一个点完全重合造成的零长度线段
         if self.current_stroke and len(self.current_stroke) > 0:
             prev_x, prev_y, prev_time = self.current_stroke[-1]
-            if abs(x - prev_x) < 0.1 and abs(y - prev_y) < 0.1:
+            # 使用平方距离比较，避免开平方运算
+            dx = x - prev_x
+            dy = y - prev_y
+            squared_dist = dx*dx + dy*dy
+            if squared_dist < 0.01:  # 0.1 * 0.1 = 0.01
                 return
         
         # 更新笔画数据
@@ -669,25 +1137,31 @@ class InkPainter:
             prev_x, prev_y, prev_time = self.smoothed_stroke[-2]
             curr_x, curr_y, curr_time = self.smoothed_stroke[-1]
             
-            # 计算移动距离和时间差
-            dist = math.sqrt((curr_x - prev_x) ** 2 + (curr_y - prev_y) ** 2)
+            # 计算移动距离的平方 - 避免开平方运算
+            dx = curr_x - prev_x
+            dy = curr_y - prev_y
+            squared_dist = dx*dx + dy*dy
             
             # 即使距离较大也进行连接，但需要处理大距离情况
-            if dist > 100:
+            # 10000 = 100*100, 40000 = 200*200
+            if squared_dist > 10000:  # 距离大于100像素
+                # 只在调试模式下输出详细日志
                 if IS_DEBUG_MODE:
-                    log.info(self.file_name + "发现距离较大的点，执行平滑连接: " + str(dist))
+                    log.info(self.file_name + f"发现距离较大的点，执行平滑连接: {math.sqrt(squared_dist):.2f}像素")
                 else:
+                    # 非调试模式下只记录一次日志，使用非精确值
                     log.info(self.file_name + "发现距离较大的点，执行平滑连接")
                 
                 # 对于特别大的距离，插入中间点
-                if dist > 200:
-                    # 计算需要插入多少个中间点
+                if squared_dist > 40000:  # 距离大于200像素
+                    # 计算需要插入多少个中间点 - 基于实际距离
+                    dist = math.sqrt(squared_dist)  # 这里需要开平方
                     insert_count = min(10, int(dist / 30))
                     
                     # 最后绘制的坐标点
                     last_drawn_x, last_drawn_y = prev_x, prev_y
                     
-                    # 计算高级画笔的线宽
+                    # 计算高级画笔的线宽 - 只计算一次
                     line_width = self.calculate_line_width(prev_x, prev_y, curr_x, curr_y, prev_time, curr_time)
                     
                     # 创建插值点绘制线条
@@ -723,8 +1197,12 @@ class InkPainter:
         if not self.use_advanced_brush:
             return self.base_width
             
-        # 计算移动距离和时间差
-        dist = math.sqrt((curr_x - prev_x) ** 2 + (curr_y - prev_y) ** 2)
+        # 计算移动距离和时间差 - 使用平方距离优化
+        dx = curr_x - prev_x
+        dy = curr_y - prev_y
+        squared_dist = dx*dx + dy*dy
+        # 只有在真正需要时才计算开平方
+        dist = math.sqrt(squared_dist)
         time_diff = max(0.001, curr_time - prev_time)  # 防止除零
         
         # 计算速度
@@ -742,13 +1220,17 @@ class InkPainter:
         if len(self.line_width_history) > 8:
             self.line_width_history.pop(0)
         
-        # 计算平滑后的线宽调整系数 - 使用加权移动平均
+        # 计算平滑后的线宽调整系数 - 使用加权移动平均，优化计算
         weights = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # 越新的值权重越高
-        trimmed_weights = weights[-len(self.line_width_history):]
+        num_values = len(self.line_width_history)
+        trimmed_weights = weights[-num_values:]
         
-        # 计算加权平均
-        weighted_sum = sum(w * v for w, v in zip(trimmed_weights, self.line_width_history))
-        weight_sum = sum(trimmed_weights)
+        # 优化计算加权平均
+        weighted_sum = 0
+        weight_sum = 0
+        for i in range(num_values):
+            weighted_sum += trimmed_weights[i] * self.line_width_history[i]
+            weight_sum += trimmed_weights[i]
         smooth_speed_multiplier = weighted_sum / weight_sum
         
         # 平滑处理：让当前值与上一个值之间有平滑过渡
@@ -808,7 +1290,12 @@ class InkPainter:
         
         # 添加到已完成笔画历史，并且进行手势识别（如果不是强制结束）
         if len(current_stroke_copy) > 5 and not is_forced_end:  # 至少需要5个点才能作为有效笔画
+            # 限制已完成笔画历史大小，防止内存无限增长
+            max_finished_strokes = 10
             self.finished_strokes.append(current_stroke_copy)
+            # 保持最近的10个笔画
+            if len(self.finished_strokes) > max_finished_strokes:
+                self.finished_strokes = self.finished_strokes[-max_finished_strokes:]
             
             # 尝试识别手势 - 直接处理，不使用线程
             try:
@@ -837,9 +1324,14 @@ class InkPainter:
             fade_start = time.time()
             fade_end = fade_start + self.fade_duration
             
+            # 过滤有效的线条对象
+            valid_lines = [line for line in self.active_lines if isinstance(line, dict)]
+            if len(valid_lines) < len(self.active_lines):
+                log.warning(f"过滤掉了 {len(self.active_lines) - len(valid_lines)} 个无效线条对象")
+            
             # 设置渐隐动画
             self.fade_animations.append({
-                'lines': self.active_lines.copy(),
+                'lines': valid_lines,
                 'start_color': self.line_color,
                 'start_time': fade_start,
                 'end_time': fade_end
@@ -857,8 +1349,15 @@ class InkPainter:
             self.active_lines = []
         else:
             # 没有渐隐效果，直接清除线条
-            for line in self.active_lines:
-                self.canvas.delete(line)
+            try:
+                valid_lines = [line for line in self.active_lines if isinstance(line, dict)]
+                if hasattr(self.canvas, 'batch_delete_lines') and valid_lines:
+                    self.canvas.batch_delete_lines(valid_lines)
+                else:
+                    for line in valid_lines:
+                        self.canvas.delete(line)
+            except Exception as e:
+                log.error(f"清除线条时出错: {e}")
             self.active_lines = []
         
         # 重置状态
@@ -881,6 +1380,10 @@ class InkPainter:
                 first_points = trail_points[:3]
                 last_points = trail_points[-3:]
                 log.debug(f"轨迹起始点: {first_points}, 结束点: {last_points}")
+            
+            # 确保手势解析器已初始化
+            if not _GESTURE_PARSER_INITIALIZED:
+                self.init_gesture_parser()
             
             # 创建新的GestureParser实例，传入轨迹点
             parser = GestureParser(trail_points)
@@ -910,9 +1413,11 @@ class InkPainter:
                 for anim in fade_copy:
                     for line in anim['lines']:
                         try:
-                            self.canvas.delete(line)
-                        except Exception:
-                            pass
+                            # 确保是字典对象
+                            if isinstance(line, dict):
+                                self.canvas.delete(line)
+                        except Exception as e:
+                            log.error(f"删除手势渐隐线条时出错: {e}")
                 self.fade_animations.clear()
             
             # 直接调用顶部导入的execute_operation函数
@@ -921,6 +1426,8 @@ class InkPainter:
             
         except Exception as e:
             log.error("处理手势失败: " + str(e))
+            import traceback
+            log.error(f"处理手势错误堆栈: {traceback.format_exc()}")
 
     def process_fade_animation(self):
         """处理渐隐动画帧"""
@@ -940,6 +1447,7 @@ class InkPainter:
         
         # 批量处理动画
         batch_updates = []
+        lines_to_remove = []
         
         for anim in self.fade_animations:
             elapsed = current_time - anim['start_time']
@@ -951,21 +1459,48 @@ class InkPainter:
             
             # 批量收集更新
             for line_id in anim['lines']:
-                batch_updates.append((line_id, fade_color))
+                # 确保是有效线条对象
+                if isinstance(line_id, dict) and 'color' in line_id:
+                    batch_updates.append((line_id, fade_color))
             
             if progress >= 1.0:
                 for line_id in anim['lines']:
-                    self.canvas.delete(line_id)
+                    # 只添加有效的线条对象到删除列表
+                    if isinstance(line_id, dict):
+                        lines_to_remove.append(line_id)
                 removals.append(anim)
         
-        # 批量执行更新
-        for line_id, color in batch_updates:
-            self.canvas.itemconfig(line_id, color)
+        # 批量执行更新（如果Canvas支持批量更新）
+        if hasattr(self.canvas, 'batch_update_lines') and batch_updates:
+            self.canvas.batch_update_lines(batch_updates)
+        else:
+            # 否则普通方式逐条更新
+            for line_id, color in batch_updates:
+                try:
+                    self.canvas.itemconfig(line_id, color)
+                except Exception as e:
+                    if IS_DEBUG_MODE:
+                        log.error(f"更新线条颜色失败: {e}, line_id: {line_id}")
+        
+        # 批量删除已完成的线条
+        if lines_to_remove:
+            try:
+                if hasattr(self.canvas, 'batch_delete_lines'):
+                    self.canvas.batch_delete_lines(lines_to_remove)
+                else:
+                    for line_id in lines_to_remove:
+                        self.canvas.delete(line_id)
+            except Exception as e:
+                log.error(f"删除渐隐完成线条时出错: {e}")
         
         # 移除已完成的动画
         for anim in removals:
-            self.fade_animations.remove(anim)
-        
+            try:
+                self.fade_animations.remove(anim)
+            except ValueError:
+                log.error(f"尝试移除不存在的动画: {anim}")
+                
+        # 恢复定时器管理代码
         # 如果还有活动的动画，继续定时器
         if self.fade_animations:
             # 不需要重新启动定时器，会自动继续
@@ -978,46 +1513,69 @@ class InkPainter:
     def calculate_fade_color(self, base_color, progress):
         """计算渐隐过程中的颜色（保持RGB不变，仅降低alpha值）"""
         try:
+            # 进行安全检查，避免空值或无效值
+            if base_color is None:
+                log.error("计算渐隐颜色失败: 基础颜色为空")
+                return "#80AAAAAA"  # 返回一个安全的半透明灰色
+
             # 解析原始颜色
+            r, g, b = 170, 85, 255  # 默认值：紫色，避免使用初始的红色
+            
             if isinstance(base_color, tuple) and len(base_color) >= 3:
                 # 元组形式的RGB颜色
                 r, g, b = base_color
             elif isinstance(base_color, str) and base_color.startswith("#"):
                 # 十六进制颜色
                 if len(base_color) == 7:  # #RRGGBB
-                    r = int(base_color[1:3], 16)
-                    g = int(base_color[3:5], 16)
-                    b = int(base_color[5:7], 16)
+                    try:
+                        r = int(base_color[1:3], 16)
+                        g = int(base_color[3:5], 16)
+                        b = int(base_color[5:7], 16)
+                    except ValueError:
+                        log.error(f"解析十六进制颜色失败: {base_color}")
                 elif len(base_color) == 9:  # #AARRGGBB
-                    r = int(base_color[3:5], 16)
-                    g = int(base_color[5:7], 16)
-                    b = int(base_color[7:9], 16)
+                    try:
+                        r = int(base_color[3:5], 16)
+                        g = int(base_color[5:7], 16)
+                        b = int(base_color[7:9], 16)
+                    except ValueError:
+                        log.error(f"解析带透明度的十六进制颜色失败: {base_color}")
                 else:
                     # 无法识别的颜色格式，使用默认值
-                    r, g, b = 255, 0, 0  # 纯红色
-                    log.error(f"计算渐隐颜色时使用默认纯红色 - 颜色格式识别失败: {base_color}")
+                    log.error(f"计算渐隐颜色时使用默认紫色 - 颜色格式识别失败: {base_color}")
             elif isinstance(base_color, str):
                 # 如果不是十六进制，假设是rgb格式
                 color_match = re.search(r'rgb\((\d+),\s*(\d+),\s*(\d+)\)', base_color)
                 if color_match:
-                    r, g, b = map(int, color_match.groups())
+                    try:
+                        r, g, b = map(int, color_match.groups())
+                    except ValueError:
+                        log.error(f"解析RGB格式颜色失败: {base_color}")
                 else:
-                    # 无法识别的颜色格式，使用默认值
-                    r, g, b = 255, 0, 0  # 纯红色
-                    log.error(f"计算渐隐颜色时使用默认纯红色 - 颜色格式识别失败: {base_color}")
+                    # 无法识别的字符串格式，使用默认值
+                    log.error(f"计算渐隐颜色时使用默认紫色 - 颜色格式识别失败: {base_color}")
             else:
                 # 无法识别的颜色格式，使用默认值
-                r, g, b = 255, 0, 0  # 纯红色
-                log.error(f"计算渐隐颜色时使用默认纯红色 - 颜色格式识别失败: {base_color}")
+                log.error(f"计算渐隐颜色时使用默认紫色 - 颜色格式类型错误: {type(base_color)}")
+            
+            # 确保RGB值在有效范围内
+            r = max(0, min(255, r))
+            g = max(0, min(255, g))
+            b = max(0, min(255, b))
             
             # 计算alpha值 - 使用非线性衰减，让开始减淡更慢一些
+            # 确保progress在有效范围内
+            progress = max(0.0, min(1.0, progress))
             a = int(255 * (1 - progress**0.7))  # 降低幂次，使淡出更平滑
+            a = max(0, min(255, a))  # 确保透明度在有效范围
             
             # 返回包含透明度信息的颜色，格式调整为 #AARRGGBB
             return f"#{a:02X}{r:02X}{g:02X}{b:02X}"
         except Exception as e:
-            log.error("计算渐隐颜色失败: " + str(e))
-            return "#FF0000"  # 返回纯红色作为显式错误指示
+            log.error(f"计算渐隐颜色失败: {e}")
+            import traceback
+            log.error(f"计算渐隐颜色错误堆栈: {traceback.format_exc()}")
+            return "#80AAAAAA"  # 返回一个安全的半透明灰色
 
     def shutdown(self):
         """安全关闭程序，释放资源"""
@@ -1029,24 +1587,43 @@ class InkPainter:
         
         # 停止所有定时器
         if hasattr(self, 'fade_timer') and self.fade_timer:
-            self.fade_timer.stop()
+            try:
+                self.fade_timer.stop()
+            except Exception as e:
+                log.error(f"停止渐隐定时器时出错: {e}")
             
         if hasattr(self, 'processing_thread') and self.processing_thread:
-            self.processing_thread.stop()
+            try:
+                self.processing_thread.stop()
+            except Exception as e:
+                log.error(f"停止处理线程时出错: {e}")
         
         # 清空所有线条
         if hasattr(self, 'canvas') and self.canvas:
+            # 处理活动线条
             for line in self.active_lines:
-                self.canvas.delete(line)
-                
+                try:
+                    if isinstance(line, dict):
+                        self.canvas.delete(line)
+                except Exception as e:
+                    log.error(f"删除活动线条时出错: {e}")
+                    
+            # 处理渐隐动画中的线条
             for anim in self.fade_animations:
                 for line in anim['lines']:
-                    self.canvas.delete(line)
+                    try:
+                        if isinstance(line, dict):
+                            self.canvas.delete(line)
+                    except Exception as e:
+                        log.error(f"删除渐隐动画线条时出错: {e}")
         
         # 关闭窗口
         if hasattr(self, 'canvas') and self.canvas:
-            self.canvas.hide()
-        self.canvas.close()
+            try:
+                self.canvas.hide()
+                self.canvas.close()
+            except Exception as e:
+                log.error(f"关闭画布窗口时出错: {e}")
         
         log.info("绘画模块已安全关闭")
 

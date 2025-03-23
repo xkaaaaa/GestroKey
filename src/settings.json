@@ -13,10 +13,10 @@
     "max_stroke_points": 200,
     "max_stroke_duration": 5,
     "hardware_acceleration": true,
-    "canvas_border": 1.0,
+    "canvas_border": 1,
     "min_points": 10,
-    "max_pause_ms": 300.0,
-    "min_length": 50.0,
+    "max_pause_ms": 300,
+    "min_length": 50,
     "sensitivity": 0.8
   },
   "app": {
