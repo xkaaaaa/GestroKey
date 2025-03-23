@@ -9,6 +9,9 @@ from PyQt5.QtCore import Qt, QObject, pyqtSignal
 # 确保app模块可以被导入
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# 导入版本信息
+from version import __version__, __title__, __copyright__, get_about_text
+
 # 导入应用日志模块
 from app.log import log, setup_logger
 
@@ -250,36 +253,33 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
-    """主函数"""
+    """应用程序入口函数"""
     # 解析命令行参数
-    args = parse_arguments()
+    parser = argparse.ArgumentParser(description='GestroKey - 一款基于鼠标手势的自动化工具')
+    parser.add_argument('--debug', action='store_true', help='启用调试模式')
+    args = parser.parse_args()
     
     # 设置调试模式
     debug_mode = args.debug
-    
-    # 初始化日志系统，根据命令行参数设置调试模式
     setup_logger(debug_mode)
-    
-    # 设置墨水绘图器的调试模式
     set_debug_mode(debug_mode)
     
+    # 记录启动信息
+    log.info(f"{__title__} v{__version__} 启动中...")
     if debug_mode:
-        log.debug("调试模式已启用，将显示详细日志信息")
+        log.info("调试模式已启用")
     
     # 设置高DPI支持
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     
     # 设置应用程序信息
-    QApplication.setApplicationName("GestroKey")
-    QApplication.setApplicationVersion("1.0.0")
+    QApplication.setApplicationName(__title__)
+    QApplication.setApplicationVersion(__version__)
     QApplication.setOrganizationName("GestroKey")
     
     # 创建QApplication实例
     app = QApplication(sys.argv)
-    
-    # 记录启动信息
-    log.info("GestroKey启动")
     
     # 初始化设置管理器
     settings_manager = SettingsManager()
@@ -293,8 +293,9 @@ def main():
     # 显示主窗口
     main_window.show()
     
-    # 应用设置
-    app_settings = settings_manager.get_settings().get("app", {})
+    # 加载应用程序设置
+    all_settings = settings_manager.get_settings()
+    app_settings = all_settings.get("app", {})
     
     # 如果设置为启动时最小化
     if app_settings.get("start_minimized", False):

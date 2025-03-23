@@ -19,6 +19,13 @@ from ui.utils.gesture_manager import GestureManager
 # 导入日志模块
 from app.log import log
 
+# 导入版本信息
+try:
+    from version import __version__, __title__, __copyright__, get_about_text
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from version import __version__, __title__, __copyright__, get_about_text
+
 class MainWindow(QMainWindow):
     """主窗口类，包含侧边栏和主要内容区域"""
     
@@ -50,6 +57,7 @@ class MainWindow(QMainWindow):
         
         # 设置应用图标
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
+        self.app_icon_path = icon_path  # 将图标路径保存为类属性
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
             # 如果有系统托盘，也设置托盘图标
@@ -431,36 +439,37 @@ class MainWindow(QMainWindow):
         
     def setup_tray_icon(self):
         """设置系统托盘图标"""
-        # 创建系统托盘图标
         self.tray_icon = QSystemTrayIcon(self)
         
-        # 设置图标
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
-        if os.path.exists(icon_path):
-            self.tray_icon.setIcon(QIcon(icon_path))
+        # 设置托盘图标
+        if hasattr(self, 'app_icon_path') and os.path.exists(self.app_icon_path):
+            self.tray_icon.setIcon(QIcon(self.app_icon_path))
         else:
-            log.warning(f"找不到托盘图标: {icon_path}")
+            # 如果找不到图标，使用默认图标
+            self.tray_icon.setIcon(self.windowIcon())
         
-        # 设置托盘菜单
+        # 创建托盘菜单
         tray_menu = QMenu()
         
-        # 显示主窗口
-        show_action = QAction("显示主窗口", self)
-        show_action.triggered.connect(self.show)
-        tray_menu.addAction(show_action)
+        # 添加显示/隐藏动作
+        toggle_visibility_action = QAction("显示/隐藏", self)
+        toggle_visibility_action.triggered.connect(self.toggle_visibility)
+        tray_menu.addAction(toggle_visibility_action)
         
-        # 分隔线
-        tray_menu.addSeparator()
-        
-        # 启动/停止手势识别
+        # 添加开始/停止绘制动作
         self.toggle_drawing_action = QAction("启动手势识别", self)
         self.toggle_drawing_action.triggered.connect(self.toggle_drawing)
         tray_menu.addAction(self.toggle_drawing_action)
         
-        # 分隔线
+        # 添加分隔线
         tray_menu.addSeparator()
         
-        # 退出
+        # 添加关于操作
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(self.show_about_dialog)
+        tray_menu.addAction(about_action)
+        
+        # 添加退出动作
         exit_action = QAction("退出", self)
         exit_action.triggered.connect(self.close)
         tray_menu.addAction(exit_action)
@@ -468,22 +477,19 @@ class MainWindow(QMainWindow):
         # 设置托盘菜单
         self.tray_icon.setContextMenu(tray_menu)
         
+        # 设置托盘图标双击事件
+        self.tray_icon.activated.connect(self._tray_icon_activated)
+        
         # 显示托盘图标
         self.tray_icon.show()
+        log.info("系统托盘图标已设置")
+
+    def show_about_dialog(self):
+        """显示关于对话框"""
+        about_text = get_about_text()
+        QMessageBox.about(self, f"关于 {__title__}", about_text)
+        log.debug("显示关于对话框")
         
-        # 连接托盘图标的点击信号
-        self.tray_icon.activated.connect(self.on_tray_icon_activated)
-        
-    def on_tray_icon_activated(self, reason):
-        """托盘图标激活处理
-        
-        Args:
-            reason: 激活原因
-        """
-        if reason == QSystemTrayIcon.DoubleClick:
-            # 双击托盘图标显示主窗口
-            self.show()
-            
     def apply_styles(self):
         """应用样式"""
         # 设置全局字体
@@ -705,6 +711,24 @@ class MainWindow(QMainWindow):
         # 更新托盘菜单的状态
         action_text = "停止手势识别" if self.drawing_active else "启动手势识别"
         self.toggle_drawing_action.setText(action_text)
+
+    def toggle_visibility(self):
+        """切换窗口显示/隐藏状态"""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.activateWindow()  # 确保窗口被激活（在前台显示）
+    
+    def _tray_icon_activated(self, reason):
+        """托盘图标激活事件处理
+        
+        Args:
+            reason: 激活原因
+        """
+        if reason == QSystemTrayIcon.DoubleClick:
+            # 双击托盘图标切换主窗口可见性
+            self.toggle_visibility()
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication

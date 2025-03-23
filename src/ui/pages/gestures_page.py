@@ -10,6 +10,13 @@ import sys
 import base64
 import uuid
 
+# 尝试导入版本信息
+try:
+    from version import __version__
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from version import __version__
+
 try:
     from app.log import log
 except ImportError:
@@ -543,7 +550,7 @@ class GesturesPage(QWidget):
                 # 新版格式，从gestures字段中获取
                 gestures = all_gestures.get('gestures', {})
             else:
-                # 旧版格式，直接使用
+                # 旧版格式，直接使用，但排除version字段
                 gestures = {k: v for k, v in all_gestures.items() if k != 'version'}
         
         if not gestures:

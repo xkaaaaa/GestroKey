@@ -1,9 +1,25 @@
 import os
 import json
 import copy
-from PyQt5.QtCore import QObject, pyqtSignal
+import sys
+import uuid
+import base64
 
-from app.log import log
+# 导入版本信息
+try:
+    from version import __version__
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from version import __version__
+
+# 尝试导入log模块
+try:
+    from app.log import log
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from app.log import log
+
+from PyQt5.QtCore import QObject, pyqtSignal
 
 class GestureManager(QObject):
     """手势管理器，负责管理手势数据的存储和检索"""
@@ -127,11 +143,11 @@ class GestureManager(QObject):
         try:
             # 确保使用新格式保存
             if 'version' not in self.gestures:
-                self.gestures['version'] = "1.0"
+                self.gestures['version'] = __version__
                 
             if 'gestures' not in self.gestures:
                 # 创建gestures字段并移动所有手势到此字段下
-                new_gestures = {'version': self.gestures.get('version', "1.0"), 'gestures': {}}
+                new_gestures = {'version': self.gestures.get('version', __version__), 'gestures': {}}
                 
                 # 复制所有手势
                 for key, value in self.gestures.items():
@@ -462,6 +478,64 @@ class GestureManager(QObject):
             log.info("已重置为默认手势配置")
             
         return result
+
+    def _init_default_gestures(self):
+        """初始化默认手势数据"""
+        # 默认手势库，包含一些基本的手势
+        self.gestures = {
+            'version': __version__,
+            'gestures': {}
+        }
+        log.info("已初始化空手势库")
+
+    def export_demo_gestures(self):
+        """导出演示用的手势库
+        
+        Returns:
+            True/False: 是否成功导出
+        """
+        # 创建演示手势
+        demo_gestures = {
+            'version': __version__,
+            'gestures': {
+                'up': {
+                    "name": "向上",
+                    "directions": "up",
+                    "action": "maximize_current_window"
+                },
+                'down': {
+                    "name": "向下",
+                    "directions": "down",
+                    "action": "minimize_current_window"
+                },
+                'left': {
+                    "name": "向左",
+                    "directions": "left",
+                    "action": "prev_window"
+                },
+                'right': {
+                    "name": "向右",
+                    "directions": "right",
+                    "action": "next_window"
+                },
+                'circ': {
+                    "name": "画圈",
+                    "directions": "up,right,down,left",
+                    "action": "restore_all"
+                }
+            }
+        }
+
+        # 将手势库转换为字符串
+        demo_gestures_str = json.dumps(demo_gestures, ensure_ascii=False, indent=2)
+
+        # 将字符串保存到文件
+        demo_gestures_path = os.path.join(os.path.dirname(self.config_file), "demo_gestures.json")
+        with open(demo_gestures_path, 'w', encoding='utf-8') as f:
+            f.write(demo_gestures_str)
+
+        log.info(f"已成功导出演示手势库到 {demo_gestures_path}")
+        return True
 
 if __name__ == "__main__":
     import sys

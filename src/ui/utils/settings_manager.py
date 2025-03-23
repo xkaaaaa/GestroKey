@@ -1,9 +1,22 @@
 import os
 import json
 import copy
-from PyQt5.QtCore import QObject, pyqtSignal
+import sys
 
-from app.log import log
+# 导入版本信息
+try:
+    from version import __version__
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from version import __version__
+
+try:
+    from app.log import log
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from app.log import log
+
+from PyQt5.QtCore import QObject, pyqtSignal
 
 class SettingsManager(QObject):
     """设置管理器类，负责管理应用程序设置"""
@@ -39,7 +52,33 @@ class SettingsManager(QObject):
             self.config_file = config_file
         
         # 默认设置
-        self.default_settings = {
+        self.default_settings = self.get_default_settings()
+        
+        # 当前设置
+        self.settings = {}
+        
+        # 加载设置
+        self.load_settings()
+        
+        log.info("设置管理器已初始化")
+        
+    def get_default_settings(self):
+        """获取默认设置
+        
+        Returns:
+            dict: 默认设置字典
+        """
+        # 默认设置，当没有找到配置文件或者配置文件出错时使用
+        default_settings = {
+            "app": {
+                "start_minimized": False,  # 是否在启动时最小化
+                "auto_start_recognition": False,  # 是否在启动时自动开始识别
+                "show_tray_notifications": True,  # 是否显示托盘通知
+                "stay_on_top": False,  # 是否置顶窗口
+                "language": "zh_CN",  # 界面语言
+                "theme": "light",  # 界面主题
+                "version": __version__  # 使用version模块的版本号
+            },
             # 绘制设置
             "drawing": {
                 "speed_factor": 1.2,    # 速度因子
@@ -60,25 +99,10 @@ class SettingsManager(QObject):
                 "max_pause_ms": 300,  # 最大暂停时间（毫秒）（原手势设置）
                 "min_length": 50,     # 最小长度（原手势设置）
                 "sensitivity": 0.8,   # 灵敏度（原手势设置）
-            },
-            # 应用程序设置
-            "app": {
-                "start_with_windows": False,  # 开机启动
-                "start_minimized": False,     # 启动时最小化
-                "minimize_to_tray": True,     # 最小化到系统托盘
-                "auto_start_recognition": False,  # 自动开始识别
-                "show_notifications": True,   # 显示通知
-                "log_level": "info",          # 日志级别
             }
         }
         
-        # 当前设置
-        self.settings = {}
-        
-        # 加载设置
-        self.load_settings()
-        
-        log.info("设置管理器已初始化")
+        return default_settings
         
     def load_settings(self):
         """从配置文件加载设置"""
@@ -273,7 +297,7 @@ class SettingsManager(QObject):
             if category in special_keys_mapping:
                 target_category, target_key = special_keys_mapping[category]
                 result[target_category][target_key] = category_settings
-                log.info(f"特殊设置 '{category}' 已移动到 '{target_category}/{target_key}'")
+                log.debug(f"特殊设置 '{category}' 已移动到 '{target_category}/{target_key}'")
                 continue
                 
             if category in result and isinstance(result[category], dict) and isinstance(category_settings, dict):
@@ -310,13 +334,13 @@ class SettingsManager(QObject):
                             # 找到了应该放置的类别
                             result[default_category][category] = category_settings
                             category_found = True
-                            log.info(f"设置 '{category}' 已移动到 '{default_category}' 类别")
+                            log.debug(f"设置 '{category}' 已移动到 '{default_category}' 类别")
                             break
                     
                     if not category_found:
                         # 没有找到对应的类别，保留在根级别
                         result[category] = category_settings
-                        log.warning(f"未知的设置项 '{category}' 保留在根级别")
+                        log.debug(f"未知的设置项 '{category}' 保留在根级别")
                 
         return result
         

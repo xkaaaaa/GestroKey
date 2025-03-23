@@ -21,7 +21,7 @@ GestroKey是一个基于PyQt5开发的手势控制应用程序，它允许用户
 
 ```bash
 # 克隆仓库
-git clone https://github.com/xkxkaaaaa/GestroKey.git
+git clone https://github.com/xkaaaaa/GestroKey.git
 
 # 进入项目目录
 cd GestroKey
