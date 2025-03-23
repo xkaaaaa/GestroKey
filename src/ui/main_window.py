@@ -51,6 +51,9 @@ class MainWindow(QMainWindow):
         # 初始化手势管理器
         self.gesture_manager = GestureManager()
         
+        # 状态变量 - 移动到这里，确保在setup_tray_icon之前初始化
+        self.drawing_active = False
+        
         # 窗口基本设置
         self.setWindowTitle("GestroKey")
         self.setMinimumSize(1000, 600)
@@ -74,9 +77,6 @@ class MainWindow(QMainWindow):
         
         # 应用样式
         self.apply_styles()
-        
-        # 状态变量
-        self.drawing_active = False
         
         # 标记是否正在处理页面切换
         self.is_handling_page_change = False
@@ -283,6 +283,11 @@ class MainWindow(QMainWindow):
         # 发出绘制状态变化信号
         self.sigDrawingStateChange.emit(self.drawing_active)
         
+        # 更新托盘图标菜单文本
+        if hasattr(self, 'toggle_drawing_action'):
+            action_text = "停止手势识别" if self.drawing_active else "启动手势识别"
+            self.toggle_drawing_action.setText(action_text)
+        
         # 记录日志
         state_text = "启动" if self.drawing_active else "停止"
         log.info(f"{state_text}手势识别")
@@ -449,33 +454,34 @@ class MainWindow(QMainWindow):
             self.tray_icon.setIcon(self.windowIcon())
         
         # 创建托盘菜单
-        tray_menu = QMenu()
+        self.tray_menu = QMenu()
         
         # 添加显示/隐藏动作
-        toggle_visibility_action = QAction("显示/隐藏", self)
-        toggle_visibility_action.triggered.connect(self.toggle_visibility)
-        tray_menu.addAction(toggle_visibility_action)
+        self.toggle_visibility_action = QAction("显示窗口", self)
+        self.toggle_visibility_action.triggered.connect(self.toggle_visibility)
+        self.tray_menu.addAction(self.toggle_visibility_action)
         
         # 添加开始/停止绘制动作
-        self.toggle_drawing_action = QAction("启动手势识别", self)
+        action_text = "停止手势识别" if self.drawing_active else "启动手势识别"
+        self.toggle_drawing_action = QAction(action_text, self)
         self.toggle_drawing_action.triggered.connect(self.toggle_drawing)
-        tray_menu.addAction(self.toggle_drawing_action)
+        self.tray_menu.addAction(self.toggle_drawing_action)
         
         # 添加分隔线
-        tray_menu.addSeparator()
+        self.tray_menu.addSeparator()
         
         # 添加关于操作
         about_action = QAction("关于", self)
         about_action.triggered.connect(self.show_about_dialog)
-        tray_menu.addAction(about_action)
+        self.tray_menu.addAction(about_action)
         
         # 添加退出动作
         exit_action = QAction("退出", self)
         exit_action.triggered.connect(self.close)
-        tray_menu.addAction(exit_action)
+        self.tray_menu.addAction(exit_action)
         
         # 设置托盘菜单
-        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.setContextMenu(self.tray_menu)
         
         # 设置托盘图标双击事件
         self.tray_icon.activated.connect(self._tray_icon_activated)
@@ -487,7 +493,18 @@ class MainWindow(QMainWindow):
     def show_about_dialog(self):
         """显示关于对话框"""
         about_text = get_about_text()
-        QMessageBox.about(self, f"关于 {__title__}", about_text)
+        # 使用自定义消息框代替QMessageBox.about以设置中文按钮
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(f"关于 {__title__}")
+        msg_box.setText(about_text)
+        msg_box.setIcon(QMessageBox.Information)
+        
+        # 添加确认按钮(中文)
+        confirm_btn = msg_box.addButton("确认", QMessageBox.AcceptRole)
+        msg_box.setDefaultButton(confirm_btn)
+        
+        # 显示对话框
+        msg_box.exec_()
         log.debug("显示关于对话框")
         
     def apply_styles(self):
@@ -606,24 +623,24 @@ class MainWindow(QMainWindow):
         """)
         
     def closeEvent(self, event):
-        """窗口关闭事件处理
+        """关闭窗口事件处理
         
         Args:
             event: 关闭事件
         """
-        # 检查是否有未保存的设置更改
-        if self.current_page == "settings" and self.settings_page.has_pending_changes():
-            log.debug("关闭窗口时有未保存的设置更改，显示确认对话框")
-            
+        # 检查是否有未保存的更改
+        if self.has_unsaved_changes():
             # 创建消息框
+            log.debug("检测到未保存的更改，显示确认对话框")
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle("未保存的更改")
-            msg_box.setText("您有未保存的设置更改。是否在退出前保存这些更改？")
-            msg_box.setIcon(QMessageBox.Question)
+            msg_box.setText("你有未保存的更改，确定要退出吗？")
+            msg_box.setInformativeText("退出前是否保存更改？")
+            msg_box.setIcon(QMessageBox.Warning)
             
             # 添加自定义按钮
-            save_btn = msg_box.addButton("保存", QMessageBox.AcceptRole)
-            discard_btn = msg_box.addButton("放弃", QMessageBox.DestructiveRole)
+            save_btn = msg_box.addButton("保存并退出", QMessageBox.AcceptRole)
+            discard_btn = msg_box.addButton("放弃更改", QMessageBox.DestructiveRole)
             cancel_btn = msg_box.addButton("取消", QMessageBox.RejectRole)
             
             # 显示对话框
@@ -631,22 +648,15 @@ class MainWindow(QMainWindow):
             
             # 处理用户选择
             clicked_button = msg_box.clickedButton()
-            
             if clicked_button == save_btn:
-                # 保存设置
-                log.info("用户选择保存设置后退出")
+                log.info("保存更改并退出")
                 self.save_settings()
-                # 继续关闭
+                # 继续关闭处理...
             elif clicked_button == discard_btn:
-                # 放弃更改，重新加载设置
-                log.info("用户选择放弃更改后退出")
-                current_settings = self.settings_manager.get_settings()
-                self.settings_page.update_settings(current_settings)
-                self.settings_page.hasUnsavedChanges.emit(False)
-                # 继续关闭
-            elif clicked_button == cancel_btn:
-                # 取消关闭
-                log.info("用户取消退出，保持窗口打开")
+                log.info("放弃更改并退出")
+                # 继续关闭处理...
+            else:  # cancel_btn
+                log.info("取消关闭操作")
                 event.ignore()
                 return
 
@@ -694,13 +704,8 @@ class MainWindow(QMainWindow):
         Args:
             event: 隐藏事件
         """
-        # 显示通知
-        self.tray_icon.showMessage(
-            "GestroKey", 
-            "应用程序已最小化到系统托盘。双击图标以恢复窗口。",
-            QSystemTrayIcon.Information,
-            2000
-        )
+        # 隐藏窗口，不显示通知
+        log.debug("窗口已隐藏到系统托盘")
         
     def showEvent(self, event):
         """窗口显示事件处理
@@ -715,11 +720,19 @@ class MainWindow(QMainWindow):
     def toggle_visibility(self):
         """切换窗口显示/隐藏状态"""
         if self.isVisible():
+            # 当前窗口可见，隐藏到托盘
             self.hide()
+            # 更新托盘菜单显示
+            if hasattr(self, 'toggle_visibility_action'):
+                self.toggle_visibility_action.setText("显示窗口")
         else:
+            # 当前窗口隐藏，显示窗口
             self.show()
             self.activateWindow()  # 确保窗口被激活（在前台显示）
-    
+            # 更新托盘菜单显示
+            if hasattr(self, 'toggle_visibility_action'):
+                self.toggle_visibility_action.setText("隐藏到托盘")
+                
     def _tray_icon_activated(self, reason):
         """托盘图标激活事件处理
         
@@ -729,6 +742,22 @@ class MainWindow(QMainWindow):
         if reason == QSystemTrayIcon.DoubleClick:
             # 双击托盘图标切换主窗口可见性
             self.toggle_visibility()
+
+    def has_unsaved_changes(self):
+        """检查是否有未保存的更改
+        
+        Returns:
+            bool: 是否有未保存的更改
+        """
+        # 检查设置页面是否有未保存的更改
+        if self.current_page == "settings" and self.settings_page.has_pending_changes():
+            log.debug("设置页面有未保存的更改")
+            return True
+            
+        # 检查其他页面的未保存更改（如果有的话）
+        # 例如，可以在这里添加对手势页面等的检查
+        
+        return False
 
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
