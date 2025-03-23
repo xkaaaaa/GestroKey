@@ -285,6 +285,20 @@ class MainWindow(QMainWindow):
         # 保存到设置管理器
         if self.settings_manager.save_settings(current_settings):
             log.info("设置已保存")
+            
+            # 重新加载保存后的设置
+            saved_settings = self.settings_manager.get_settings()
+            
+            # 先加载设置以确保内部状态一致
+            self.settings_page.load_settings(saved_settings)
+            
+            # 再更新UI显示
+            self.settings_page.update_settings(saved_settings)
+            
+            # 更新UI以表示设置已保存
+            self.settings_page.hasUnsavedChanges.emit(False)
+            log.debug("重置设置页面的未保存更改状态")
+            
             QMessageBox.information(self, "保存成功", "设置已成功保存。")
             
             # 应用设置到应用控制器
@@ -307,9 +321,18 @@ class MainWindow(QMainWindow):
             if self.settings_manager.reset_to_defaults():
                 log.info("设置已重置为默认值")
                 
-                # 更新UI显示
+                # 获取默认设置
                 default_settings = self.settings_manager.get_settings()
+                
+                # 先加载设置以确保内部状态一致
+                self.settings_page.load_settings(default_settings)
+                
+                # 然后更新UI显示
                 self.settings_page.update_settings(default_settings)
+                
+                # 确保设置页面的未保存更改状态被重置
+                self.settings_page.hasUnsavedChanges.emit(False)
+                log.debug("重置设置页面的未保存更改状态")
                 
                 # 应用设置到应用控制器
                 if self.app_controller:
@@ -319,7 +342,7 @@ class MainWindow(QMainWindow):
             else:
                 log.error("重置设置失败")
                 QMessageBox.warning(self, "重置失败", "重置设置时发生错误。")
-                
+            
     def apply_single_setting(self, key, value):
         """处理单个设置变更
         

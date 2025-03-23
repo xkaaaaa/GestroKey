@@ -799,23 +799,56 @@ class SettingsPage(QWidget):
         Args:
             settings: 设置字典
         """
-        self.settings = settings
+        # 保存当前的信号连接状态
+        old_connections = {}
         
-        # 清除未保存的标记
+        # 临时断开所有控件的值更改信号
+        for key, control in self.settings_controls.items():
+            try:
+                # 暂时断开连接
+                if isinstance(control, SliderSetting) or isinstance(control, CheckboxSetting) or isinstance(control, ColorPickerSetting):
+                    connected = control.valueChanged.disconnect(self.on_setting_changed)
+                    old_connections[key] = connected
+            except TypeError:
+                # 如果没有连接，忽略错误
+                pass
+        
+        try:
+            self.settings = settings
+            
+            # 清除未保存的标记
+            self.pending_settings = {}
+            self.has_unsaved_changes = False
+            self.hasUnsavedChanges.emit(False)
+            
+            # 更新控件值
+            for key, control in self.settings_controls.items():
+                if "/" in key:
+                    category, setting_key = key.split("/", 1)
+                    if category in settings and setting_key in settings[category]:
+                        if isinstance(control, SliderSetting):
+                            control.set_value(settings[category][setting_key])
+                        elif isinstance(control, CheckboxSetting):
+                            control.set_checked(settings[category][setting_key])
+                        elif isinstance(control, ColorPickerSetting):
+                            control.set_color(settings[category][setting_key])
+        finally:
+            # 重新连接所有控件的值更改信号
+            for key, control in self.settings_controls.items():
+                try:
+                    # 重新连接
+                    if isinstance(control, SliderSetting) or isinstance(control, CheckboxSetting) or isinstance(control, ColorPickerSetting):
+                        control.valueChanged.connect(self.on_setting_changed)
+                except TypeError:
+                    # 如果连接失败，忽略错误
+                    pass
+        
+        # 最终确保未保存状态被重置
         self.pending_settings = {}
         self.has_unsaved_changes = False
         self.hasUnsavedChanges.emit(False)
-        
-        # 更新控件值
-        for key, control in self.settings_controls.items():
-            if "/" in key:
-                category, setting_key = key.split("/", 1)
-                if category in settings and setting_key in settings[category]:
-                    if isinstance(control, SliderSetting):
-                        control.set_value(settings[category][setting_key])
-                    elif isinstance(control, CheckboxSetting):
-                        control.set_checked(settings[category][setting_key])
-                        
+        log.debug("更新控件值完成，重置未保存状态")
+
     def has_pending_changes(self):
         """检查是否有未保存的设置更改
         
