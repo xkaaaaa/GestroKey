@@ -139,9 +139,14 @@ class SidebarButton(QPushButton):
                 }
             """)
         else:
-            # 展开状态：显示文本，隐藏图标
+            # 展开状态：显示文本并恢复图标
             self.setText(self.button_text)
-            self.setIconSize(QSize(0, 0))  # 将图标尺寸设为0，实际隐藏图标
+            
+            # 恢复图标尺寸
+            if self.icon_path and os.path.exists(self.icon_path):
+                self.setIconSize(QSize(20, 20))
+                self.setIcon(QIcon(self.icon_path))
+            
             self.setToolTip("")  # 清除工具提示
             self.setStyleSheet("""
                 QPushButton {
