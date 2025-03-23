@@ -399,16 +399,30 @@ class GestureParser:
                         
                         # 检查directions是字符串还是列表
                         if isinstance(directions_str, str):
-                            # 如果是单个字符串，不需要分割
-                            directions_list = [directions_str]
+                            # 检查是否包含逗号分隔的方向列表
+                            if ',' in directions_str:
+                                directions_list = [d.strip() for d in directions_str.split(',')]
+                            else:
+                                # 如果是单个字符串，不需要分割
+                                directions_list = [directions_str]
                         else:
                             # 如果已经是列表，直接使用
                             directions_list = directions_str
                         
+                        # 优先使用预解码的动作代码
+                        action_value = None
+                        if 'decoded_action' in gesture:
+                            action_value = gesture['decoded_action']
+                            log.debug(f"{self.file_name} - 使用预解码动作加载手势 '{name}'")
+                        else:
+                            # 兼容旧版，使用编码的action
+                            action_value = gesture['action']
+                            log.debug(f"{self.file_name} - 使用原始编码动作加载手势 '{name}'")
+                        
                         gestures.append({
                             'name': name,
                             'directions': directions_list,
-                            'action': gesture['action']
+                            'action': action_value
                         })
                     
                     log.info(f"{self.file_name} - 成功加载手势库，共加载{len(gestures)}个手势")

@@ -12,11 +12,8 @@
     },
     "示例手势2": {
       "name": "示例手势2",
-      "directions": [
-        "←",
-        "→"
-      ],
-      "action": "cHlhdXRvZ3VpLmhvdGtleSgnYWx0JywgJ3RhYicp"
+      "directions": "←,→",
+      "action": "cHlhdXRvZ3VpLmhvdGtleSgnd2luJywgJ2QnKQ=="
     }
   }
 }

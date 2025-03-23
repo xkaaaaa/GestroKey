@@ -16,15 +16,45 @@ try:
 except ImportError:
     from log import log
 
-def execute(action_base64):
-    """解码并执行base64编码的Python代码"""
+def execute(action_code):
+    """执行操作代码，支持已解码的代码和base64编码的代码
+    
+    Args:
+        action_code: 操作代码，可以是已解码的字符串或base64编码的字符串
+    
+    Returns:
+        是否执行成功
+    """
     try:
         # 记录操作开始
         log.info(f"接收到操作请求")
         
-        # 解码base64指令
-        action_string = base64.b64decode(action_base64).decode('utf-8')
-        log.info(f"解码操作: {action_string}")
+        # 确定输入类型并获取操作字符串
+        action_string = None
+        if isinstance(action_code, str):
+            # 尝试检测是否为base64编码字符串
+            is_base64_encoded = True
+            try:
+                # 标准base64字符集为A-Za-z0-9+/=，可能末尾有=或==
+                base64_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+                if not all(c in base64_chars for c in action_code) or len(action_code) % 4 != 0:
+                    is_base64_encoded = False
+                
+                # 尝试解码
+                if is_base64_encoded:
+                    decoded = base64.b64decode(action_code).decode('utf-8')
+                    log.info(f"解码操作成功: {decoded}")
+                    action_string = decoded
+                else:
+                    log.info(f"接收到非Base64格式的操作代码，直接使用: {action_code[:30]}..." if len(action_code) > 30 else action_code)
+                    action_string = action_code
+            except Exception as e:
+                # 解码失败，认为是已解码的字符串
+                log.info(f"Base64解码失败，使用原始字符串: {str(e)}")
+                action_string = action_code
+        else:
+            log.warning(f"操作代码类型异常: {type(action_code)}")
+            return False
         
         # 检查操作字符串的有效性
         if not action_string or len(action_string.strip()) == 0:

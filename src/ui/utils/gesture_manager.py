@@ -67,35 +67,6 @@ class GestureManager(QObject):
         else:
             self.config_file = config_file
         
-        # 默认手势配置
-        self.default_gestures = {
-            "up": {
-                "name": "向上",
-                "directions": "up",
-                "action": "maximize_current_window"
-            },
-            "down": {
-                "name": "向下",
-                "directions": "down",
-                "action": "minimize_current_window"
-            },
-            "left": {
-                "name": "向左",
-                "directions": "left",
-                "action": "prev_window"
-            },
-            "right": {
-                "name": "向右",
-                "directions": "right",
-                "action": "next_window"
-            },
-            "circ": {
-                "name": "画圈",
-                "directions": "up,right,down,left",
-                "action": "restore_all"
-            }
-        }
-        
         # 当前手势数据
         self.gestures = {}
         
@@ -115,25 +86,84 @@ class GestureManager(QObject):
                     # 检查是否为新版手势库格式 (有 version 和 gestures 字段)
                     if isinstance(loaded_gestures, dict) and 'version' in loaded_gestures and 'gestures' in loaded_gestures:
                         log.info(f"检测到新版手势库文件格式，版本: {loaded_gestures.get('version', '未知')}")
+                        
+                        # 预处理手势动作，解码Base64
+                        if 'gestures' in loaded_gestures and isinstance(loaded_gestures['gestures'], dict):
+                            for gesture_key, gesture_data in loaded_gestures['gestures'].items():
+                                if isinstance(gesture_data, dict) and 'action' in gesture_data:
+                                    try:
+                                        # 解码Base64保存到decoded_action字段
+                                        base64_action = gesture_data['action']
+                                        decoded_action = base64.b64decode(base64_action).decode('utf-8')
+                                        gesture_data['decoded_action'] = decoded_action
+                                        log.debug(f"预处理手势 '{gesture_key}' 的动作代码")
+                                    except Exception as e:
+                                        log.warning(f"解码手势 '{gesture_key}' 的动作代码时出错: {str(e)}")
+                        
                         self.gestures = loaded_gestures
                         log.info(f"从配置文件 {self.config_file} 加载了 {len(loaded_gestures.get('gestures', {}))} 个手势")
                     # 验证加载的数据是否符合旧版格式要求
                     elif isinstance(loaded_gestures, dict):
+                        # 处理旧版格式的手势，同样进行预解码
+                        for gesture_key, gesture_data in loaded_gestures.items():
+                            if gesture_key != 'version' and isinstance(gesture_data, dict) and 'action' in gesture_data:
+                                try:
+                                    # 解码Base64保存到decoded_action字段
+                                    base64_action = gesture_data['action']
+                                    decoded_action = base64.b64decode(base64_action).decode('utf-8')
+                                    gesture_data['decoded_action'] = decoded_action
+                                    log.debug(f"预处理旧版格式手势 '{gesture_key}' 的动作代码")
+                                except Exception as e:
+                                    log.warning(f"解码旧版格式手势 '{gesture_key}' 的动作代码时出错: {str(e)}")
+                        
                         self.gestures = loaded_gestures
                         log.info(f"从配置文件 {self.config_file} 加载了 {len(self.gestures)} 个手势")
                     else:
                         log.error("配置文件格式错误，使用默认配置")
                         self.gestures = copy.deepcopy(self.default_gestures)
+                        self._preprocess_default_gestures()
             else:
                 # 文件不存在，使用默认配置并保存
                 log.info("配置文件不存在，使用默认配置")
                 self.gestures = copy.deepcopy(self.default_gestures)
+                self._preprocess_default_gestures()
                 self.save_gestures()
                 
         except Exception as e:
             log.error(f"加载手势配置失败: {str(e)}")
             self.gestures = copy.deepcopy(self.default_gestures)
+            self._preprocess_default_gestures()
         
+    def _preprocess_default_gestures(self):
+        """预处理默认手势，解码Base64动作"""
+        if isinstance(self.gestures, dict):
+            if 'gestures' in self.gestures and isinstance(self.gestures['gestures'], dict):
+                # 新版格式处理
+                for gesture_key, gesture_data in self.gestures['gestures'].items():
+                    if isinstance(gesture_data, dict) and 'action' in gesture_data:
+                        try:
+                            # 解码Base64保存到decoded_action字段
+                            base64_action = gesture_data['action']
+                            if isinstance(base64_action, str):
+                                decoded_action = base64.b64decode(base64_action).decode('utf-8')
+                                gesture_data['decoded_action'] = decoded_action
+                                log.debug(f"预处理默认手势 '{gesture_key}' 的动作代码")
+                        except Exception as e:
+                            log.warning(f"解码默认手势 '{gesture_key}' 的动作代码时出错: {str(e)}")
+            else:
+                # 旧版格式处理
+                for gesture_key, gesture_data in self.gestures.items():
+                    if gesture_key != 'version' and isinstance(gesture_data, dict) and 'action' in gesture_data:
+                        try:
+                            # 解码Base64保存到decoded_action字段
+                            base64_action = gesture_data['action']
+                            if isinstance(base64_action, str):
+                                decoded_action = base64.b64decode(base64_action).decode('utf-8')
+                                gesture_data['decoded_action'] = decoded_action
+                                log.debug(f"预处理默认手势 '{gesture_key}' 的动作代码")
+                        except Exception as e:
+                            log.warning(f"解码默认手势 '{gesture_key}' 的动作代码时出错: {str(e)}")
+
     def save_gestures(self):
         """保存手势到文件
         
@@ -155,10 +185,17 @@ class GestureManager(QObject):
                         new_gestures['gestures'][key] = value
                         
                 self.gestures = new_gestures
+            
+            # 创建一个深拷贝用于保存，移除decoded_action字段以避免重复存储
+            save_data = copy.deepcopy(self.gestures)
+            if 'gestures' in save_data and isinstance(save_data['gestures'], dict):
+                for gesture_data in save_data['gestures'].values():
+                    if isinstance(gesture_data, dict) and 'decoded_action' in gesture_data:
+                        del gesture_data['decoded_action']
                 
             # 转换为JSON并保存
             with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(self.gestures, f, ensure_ascii=False, indent=2)
+                json.dump(save_data, f, ensure_ascii=False, indent=2)
                 
             log.info(f"手势已保存到 {self.config_file}")
             return True
@@ -296,142 +333,129 @@ class GestureManager(QObject):
         """添加新手势
         
         Args:
-            key: 手势键名
-            name: 手势名称（可选），如果为空则使用键名
-            directions: 手势方向列表
-            action: 手势操作代码
+            key: 手势的键名
+            name: 手势的显示名称
+            directions: 手势方向序列
+            action: 手势触发的操作脚本
             
         Returns:
             是否添加成功
         """
         try:
-            # 确保名称不为空
-            if not name:
-                name = key
-                
-            # 确保directions是列表格式
-            if isinstance(directions, str):
-                if ',' in directions:
-                    directions = [d.strip() for d in directions.split(',')]
-                else:
-                    directions = [directions] if directions else []
+            log.info(f"添加手势 {key}: {name}, 方向: {directions}")
             
-            # 检查是否是新版格式
-            if 'gestures' in self.gestures:
-                # 检查键名是否已存在
-                if key in self.gestures['gestures']:
-                    log.warning(f"添加手势失败: 键名 {key} 已存在")
-                    return False
+            # 确保手势库使用新格式
+            if 'gestures' not in self.gestures:
+                self.gestures['gestures'] = {}
                 
-                # 添加新手势
-                self.gestures['gestures'][key] = {
-                    "name": name,
-                    "directions": directions,
-                    "action": action
-                }
+            # 检查手势键名是否已存在
+            if 'gestures' in self.gestures and key in self.gestures['gestures']:
+                log.warning(f"手势键名 {key} 已存在，无法添加")
+                return False
+                
+            # 预处理方向
+            if isinstance(directions, list):
+                directions_str = ','.join(directions)
             else:
-                # 旧版格式，直接添加到根字典
-                # 检查键名是否已存在
-                if key in self.gestures:
-                    log.warning(f"添加手势失败: 键名 {key} 已存在")
-                    return False
+                directions_str = directions
                 
-                # 添加新手势
-                self.gestures[key] = {
-                    "name": name,
-                    "directions": directions,
-                    "action": action
-                }
+            # 预解码action
+            decoded_action = None
+            try:
+                decoded_action = base64.b64decode(action).decode('utf-8')
+                log.debug(f"预解码手势动作成功: {decoded_action[:50]}..." if len(decoded_action) > 50 else decoded_action)
+            except Exception as e:
+                log.warning(f"预解码手势动作失败: {str(e)}")
             
-            # 保存手势配置
-            success = self.save_gestures()
+            # 添加到手势库
+            self.gestures['gestures'][key] = {
+                'name': name,
+                'directions': directions_str,
+                'action': action,
+                'decoded_action': decoded_action
+            }
             
-            # 发出信号
-            if success:
-                self.gesturesChanged.emit(self.get_all_gestures())
+            # 保存手势库
+            result = self.save_gestures()
             
-            return success
+            # 发出手势变更信号
+            self.gesturesChanged.emit(copy.deepcopy(self.gestures))
+            
+            return result
         except Exception as e:
             log.error(f"添加手势失败: {str(e)}")
             return False
         
     def update_gesture(self, old_key, new_key, name, directions, action):
-        """更新现有手势
+        """更新手势
         
         Args:
             old_key: 原手势键名
-            new_key: 新手势键名（可以与原键名相同）
-            name: 手势名称（可选），如果为空则使用键名
-            directions: 手势方向列表
-            action: 手势操作代码
+            new_key: 新手势键名
+            name: 手势显示名称
+            directions: 手势方向序列
+            action: 手势触发的操作脚本
             
         Returns:
             是否更新成功
         """
         try:
-            # 确保名称不为空
-            if not name:
-                name = new_key
-                
-            # 确保directions是列表格式
-            if isinstance(directions, str):
-                if ',' in directions:
-                    directions = [d.strip() for d in directions.split(',')]
-                else:
-                    directions = [directions] if directions else []
+            log.info(f"更新手势 {old_key} -> {new_key}: {name}, 方向: {directions}")
             
-            # 检查是否是新版格式
-            if 'gestures' in self.gestures:
-                target_gestures = self.gestures['gestures']
+            # 确保手势库使用新格式
+            if 'gestures' not in self.gestures:
+                log.warning("手势库不是新格式，无法更新")
+                return False
+                
+            # 检查原手势键名是否存在
+            if old_key not in self.gestures['gestures']:
+                log.warning(f"手势键名 {old_key} 不存在，无法更新")
+                return False
+                
+            # 检查新键名是否已存在（且不是原键名）
+            if new_key != old_key and new_key in self.gestures['gestures']:
+                log.warning(f"新手势键名 {new_key} 已存在，无法更新")
+                return False
+                
+            # 预解码action
+            decoded_action = None
+            try:
+                decoded_action = base64.b64decode(action).decode('utf-8')
+                log.debug(f"预解码更新的手势动作成功: {decoded_action[:50]}..." if len(decoded_action) > 50 else decoded_action)
+            except Exception as e:
+                log.warning(f"预解码更新的手势动作失败: {str(e)}")
+                
+            # 预处理方向
+            if isinstance(directions, list):
+                directions_str = ','.join(directions)
             else:
-                target_gestures = self.gestures
+                directions_str = directions
                 
-            # 检查原键名是否存在
-            if old_key not in target_gestures:
-                log.warning(f"更新手势失败: 键名 {old_key} 不存在")
-                return False
+            # 创建新的手势数据
+            gesture_data = {
+                'name': name,
+                'directions': directions_str,
+                'action': action,
+                'decoded_action': decoded_action
+            }
             
-            # 如果新键名与旧键名不同，检查新键名是否已存在
-            if old_key != new_key and new_key in target_gestures:
-                log.warning(f"更新手势失败: 新键名 {new_key} 已存在")
-                return False
-            
-            # 如果键名有变更，需要删除旧手势并添加新手势
-            if old_key != new_key:
-                # 保存旧手势数据（可能有其他字段）
-                old_gesture = target_gestures.pop(old_key)
-                
-                # 更新数据
-                updated_gesture = {
-                    "name": name,
-                    "directions": directions,
-                    "action": action
-                }
-                
-                # 如果旧手势有其他字段，保留它们
-                for key, value in old_gesture.items():
-                    if key not in updated_gesture:
-                        updated_gesture[key] = value
-                
+            # 处理键名变更
+            if new_key != old_key:
+                # 删除原手势
+                del self.gestures['gestures'][old_key]
                 # 添加新手势
-                target_gestures[new_key] = updated_gesture
+                self.gestures['gestures'][new_key] = gesture_data
             else:
-                # 键名未变，直接更新
-                target_gestures[old_key] = {
-                    "name": name,
-                    "directions": directions,
-                    "action": action
-                }
+                # 更新手势
+                self.gestures['gestures'][old_key] = gesture_data
             
-            # 保存手势配置
-            success = self.save_gestures()
+            # 保存手势库
+            result = self.save_gestures()
             
-            # 发出信号
-            if success:
-                self.gesturesChanged.emit(self.get_all_gestures())
-                log.info(f"更新了手势: {old_key} -> {new_key} ({name})")
+            # 发出手势变更信号
+            self.gesturesChanged.emit(copy.deepcopy(self.gestures))
             
-            return success
+            return result
         except Exception as e:
             log.error(f"更新手势失败: {str(e)}")
             return False
