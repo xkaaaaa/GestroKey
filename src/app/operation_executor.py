@@ -1,6 +1,7 @@
 """
 操作执行模块
 处理手势识别后的命令执行逻辑
+使用多进程执行以避免阻塞主程序
 """
 
 import os
@@ -10,20 +11,49 @@ import base64
 import pyautogui
 import subprocess
 import traceback
+import multiprocessing
+from multiprocessing import Process
 
 try:
     from .log import log
 except ImportError:
     from log import log
 
+def _execute_in_process(action_string):
+    """在单独进程中执行操作代码
+    
+    Args:
+        action_string: 解码后的操作代码字符串
+    """
+    try:
+        # 设置安全执行环境
+        pyautogui.FAILSAFE = False  # 防止鼠标移动到角落导致异常
+        
+        # 创建执行环境
+        local_vars = {}
+        global_vars = {
+            'os': os,
+            'sys': sys,
+            'subprocess': subprocess,
+            'pyautogui': pyautogui,
+            'time': time,
+        }
+        
+        # 执行代码
+        exec(action_string, global_vars, local_vars)
+    except Exception as e:
+        log.error(f"执行操作失败: {str(e)}")
+        log.error(f"详细错误: {traceback.format_exc()}")
+
 def execute(action_code):
     """执行操作代码，支持已解码的代码和base64编码的代码
+    在单独进程中执行，避免阻塞主程序
     
     Args:
         action_code: 操作代码，可以是已解码的字符串或base64编码的字符串
     
     Returns:
-        是否执行成功
+        是否成功启动执行进程
     """
     try:
         # 记录操作开始
@@ -60,30 +90,29 @@ def execute(action_code):
         if not action_string or len(action_string.strip()) == 0:
             log.warning("操作字符串为空，跳过执行")
             return False
-            
-        # 设置安全执行环境
-        pyautogui.FAILSAFE = False  # 防止鼠标移动到角落导致异常
         
-        # 创建执行环境
-        local_vars = {}
-        global_vars = {
-            'os': os,
-            'sys': sys,
-            'subprocess': subprocess,
-            'pyautogui': pyautogui,
-            'time': time,
-        }
-        
-        # 执行代码
-        log.info("执行操作代码")
-        exec(action_string, global_vars, local_vars)
-        log.info("操作执行完成")
+        # 创建并启动新进程执行操作
+        log.info("在新进程中执行操作代码")
+        process = Process(target=_execute_in_process, args=(action_string,))
+        process.daemon = True  # 设置为守护进程，这样不会阻止主程序退出
+        process.start()
+        log.info(f"操作执行进程已启动 (PID: {process.pid})")
         return True
     except Exception as e:
-        log.error(f"执行操作失败: {str(e)}")
+        log.error(f"启动操作执行进程失败: {str(e)}")
         error_details = traceback.format_exc()
         log.error(f"详细错误: {error_details}")
         return False
     
 if __name__ == "__main__":
-    print("操作执行模块，不建议直接运行。") 
+    
+    # 简单测试
+    def test():
+        # 测试长时间操作
+        print("开始测试长时间操作")
+        execute("import time; print('开始睡眠10秒'); time.sleep(10); print('睡眠结束')")
+        print("操作已提交，主程序继续运行")
+        time.sleep(2)
+        print("主程序仍然响应")
+    
+    test() 
