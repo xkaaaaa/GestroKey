@@ -15,6 +15,9 @@ from version import __version__, __title__, __copyright__, get_about_text
 # 导入应用日志模块
 from app.log import log, setup_logger, shutdown_logger
 
+# 导入应用初始化模块
+from app._init_app import initialize_app
+
 # 导入设置管理器
 from ui.utils.settings_manager import SettingsManager
 
@@ -298,6 +301,12 @@ def main():
     if debug_mode:
         log.info("调试模式已启用")
     
+    # 预初始化应用程序组件，提高后续响应速度
+    startup_time = time.time()
+    log.info("开始预初始化应用程序组件...")
+    initialize_app(async_init=True)  # 异步初始化，不阻塞UI加载
+    log.info(f"应用预初始化启动耗时: {time.time() - startup_time:.3f}秒")
+    
     # 设置高DPI支持
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
@@ -322,6 +331,14 @@ def main():
         try:
             # 确保控制器资源被正确释放
             app_controller.cleanup()
+            
+            # 关闭操作执行进程池
+            try:
+                from app.operation_executor import shutdown as shutdown_executor
+                shutdown_executor()
+                log.info("操作执行进程池已关闭")
+            except Exception as e:
+                log.error(f"关闭操作执行进程池失败: {e}")
                   
             # 在调试模式下弹出问题解决情况反馈对话框
             if debug_mode:

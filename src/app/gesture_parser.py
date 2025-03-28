@@ -27,6 +27,18 @@ try:
 except ImportError:
     from log import log
 
+# 全局缓存，避免重复加载
+_CONFIG_CACHE = {}
+_CONFIG_MTIME = 0
+_GESTURES_CACHE = {}
+_GESTURES_MTIME = 0
+_DEFAULT_PARAMS = {
+    'min_points': 5,
+    'step_base': 3,
+    'merge_threshold': 25,
+    'noise_threshold': 15
+}
+
 class GestureParser:
     DIRECTION_MAP = ["右", "右上", "上", "左上", 
                     "左", "左下", "下", "右下"]
@@ -55,6 +67,87 @@ class GestureParser:
         '右下': '↘'
     }
     
+    @staticmethod
+    def get_config_paths():
+        """获取默认配置文件路径"""
+        src_dir_config = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settings.json")
+        src_dir_gestures = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gestures.json")
+        
+        config_path = src_dir_config if os.path.exists(src_dir_config) else os.path.expanduser("~/.gestrokey/settings.json")
+        gestures_path = src_dir_gestures if os.path.exists(src_dir_gestures) else os.path.expanduser("~/.gestrokey/gestures.json")
+        
+        return config_path, gestures_path
+    
+    @staticmethod
+    def load_gesture_lib(gestures_path=None):
+        """加载手势库，使用全局缓存优化性能"""
+        global _GESTURES_CACHE, _GESTURES_MTIME
+        
+        if gestures_path is None:
+            _, gestures_path = GestureParser.get_config_paths()
+        
+        # 检查文件是否存在
+        if not os.path.exists(gestures_path):
+            return {}
+            
+        # 检查文件是否有更新
+        current_mtime = os.path.getmtime(gestures_path)
+        if _GESTURES_CACHE and current_mtime <= _GESTURES_MTIME:
+            # 使用缓存
+            return _GESTURES_CACHE
+        
+        # 加载文件
+        try:
+            with open(gestures_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 更新缓存
+            _GESTURES_CACHE = data.get('gestures', {})
+            _GESTURES_MTIME = current_mtime
+            return _GESTURES_CACHE
+        except Exception as e:
+            log.error(f"加载手势库出错: {str(e)}")
+            return {}
+    
+    @staticmethod
+    def load_config_params(config_path=None):
+        """加载配置参数，使用全局缓存优化性能"""
+        global _CONFIG_CACHE, _CONFIG_MTIME, _DEFAULT_PARAMS
+        
+        if config_path is None:
+            config_path, _ = GestureParser.get_config_paths()
+        
+        # 检查文件是否存在
+        if not os.path.exists(config_path):
+            return _DEFAULT_PARAMS.copy()
+            
+        # 检查文件是否有更新
+        current_mtime = os.path.getmtime(config_path)
+        if _CONFIG_CACHE and current_mtime <= _CONFIG_MTIME:
+            # 使用缓存
+            return _CONFIG_CACHE
+        
+        # 加载文件
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 获取手势参数
+            params = _DEFAULT_PARAMS.copy()
+            if 'gesture_settings' in data:
+                gs = data['gesture_settings']
+                for key in params:
+                    if key in gs:
+                        params[key] = gs[key]
+            
+            # 更新缓存
+            _CONFIG_CACHE = params
+            _CONFIG_MTIME = current_mtime
+            return params
+        except Exception as e:
+            log.error(f"加载配置参数出错: {str(e)}")
+            return _DEFAULT_PARAMS.copy()
+    
     def __init__(self, trail_points: List[tuple], 
                  config_path: str = None, 
                  gestures_path: str = None):
@@ -65,119 +158,51 @@ class GestureParser:
         :param gestures_path: 手势库文件路径
         """
         self.trail = trail_points
-        
-        # 如果没有指定路径，优先查找项目目录下的文件
-        if config_path is None:
-            # 尝试查找项目目录下的设置文件
-            src_dir_config = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settings.json")
-            
-            if os.path.exists(src_dir_config):
-                config_path = src_dir_config
-            else:
-                config_path = os.path.expanduser("~/.gestrokey/settings.json")
-        
-        if gestures_path is None:
-            # 尝试查找项目目录下的手势库文件
-            src_dir_gestures = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gestures.json")
-            
-            if os.path.exists(src_dir_gestures):
-                gestures_path = src_dir_gestures
-            else:
-                gestures_path = os.path.expanduser("~/.gestrokey/gestures.json")
-            
-        self.config_path = config_path
-        self.gestures_path = gestures_path
-        
-        self.min_points = 5           # 最小识别点数
-        self.step_base = 3            # 动态步长基数
-        self.merge_threshold = 25     # 合并阈值(px)
-        self.noise_threshold = 15     # 噪音阈值(px)
         self.file_name = 'gesture_parser'
         
-        # 记录文件修改时间
-        self.config_mtime = 0
-        self.gestures_mtime = 0
+        # 使用默认路径或指定路径
+        if config_path is None or gestures_path is None:
+            default_config, default_gestures = self.get_config_paths()
+            self.config_path = config_path or default_config
+            self.gestures_path = gestures_path or default_gestures
+        else:
+            self.config_path = config_path
+            self.gestures_path = gestures_path
 
-        log.info(f"{self.file_name} - 初始化解析器，轨迹点数: {len(trail_points)}，配置文件: {self.config_path}，手势库: {self.gestures_path}")
+        # 从缓存加载参数和手势库
+        params = self.load_config_params(self.config_path)
+        self.min_points = params['min_points']
+        self.step_base = params['step_base'] 
+        self.merge_threshold = params['merge_threshold']
+        self.noise_threshold = params['noise_threshold']
+        
         # 加载手势库
-        self.gesture_lib = self._load_gesture_lib()
+        self.gesture_lib = self.load_gesture_lib(self.gestures_path)
 
     def parse(self) -> Optional[str]:
         """
         主解析流程
         :return: Base64编码的操作指令或None
         """
-        # 检查文件是否有变化，有则重新加载
-        self._check_file_changes()
-        
-        log.info(f"{self.file_name} - 开始解析手势...")
         if len(self.trail) < self.min_points:
-            log.info(f"{self.file_name} - 轨迹点不足，需要至少{self.min_points}个点")
             return None
             
         # 核心处理流程
         raw_segments = self._parse_raw_strokes()
         optimized = self._optimize_strokes(raw_segments)
         result = self._match_gesture(optimized)
-        log.info(f"{self.file_name} - 解析完成，结果: {result}")
         return result
-
-    def _check_file_changes(self):
-        """检查配置文件和手势库文件是否有更新"""
-        try:
-            # 检查配置文件
-            if os.path.exists(self.config_path):
-                current_config_mtime = os.path.getmtime(self.config_path)
-                if current_config_mtime > self.config_mtime:
-                    log.info(f"{self.file_name} - 检测到配置文件更新，重新加载")
-                    self.config_mtime = current_config_mtime
-                    self._reload_config()
-            
-            # 检查手势库文件
-            if os.path.exists(self.gestures_path):
-                current_gestures_mtime = os.path.getmtime(self.gestures_path)
-                if current_gestures_mtime > self.gestures_mtime:
-                    log.info(f"{self.file_name} - 检测到手势库文件更新，重新加载")
-                    self.gestures_mtime = current_gestures_mtime
-                    self.gesture_lib = self._load_gesture_lib()
-        except Exception as e:
-            log.error(f"{self.file_name} - 检查文件变化时出错: {str(e)}")
-
-    def _reload_config(self):
-        """重新加载配置文件中的相关设置"""
-        try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            # 从配置中更新相关参数
-            if 'gesture_settings' in config:
-                gs = config['gesture_settings']
-                if 'min_points' in gs:
-                    self.min_points = gs['min_points']
-                if 'step_base' in gs:
-                    self.step_base = gs['step_base']
-                if 'merge_threshold' in gs:
-                    self.merge_threshold = gs['merge_threshold']
-                if 'noise_threshold' in gs:
-                    self.noise_threshold = gs['noise_threshold']
-                
-                log.info(f"{self.file_name} - 已更新配置参数: min_points={self.min_points}, step_base={self.step_base}, merge_threshold={self.merge_threshold}, noise_threshold={self.noise_threshold}")
-        except Exception as e:
-            log.error(f"{self.file_name} - 重新加载配置时出错: {str(e)}")
 
     def _parse_raw_strokes(self) -> List[Dict]:
         """
         原始笔画分割算法
         :return: 未优化的笔画序列 [{'方向':str, '长度':float}, ...]
         """
-        log.info(f"{self.file_name} - 开始原始笔画分割...")
         if len(self.trail) < 2:
-            log.info(f"{self.file_name} - 轨迹点不足，无法分割")
             return []
 
         # 动态计算采样步长
         step = max(self.step_base, len(self.trail)//20)
-        log.info(f"{self.file_name} - 计算采样步长: {step}")
         segments = []
         current_dir = None
         accum_vector = np.array([0, 0])
@@ -334,154 +359,98 @@ class GestureParser:
                 
         log.info(f"{self.file_name} - 标准化后的输入方向序列: {std_directions}")
         
-        for gesture in self.gesture_lib:
-            log.info(f"{self.file_name} - 尝试匹配手势: {gesture['name']}, 方向: {gesture['directions']}")
-            
-            if len(std_directions) != len(gesture['directions']):
-                log.info(f"{self.file_name} - 方向序列长度不匹配，跳过 {gesture['name']}")
-                continue
+        # 处理字典形式的手势库
+        if isinstance(self.gesture_lib, dict):
+            for name, gesture in self.gesture_lib.items():
+                log.info(f"{self.file_name} - 尝试匹配手势: {name}, 方向: {gesture.get('directions')}")
                 
-            # 标准化手势方向序列
-            std_gesture_dirs = []
-            for d in gesture['directions']:
-                if d in self.ARROW_TO_DIRECTION:
-                    # 已经是箭头符号
-                    std_gesture_dirs.append(d)
-                elif d in self.DIRECTION_TO_ARROW:
-                    # 是方向文本，转换为箭头符号
-                    std_gesture_dirs.append(self.DIRECTION_TO_ARROW[d])
+                # 获取手势方向数据
+                directions_data = gesture.get('directions', [])
+                
+                # 处理字符串形式的方向数据，如 "←,→"
+                if isinstance(directions_data, str) and ',' in directions_data:
+                    gesture_dirs = [d.strip() for d in directions_data.split(',')]
+                elif isinstance(directions_data, list):
+                    gesture_dirs = directions_data
                 else:
-                    # 未知格式，保持原样
-                    std_gesture_dirs.append(d)
-                    
-            log.info(f"{self.file_name} - 标准化后的手势方向序列: {std_gesture_dirs}")
+                    gesture_dirs = [directions_data] if directions_data else []
                 
-            match = True
-            for i, (d1, d2) in enumerate(zip(std_directions, std_gesture_dirs)):
-                if d1 != d2:
-                    log.info(f"{self.file_name} - 方向不匹配：位置 {i}, 输入 '{d1}' != 手势 '{d2}'")
-                    match = False
-                    break
+                if len(std_directions) != len(gesture_dirs):
+                    log.info(f"{self.file_name} - 方向序列长度不匹配，跳过 {name}")
+                    continue
+                
+                # 标准化手势方向序列
+                std_gesture_dirs = []
+                for d in gesture_dirs:
+                    if d in self.ARROW_TO_DIRECTION:
+                        # 已经是箭头符号
+                        std_gesture_dirs.append(d)
+                    elif d in self.DIRECTION_TO_ARROW:
+                        # 是方向文本，转换为箭头符号
+                        std_gesture_dirs.append(self.DIRECTION_TO_ARROW[d])
+                    else:
+                        # 未知格式，保持原样
+                        std_gesture_dirs.append(d)
+                
+                log.info(f"{self.file_name} - 标准化后的手势方向序列: {std_gesture_dirs}")
+                
+                # 比较方向序列
+                match = True
+                for i, (d1, d2) in enumerate(zip(std_directions, std_gesture_dirs)):
+                    if d1 != d2:
+                        log.info(f"{self.file_name} - 方向不匹配：位置 {i}, 输入 '{d1}' != 手势 '{d2}'")
+                        match = False
+                        break
+                
+                if match:
+                    log.info(f"{self.file_name} - 匹配到手势: {name}")
+                    return gesture.get('action')
             
-            if match:
-                log.info(f"{self.file_name} - 匹配到手势: {gesture['name']}")
-                return gesture['action']
+            log.info(f"{self.file_name} - 未匹配到任何手势")
+            return None
+            
+        # 处理列表形式的手势库 (兼容旧版本)
+        elif isinstance(self.gesture_lib, list):
+            for gesture in self.gesture_lib:
+                if not isinstance(gesture, dict):
+                    continue
+                    
+                name = gesture.get('name', 'unknown')
+                log.info(f"{self.file_name} - 尝试匹配手势: {name}, 方向: {gesture.get('directions')}")
+                
+                if len(std_directions) != len(gesture.get('directions', [])):
+                    log.info(f"{self.file_name} - 方向序列长度不匹配，跳过 {name}")
+                    continue
+                    
+                # 标准化手势方向序列
+                std_gesture_dirs = []
+                for d in gesture.get('directions', []):
+                    if d in self.ARROW_TO_DIRECTION:
+                        # 已经是箭头符号
+                        std_gesture_dirs.append(d)
+                    elif d in self.DIRECTION_TO_ARROW:
+                        # 是方向文本，转换为箭头符号
+                        std_gesture_dirs.append(self.DIRECTION_TO_ARROW[d])
+                    else:
+                        # 未知格式，保持原样
+                        std_gesture_dirs.append(d)
+                        
+                log.info(f"{self.file_name} - 标准化后的手势方向序列: {std_gesture_dirs}")
+                
+                # 比较方向序列
+                match = True
+                for i, (d1, d2) in enumerate(zip(std_directions, std_gesture_dirs)):
+                    if d1 != d2:
+                        log.info(f"{self.file_name} - 方向不匹配：位置 {i}, 输入 '{d1}' != 手势 '{d2}'")
+                        match = False
+                        break
+                
+                if match:
+                    log.info(f"{self.file_name} - 匹配到手势: {name}")
+                    return gesture.get('action')
         
         log.info(f"{self.file_name} - 未匹配到任何手势")
         return None
-
-    def _load_gesture_lib(self) -> List[Dict]:
-        """从手势库文件加载手势库"""
-        # 从设置文件获取基本配置
-        try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                
-            # 更新配置文件修改时间
-            self.config_mtime = os.path.getmtime(self.config_path)
-                
-            # 加载应用设置，此处不涉及手势库
-            # 如果需要从settings.json中加载某些设置，可以在这里处理
-            
-            # 从手势库文件加载手势
-            try:
-                with open(self.gestures_path, 'r', encoding='utf-8') as f:
-                    gestures_data = json.load(f)
-                
-                # 更新手势库文件修改时间
-                self.gestures_mtime = os.path.getmtime(self.gestures_path)
-                
-                gestures = []
-                if 'gestures' in gestures_data:
-                    for name, gesture in gestures_data['gestures'].items():
-                        directions_str = gesture['directions']
-                        directions_list = []
-                        
-                        # 检查directions是字符串还是列表
-                        if isinstance(directions_str, str):
-                            # 检查是否包含逗号分隔的方向列表
-                            if ',' in directions_str:
-                                directions_list = [d.strip() for d in directions_str.split(',')]
-                            else:
-                                # 如果是单个字符串，不需要分割
-                                directions_list = [directions_str]
-                        else:
-                            # 如果已经是列表，直接使用
-                            directions_list = directions_str
-                        
-                        # 优先使用预解码的动作代码
-                        action_value = None
-                        if 'decoded_action' in gesture:
-                            action_value = gesture['decoded_action']
-                            log.debug(f"{self.file_name} - 使用预解码动作加载手势 '{name}'")
-                        else:
-                            # 兼容旧版，使用编码的action
-                            action_value = gesture['action']
-                            log.debug(f"{self.file_name} - 使用原始编码动作加载手势 '{name}'")
-                        
-                        gestures.append({
-                            'name': name,
-                            'directions': directions_list,
-                            'action': action_value
-                        })
-                    
-                    log.info(f"{self.file_name} - 成功加载手势库，共加载{len(gestures)}个手势")
-                    return gestures
-                else:
-                    log.warning(f"{self.file_name} - 手势库文件格式错误：缺少'gestures'键，将创建空手势库")
-                    # 创建一个新的带有正确格式的手势库文件
-                    try:
-                        empty_gestures = {
-                            "version": "1.0",
-                            "gestures": {
-                                "示例手势1": {
-                                    "directions": ["↑", "→", "↓", "←"],
-                                    "action": "cHlhdXRvZ3VpLmhvdGtleSgnY3RybCcsICdjJyk="  # base64编码的: pyautogui.hotkey('ctrl', 'c')
-                                },
-                                "示例手势2": {
-                                    "directions": ["←", "→"],
-                                    "action": "cHlhdXRvZ3VpLmhvdGtleSgnYWx0JywgJ3RhYicp"  # base64编码的: pyautogui.hotkey('alt', 'tab')
-                                }
-                            }
-                        }
-                        with open(self.gestures_path, 'w', encoding='utf-8') as f:
-                            json.dump(empty_gestures, f, ensure_ascii=False, indent=4)
-                        log.info(f"{self.file_name} - 已创建新的手势库文件 {self.gestures_path}")
-                        
-                        # 从新创建的文件加载手势
-                        gestures = []
-                        for name, gesture in empty_gestures['gestures'].items():
-                            directions_str = gesture['directions']
-                            directions_list = [directions_str] if isinstance(directions_str, str) else directions_str
-                            gestures.append({
-                                'name': name,
-                                'directions': directions_list,
-                                'action': gesture['action']
-                            })
-                        return gestures
-                    except Exception as e:
-                        log.error(f"{self.file_name} - 创建手势库文件失败: {str(e)}")
-                        return []
-                    
-            except FileNotFoundError:
-                log.error(f"{self.file_name} - 手势库文件未找到: {self.gestures_path}")
-                return []
-            except json.JSONDecodeError:
-                log.error(f"{self.file_name} - 手势库文件格式错误: {self.gestures_path}")
-                return []
-            except Exception as e:
-                log.error(f"{self.file_name} - 加载手势库时发生未知错误: {str(e)}")
-                return []
-            
-        except FileNotFoundError:
-            log.error(f"{self.file_name} - 配置文件未找到: {self.config_path}")
-            return []
-        except json.JSONDecodeError:
-            log.error(f"{self.file_name} - 配置文件格式错误: {self.config_path}")
-            return []
-        except Exception as e:
-            log.error(f"{self.file_name} - 加载配置时发生未知错误: {str(e)}")
-            return []
 
     def _vector_to_direction(self, vector: np.ndarray) -> str:
         """向量转8方向"""

@@ -1299,6 +1299,7 @@ class InkPainter:
         # 如果是强制结束，则跳过手势识别
         is_forced_end = getattr(self, 'forced_end', False)
         
+        # ===== 关键优化：先执行手势识别和操作，再处理渐隐动画 =====
         # 添加到已完成笔画历史，并且进行手势识别（如果不是强制结束）
         if len(current_stroke_copy) > 5 and not is_forced_end:  # 至少需要5个点才能作为有效笔画
             # 限制已完成笔画历史大小，防止内存无限增长
@@ -1415,30 +1416,26 @@ class InkPainter:
     def _handle_recognized_gesture(self, action):
         """处理识别出的手势"""
         try:
-            log.info("处理识别到的手势")
-            
-            # 清除线条显示
-            if self.fade_animations:
-                log.info("清除渐隐线条")
-                fade_copy = self.fade_animations.copy()
-                for anim in fade_copy:
-                    for line in anim['lines']:
-                        try:
-                            # 确保是字典对象
-                            if isinstance(line, dict):
-                                self.canvas.delete(line)
-                        except Exception as e:
-                            log.error(f"删除手势渐隐线条时出错: {e}")
-                self.fade_animations.clear()
-            
-            # 直接执行操作 - 从gesture_parser得到的action已经是解码后的字符串
-            log.info("执行手势动作")
+            # 立即执行操作，不等待渐隐效果
             execute_operation(action)
             
+            # 异步清除线条显示 - 不阻塞操作执行
+            if self.fade_animations:
+                QTimer.singleShot(0, self._clear_fade_animations)
         except Exception as e:
             log.error("处理手势失败: " + str(e))
-            import traceback
-            log.error(f"处理手势错误堆栈: {traceback.format_exc()}")
+    
+    def _clear_fade_animations(self):
+        """异步清除渐隐动画"""
+        try:
+            fade_copy = self.fade_animations.copy()
+            for anim in fade_copy:
+                for line in anim['lines']:
+                    if isinstance(line, dict):
+                        self.canvas.delete(line)
+            self.fade_animations.clear()
+        except Exception as e:
+            log.error(f"清除渐隐线条时出错: {e}")
 
     def process_fade_animation(self):
         """处理渐隐动画帧"""
