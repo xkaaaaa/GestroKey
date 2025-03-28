@@ -141,10 +141,20 @@ class TitleBar(QFrame):
         # 窗口控制按钮
         btn_size = QSize(32, 32)
         
+        # 获取图标路径
+        minimize_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/minimize.svg")
+        maximize_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/maximize.svg")
+        restore_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/restore.svg")
+        close_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/close.svg")
+        
         # 最小化按钮
         self.minimize_button = QToolButton()
         self.minimize_button.setFixedSize(btn_size)
-        self.minimize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMinButton))
+        if os.path.exists(minimize_icon_path):
+            self.minimize_button.setIcon(QIcon(minimize_icon_path))
+        else:
+            self.minimize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMinButton))
+            log.warning(f"找不到最小化图标: {minimize_icon_path}，使用系统默认图标")
         self.minimize_button.setIconSize(QSize(16, 16))
         self.minimize_button.setCursor(Qt.PointingHandCursor)
         self.minimize_button.setToolTip("最小化")
@@ -153,7 +163,15 @@ class TitleBar(QFrame):
         # 最大化/还原按钮
         self.maximize_button = QToolButton()
         self.maximize_button.setFixedSize(btn_size)
-        self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMaxButton))
+        if os.path.exists(maximize_icon_path):
+            self.maximize_icon = QIcon(maximize_icon_path)
+            self.restore_icon = QIcon(restore_icon_path) if os.path.exists(restore_icon_path) else self.style().standardIcon(self.style().SP_TitleBarNormalButton)
+            self.maximize_button.setIcon(self.maximize_icon)
+        else:
+            self.maximize_icon = self.style().standardIcon(self.style().SP_TitleBarMaxButton)
+            self.restore_icon = self.style().standardIcon(self.style().SP_TitleBarNormalButton)
+            self.maximize_button.setIcon(self.maximize_icon)
+            log.warning(f"找不到最大化图标: {maximize_icon_path}，使用系统默认图标")
         self.maximize_button.setIconSize(QSize(16, 16))
         self.maximize_button.setCursor(Qt.PointingHandCursor)
         self.maximize_button.setToolTip("最大化")
@@ -162,7 +180,11 @@ class TitleBar(QFrame):
         # 关闭按钮
         self.close_button = QToolButton()
         self.close_button.setFixedSize(btn_size)
-        self.close_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarCloseButton))
+        if os.path.exists(close_icon_path):
+            self.close_button.setIcon(QIcon(close_icon_path))
+        else:
+            self.close_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarCloseButton))
+            log.warning(f"找不到关闭图标: {close_icon_path}，使用系统默认图标")
         self.close_button.setIconSize(QSize(16, 16))
         self.close_button.setCursor(Qt.PointingHandCursor)
         self.close_button.setToolTip("关闭")
@@ -181,12 +203,22 @@ class TitleBar(QFrame):
             is_maximized: 是否最大化
         """
         if is_maximized:
-            self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarNormalButton))
+            # 使用还原图标
+            if hasattr(self, 'restore_icon'):
+                self.maximize_button.setIcon(self.restore_icon)
+            else:
+                self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarNormalButton))
+                log.debug("使用系统默认还原图标")
             self.maximize_button.setToolTip("还原")
             self.setStyleSheet(self.styleSheet().replace("border-top-left-radius: 10px;", "border-top-left-radius: 0px;")
                                .replace("border-top-right-radius: 10px;", "border-top-right-radius: 0px;"))
         else:
-            self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMaxButton))
+            # 使用最大化图标
+            if hasattr(self, 'maximize_icon'):
+                self.maximize_button.setIcon(self.maximize_icon)
+            else:
+                self.maximize_button.setIcon(self.style().standardIcon(self.style().SP_TitleBarMaxButton))
+                log.debug("使用系统默认最大化图标")
             self.maximize_button.setToolTip("最大化")
             self.setStyleSheet(self.styleSheet().replace("border-top-left-radius: 0px;", "border-top-left-radius: 10px;")
                                .replace("border-top-right-radius: 0px;", "border-top-right-radius: 10px;"))

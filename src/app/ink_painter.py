@@ -707,10 +707,72 @@ class InkPainter:
         # 设置窗口位置，考虑边框大小
         self.canvas.move(canvas_border, canvas_border)
         
-        self.canvas.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        # 获取是否强制窗口置顶的设置
+        force_topmost = self.config.get('app', {}).get('force_topmost', True)
+        
+        # 基本窗口标志，不显示在任务栏，无边框
+        window_flags = Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint
+        self.canvas.setWindowFlags(window_flags)
         self.canvas.setAttribute(Qt.WA_TranslucentBackground)
         self.canvas.setAttribute(Qt.WA_ShowWithoutActivating)
+        
+        # 显示窗口以获取窗口句柄
+        self.canvas.show()
+        
+        # 应用强制置顶设置
+        self._apply_force_topmost(force_topmost)
+        
         log.info(self.file_name + "画布初始化完成")
+        
+    def _apply_force_topmost(self, force_topmost):
+        """应用强制置顶设置
+        
+        Args:
+            force_topmost: 是否启用强制置顶
+        """
+        try:
+            # 仅在Windows系统下执行
+            if not hasattr(self.canvas, 'winId'):
+                log.warning(f"{self.file_name}不支持在当前系统上设置强制置顶")
+                return
+                
+            # 获取窗口句柄
+            hwnd = self.canvas.winId()
+            
+            # 导入win32con和win32gui
+            import win32con
+            import win32gui
+            
+            if force_topmost:
+                # 设置为TOPMOST层级，强制置顶
+                win32gui.SetWindowPos(
+                    hwnd, 
+                    win32con.HWND_TOPMOST,   # 最高置顶层级
+                    0, 0, 0, 0,              # 保持位置和大小不变
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE  # 不改变位置和大小
+                )
+                log.debug(f"{self.file_name}应用强制窗口置顶")
+            else:
+                # 恢复为普通置顶层级
+                win32gui.SetWindowPos(
+                    hwnd, 
+                    win32con.HWND_NOTOPMOST,  # 非TOPMOST层级
+                    0, 0, 0, 0,               # 保持位置和大小不变
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE  # 不改变位置和大小
+                )
+                # 再次设置为普通置顶以确保仍位于大部分窗口之上
+                win32gui.SetWindowPos(
+                    hwnd, 
+                    win32con.HWND_TOP,        # 普通顶层
+                    0, 0, 0, 0,               # 保持位置和大小不变
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE  # 不改变位置和大小
+                )
+                log.debug(f"{self.file_name}应用普通窗口置顶")
+        except Exception as e:
+            log.error(f"{self.file_name}设置窗口置顶级别时出错: {str(e)}")
+            if IS_DEBUG_MODE:
+                import traceback
+                log.debug(f"{self.file_name}错误详情: {traceback.format_exc()}")
 
     def load_settings(self):
         """从配置文件加载绘画设置"""
@@ -1745,146 +1807,80 @@ class InkPainter:
         """更新绘画设置
         
         Args:
-            settings: 包含绘画设置的字典
-            
-        Returns:
-            成功返回True，失败返回False
+            settings: 设置字典
         """
-        log.info(self.file_name + "更新绘画设置: " + str(settings))
-        
         try:
-            updated_settings = []
-            needs_redraw = False
-            old_line_color = self.line_color
+            # 更新配置
+            self.config = settings
             
-            # 基础宽度
-            if 'base_width' in settings:
-                self.base_width = float(settings['base_width'])
-                updated_settings.append(f"base_width={self.base_width}")
+            # 更新绘画设置
+            if 'drawing' in settings:
+                drawing_settings = settings['drawing']
                 
-            # 最小宽度
-            if 'min_width' in settings:
-                self.min_width = float(settings['min_width'])
-                updated_settings.append(f"min_width={self.min_width}")
-                
-            # 最大宽度
-            if 'max_width' in settings:
-                self.max_width = float(settings['max_width'])
-                updated_settings.append(f"max_width={self.max_width}")
-                
-            # 平滑度
-            if 'smoothing' in settings:
-                self.smoothing = float(settings['smoothing'])
-                updated_settings.append(f"smoothing={self.smoothing}")
-                
-            # 颜色
-            if 'color' in settings:
-                color_hex = settings['color']
-                # 解析HEX颜色
-                if color_hex.startswith('#') and len(color_hex) in [4, 7, 9]:
-                    try:
-                        log.info(f"正在从配置文件加载颜色: {color_hex}")
-                        r, g, b = self.hex_to_rgb(color_hex)
-                        # 设置颜色
-                        log.debug(f"更新颜色设置: {color_hex} -> RGB: ({r},{g},{b}) 旧值: {old_line_color}")
-                        self.line_color = (r, g, b)
-                        updated_settings.append(f"color={color_hex}")
-                        needs_redraw = True
-                        
-                        # 额外检查颜色设置是否成功应用
-                        log.debug(f"更新后的颜色: {self.line_color}")
-                    except Exception as e:
-                        log.error(f"颜色解析失败: {str(e)}")
-                        
-            # 高级笔刷
-            if 'advanced_brush' in settings:
-                self.use_advanced_brush = bool(settings['advanced_brush'])
-                updated_settings.append(f"advanced_brush={self.use_advanced_brush}")
-                
-            # 自动平滑
-            if 'auto_smoothing' in settings:
-                self.auto_smoothing = bool(settings['auto_smoothing'])
-                updated_settings.append(f"auto_smoothing={self.auto_smoothing}")
-                
-            # 淡出时间
-            if 'fade_time' in settings:
-                self.fade_duration = float(settings['fade_time'])
-                updated_settings.append(f"fade_time={self.fade_duration}")
-                
-            # 速度因子
-            if 'speed_factor' in settings:
-                self.speed_factor = float(settings['speed_factor'])
-                updated_settings.append(f"speed_factor={self.speed_factor}")
-                
-            # 最小触发距离
-            if 'min_distance' in settings:
-                self.min_distance = int(float(settings['min_distance']))
-                updated_settings.append(f"min_distance={self.min_distance}")
-                
-            # 最大笔画点数
-            if 'max_stroke_points' in settings:
-                self.max_stroke_points = int(float(settings['max_stroke_points']))
-                updated_settings.append(f"max_stroke_points={self.max_stroke_points}")
-                
-            # 最大笔画持续时间
-            if 'max_stroke_duration' in settings:
-                self.max_stroke_duration = int(float(settings['max_stroke_duration']))
-                updated_settings.append(f"max_stroke_duration={self.max_stroke_duration}")
-
-            # 如果颜色发生变化，立即更新已绘制的活动线条
-            if needs_redraw and hasattr(self, 'active_lines') and self.active_lines:
-                log.info("颜色设置已更改，更新活动线条颜色")
-                try:
-                    # 将RGB元组转换为CSS颜色字符串
-                    if isinstance(self.line_color, tuple) and len(self.line_color) >= 3:
-                        r, g, b = self.line_color
-                        color_str = f"rgb({r},{g},{b})"
-                    else:
-                        color_str = self.line_color
+                # 基础宽度
+                if 'base_width' in drawing_settings:
+                    self.base_width = float(drawing_settings['base_width'])
                     
-                    log.debug(f"更新活动线条颜色为: {color_str}")
+                # 最小宽度
+                if 'min_width' in drawing_settings:
+                    self.min_width = float(drawing_settings['min_width'])
                     
-                    # 更新所有活动线条的颜色
-                    for line in self.active_lines:
-                        self.canvas.itemconfig(line, fill=color_str)
+                # 最大宽度
+                if 'max_width' in drawing_settings:
+                    self.max_width = float(drawing_settings['max_width'])
                     
-                    # 更新当前渐隐动画中的开始颜色
-                    for anim in self.fade_animations:
-                        anim['start_color'] = self.line_color
-                except Exception as e:
-                    log.error(f"更新活动线条颜色失败: {str(e)}")
-            
-            # 硬件加速
-            if 'hardware_acceleration' in settings and hasattr(self, 'canvas'):
-                hardware_accel = bool(settings['hardware_acceleration'])
-                self.canvas.enable_hardware_acceleration = hardware_accel
-                updated_settings.append(f"hardware_acceleration={hardware_accel}")
+                # 平滑度
+                if 'smoothing' in drawing_settings:
+                    self.smoothing = float(drawing_settings['smoothing'])
+                    
+                # 颜色
+                if 'color' in drawing_settings:
+                    color_hex = drawing_settings['color']
+                    if color_hex.startswith('#'):
+                        try:
+                            r, g, b = self.hex_to_rgb(color_hex)
+                            self.line_color = (r, g, b)
+                            log.debug(f"{self.file_name}更新线条颜色: {color_hex} -> RGB({r}, {g}, {b})")
+                        except Exception as e:
+                            log.error(f"{self.file_name}颜色解析失败: {str(e)}")
+                            
+                # 高级笔刷
+                if 'advanced_brush' in drawing_settings:
+                    self.use_advanced_brush = bool(drawing_settings['advanced_brush'])
+                    
+                # 自动平滑
+                if 'auto_smoothing' in drawing_settings:
+                    self.auto_smoothing = bool(drawing_settings['auto_smoothing'])
+                    
+                # 淡出时间
+                if 'fade_time' in drawing_settings:
+                    self.fade_duration = float(drawing_settings['fade_time'])
+                    
+                # 速度因子
+                if 'speed_factor' in drawing_settings:
+                    self.speed_factor = float(drawing_settings['speed_factor'])
+                    
+                # 画布边框大小
+                if 'canvas_border' in drawing_settings:
+                    self.canvas_border = int(drawing_settings['canvas_border'])
+                    
+            # 更新应用设置
+            if 'app' in settings:
+                app_settings = settings['app']
                 
-            # 画布边框大小
-            if 'canvas_border' in settings:
-                old_border = self.canvas_border if hasattr(self, 'canvas_border') else 1
-                self.canvas_border = int(settings['canvas_border'])
-                updated_settings.append(f"canvas_border={self.canvas_border}")
+                # 更新窗口强制置顶状态
+                if 'force_topmost' in app_settings and hasattr(self, 'canvas'):
+                    force_topmost = bool(app_settings['force_topmost'])
+                    # 应用强制置顶设置
+                    self._apply_force_topmost(force_topmost)
                 
-                # 如果边框大小改变且画布已创建，则重新调整画布大小
-                if hasattr(self, 'canvas') and old_border != self.canvas_border:
-                    log.info(f"{self.file_name}重新调整画布大小: 宽 {self.screen_width - self.canvas_border*2}px, 高 {self.screen_height - self.canvas_border*2}px, 边框 {self.canvas_border}px")
-                    self.canvas.resize(self.screen_width - self.canvas_border*2, self.screen_height - self.canvas_border*2)
-                    # 更新画布位置
-                    self.canvas.move(self.canvas_border, self.canvas_border)
+            log.info(f"{self.file_name}绘画设置已更新")
             
-            # 打印所有更新的设置
-            if updated_settings:
-                log.info(self.file_name + "已更新以下设置: " + ", ".join(updated_settings))
-            else:
-                log.info(self.file_name + "未更新任何设置，使用现有配置")
-            
-            return True
         except Exception as e:
-            log.error(self.file_name + "更新绘画设置失败: " + str(e))
-            import traceback
-            log.error(self.file_name + "错误堆栈: " + traceback.format_exc())
-            return False
+            log.error(f"{self.file_name}更新设置失败: {str(e)}")
+            if IS_DEBUG_MODE:
+                import traceback
+                log.debug(f"{self.file_name}错误详情: {traceback.format_exc()}")
 
     # 添加重置方法，确保设置被完全刷新
     def reset_painter(self):
