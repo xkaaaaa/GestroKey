@@ -14,6 +14,7 @@ from ui.sidebar import Sidebar
 from ui.pages.console_page import ConsolePage
 from ui.pages.settings_page import SettingsPage
 from ui.pages.gestures_page import GesturesPage
+from ui.utils.icon_utils import svg_to_ico
 
 # 导入手势管理器
 from ui.utils.gesture_manager import GestureManager
@@ -319,15 +320,12 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1000, 600)
         
         # 设置应用图标
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets/icons/logo.svg")
-        self.app_icon_path = icon_path  # 将图标路径保存为类属性
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
-            # 如果有系统托盘，也设置托盘图标
-            if hasattr(self, 'tray_icon') and self.tray_icon:
-                self.tray_icon.setIcon(QIcon(icon_path))
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icons", "logo.svg")
+        ico_path = svg_to_ico(logo_path)
+        if ico_path and os.path.exists(ico_path):
+            self.setWindowIcon(QIcon(ico_path))
         else:
-            log.warning(f"找不到应用图标: {icon_path}")
+            log.warning(f"找不到应用图标: {logo_path}")
         
         # 初始化系统托盘
         self.setup_tray_icon()
