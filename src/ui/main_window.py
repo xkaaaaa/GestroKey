@@ -429,33 +429,35 @@ class MainWindow(QMainWindow):
             log.debug("移除阴影效果")
             
     def toggle_maximize(self):
-        """切换最大化/还原状态"""
+        """切换窗口最大化状态"""
         if self.isMaximized():
-            # 取消窗口置顶
-            self.setWindowFlags(Qt.FramelessWindowHint)
-            # 必须先调用show()显示窗口，否则窗口会消失
-            self.show()
+            # 先取消最大化
+            self.showNormal()
+            # 恢复窗口置顶
+            self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
             # 恢复到之前保存的窗口大小
             if self.normal_geometry:
                 self.setGeometry(self.normal_geometry)
                 log.debug(f"还原到保存的窗口几何信息: {self.normal_geometry}")
-            else:
-                self.showNormal()
-            self.apply_shadow()
-            # 强制重绘窗口以恢复圆角
-            self.update()
-            log.debug("窗口已还原，取消置顶")
+            self.show()
+            log.debug("窗口已还原并恢复置顶")
         else:
             # 保存当前窗口几何信息
             self.normal_geometry = self.geometry()
             log.debug(f"保存窗口几何信息: {self.normal_geometry}")
-            # 最大化窗口并设置置顶
-            self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+            # 最大化窗口并取消置顶
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint)
             self.showMaximized()
-            self.centralWidget().setGraphicsEffect(None)
-            log.debug("窗口已最大化并置顶")
+            log.debug("窗口已最大化并取消置顶")
             
+        # 更新标题栏状态
         self.title_bar.update_maximized_state(self.isMaximized())
+        
+        # 保存窗口状态
+        self.save_window_state()
+        
+        # 确保窗口在屏幕上
+        self.ensure_on_screen()
         
     def paintEvent(self, event):
         """绘制窗口背景
@@ -487,21 +489,15 @@ class MainWindow(QMainWindow):
             self.title_bar.update_maximized_state(is_maximized)
             
             if is_maximized:
-                # 确保最大化状态时窗口置顶
-                if not (self.windowFlags() & Qt.WindowStaysOnTopHint):
-                    self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-                    self.showMaximized()
+                # 最大化时移除阴影效果
                 self.centralWidget().setGraphicsEffect(None)
-                log.debug("窗口状态改变：最大化，确保置顶")
+                log.debug("窗口状态改变：最大化")
             else:
-                # 确保非最大化状态时取消置顶
-                if (self.windowFlags() & Qt.WindowStaysOnTopHint):
-                    self.setWindowFlags(Qt.FramelessWindowHint)
-                    self.show()
+                # 非最大化时恢复阴影效果
                 self.apply_shadow()
                 # 强制重绘以恢复圆角
                 self.update()
-                log.debug("窗口状态改变：非最大化，取消置顶")
+                log.debug("窗口状态改变：非最大化")
                 
         super().changeEvent(event)
         
