@@ -179,9 +179,9 @@ class GestureParser:
             default_config, default_gestures = self.get_config_paths()
             self.config_path = config_path or default_config
             self.gestures_path = gestures_path or default_gestures
-            else:
-        self.config_path = config_path
-        self.gestures_path = gestures_path
+        else:
+            self.config_path = config_path
+            self.gestures_path = gestures_path
         
         # 从缓存加载参数和手势库
         params = self.load_config_params(self.config_path)
