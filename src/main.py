@@ -6,6 +6,10 @@ import argparse
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt, QObject, pyqtSignal
 
+# 添加资源目录到路径
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(script_dir)
+
 # 确保app模块可以被导入
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -25,7 +29,10 @@ from ui.utils.settings_manager import SettingsManager
 from app.ink_painter import InkPainter, set_debug_mode
 
 # 导入主窗口
-from ui.main_window import MainWindow
+from ui.main_window_new import MainWindow
+
+# 导入资源管理器
+from ui.utils.resource_manager import ResourceManager
 
 # 导入应用控制器
 class AppController(QObject):
@@ -318,6 +325,9 @@ def main():
     
     # 创建QApplication实例
     app = QApplication(sys.argv)
+    
+    # 添加资源管理器初始化
+    ResourceManager.register_resources()
     
     # 初始化设置管理器
     settings_manager = SettingsManager()
