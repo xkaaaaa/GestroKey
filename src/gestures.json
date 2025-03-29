@@ -14,6 +14,13 @@
       "name": "示例手势2",
       "directions": "←,→",
       "action": "cHlhdXRvZ3VpLmhvdGtleSgnd2luJyk="
+    },
+    "测试手势3": {
+      "directions": [
+        "↑",
+        "↓"
+      ],
+      "action": "cHlhdXRvZ3VpLmhvdGtleSgnYWx0JywgJ3RhYicp"
     }
   }
 }
