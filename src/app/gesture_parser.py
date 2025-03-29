@@ -20,6 +20,7 @@ import json
 import numpy as np
 import time
 import os
+import traceback
 from typing import List, Dict, Optional
 
 try:
@@ -38,6 +39,20 @@ _DEFAULT_PARAMS = {
     'merge_threshold': 25,
     'noise_threshold': 15
 }
+
+# 调试模式标志
+_DEBUG_MODE = False
+
+def set_debug_mode(debug=False):
+    """设置调试模式
+    
+    Args:
+        debug: 是否开启调试模式
+    """
+    global _DEBUG_MODE
+    _DEBUG_MODE = debug
+    if debug:
+        log.debug("手势解析器已设置为调试模式")
 
 class GestureParser:
     DIRECTION_MAP = ["右", "右上", "上", "左上", 
@@ -184,13 +199,31 @@ class GestureParser:
         主解析流程
         :return: Base64编码的操作指令或None
         """
+        start_time = time.time()
+        
         if len(self.trail) < self.min_points:
+            if _DEBUG_MODE:
+                log.debug(f"轨迹点数量不足: {len(self.trail)} < {self.min_points}")
             return None
             
         # 核心处理流程
         raw_segments = self._parse_raw_strokes()
+        if _DEBUG_MODE:
+            log.debug(f"原始笔画分段: {[(seg['方向'], seg['长度']) for seg in raw_segments]}")
+            
         optimized = self._optimize_strokes(raw_segments)
+        if _DEBUG_MODE:
+            log.debug(f"优化后的笔画序列: {''.join([self.DIRECTION_TO_ARROW.get(d, d) for d in optimized])}")
+            
         result = self._match_gesture(optimized)
+        
+        if _DEBUG_MODE:
+            elapsed = time.time() - start_time
+            if result:
+                log.debug(f"手势匹配成功，用时: {elapsed:.4f}秒")
+            else:
+                log.debug(f"未匹配到手势，用时: {elapsed:.4f}秒")
+                
         return result
 
     def _parse_raw_strokes(self) -> List[Dict]:
@@ -338,119 +371,97 @@ class GestureParser:
 
     def _match_gesture(self, directions: List[str]) -> Optional[str]:
         """
-        匹配预定义手势
-        :param directions: 优化后的方向序列（箭头符号）
-        :return: 匹配的操作指令或None
+        匹配手势库
+        :param directions: 优化后的方向序列
+        :return: 匹配到的操作指令或None
         """
-        log.info(f"{self.file_name} - 开始手势匹配，输入方向序列: {directions}")
-        
-        # 确保输入的方向序列是标准化的（都是箭头符号）
-        std_directions = []
-        for d in directions:
-            if d in self.ARROW_TO_DIRECTION:
-                # 已经是箭头符号
-                std_directions.append(d)
-            elif d in self.DIRECTION_TO_ARROW:
-                # 是方向文本，转换为箭头符号
-                std_directions.append(self.DIRECTION_TO_ARROW[d])
-            else:
-                # 未知格式，保持原样
-                std_directions.append(d)
-                
-        log.info(f"{self.file_name} - 标准化后的输入方向序列: {std_directions}")
-        
-        # 处理字典形式的手势库
-        if isinstance(self.gesture_lib, dict):
-            for name, gesture in self.gesture_lib.items():
-                log.info(f"{self.file_name} - 尝试匹配手势: {name}, 方向: {gesture.get('directions')}")
-                
-                # 获取手势方向数据
-                directions_data = gesture.get('directions', [])
-                
-                # 处理字符串形式的方向数据，如 "←,→"
-                if isinstance(directions_data, str) and ',' in directions_data:
-                    gesture_dirs = [d.strip() for d in directions_data.split(',')]
-                elif isinstance(directions_data, list):
-                    gesture_dirs = directions_data
-                else:
-                    gesture_dirs = [directions_data] if directions_data else []
-                
-                if len(std_directions) != len(gesture_dirs):
-                    log.info(f"{self.file_name} - 方向序列长度不匹配，跳过 {name}")
-                    continue
-                
-                # 标准化手势方向序列
-                std_gesture_dirs = []
-                for d in gesture_dirs:
-                    if d in self.ARROW_TO_DIRECTION:
-                        # 已经是箭头符号
-                        std_gesture_dirs.append(d)
-                    elif d in self.DIRECTION_TO_ARROW:
-                        # 是方向文本，转换为箭头符号
-                        std_gesture_dirs.append(self.DIRECTION_TO_ARROW[d])
-                    else:
-                        # 未知格式，保持原样
-                        std_gesture_dirs.append(d)
-                
-                log.info(f"{self.file_name} - 标准化后的手势方向序列: {std_gesture_dirs}")
-                
-                # 比较方向序列
-                match = True
-                for i, (d1, d2) in enumerate(zip(std_directions, std_gesture_dirs)):
-                    if d1 != d2:
-                        log.info(f"{self.file_name} - 方向不匹配：位置 {i}, 输入 '{d1}' != 手势 '{d2}'")
-                        match = False
-                        break
-                
-                if match:
-                    log.info(f"{self.file_name} - 匹配到手势: {name}")
-                    return gesture.get('action')
-            
-            log.info(f"{self.file_name} - 未匹配到任何手势")
+        if not directions or len(directions) == 0:
+            if _DEBUG_MODE:
+                log.debug("方向序列为空，无法匹配")
             return None
             
-        # 处理列表形式的手势库 (兼容旧版本)
-        elif isinstance(self.gesture_lib, list):
-            for gesture in self.gesture_lib:
-                if not isinstance(gesture, dict):
-                    continue
-                    
-                name = gesture.get('name', 'unknown')
-                log.info(f"{self.file_name} - 尝试匹配手势: {name}, 方向: {gesture.get('directions')}")
-                
-                if len(std_directions) != len(gesture.get('directions', [])):
-                    log.info(f"{self.file_name} - 方向序列长度不匹配，跳过 {name}")
-                    continue
-                    
-                # 标准化手势方向序列
-                std_gesture_dirs = []
-                for d in gesture.get('directions', []):
-                    if d in self.ARROW_TO_DIRECTION:
-                        # 已经是箭头符号
-                        std_gesture_dirs.append(d)
-                    elif d in self.DIRECTION_TO_ARROW:
-                        # 是方向文本，转换为箭头符号
-                        std_gesture_dirs.append(self.DIRECTION_TO_ARROW[d])
-                    else:
-                        # 未知格式，保持原样
-                        std_gesture_dirs.append(d)
-                        
-                log.info(f"{self.file_name} - 标准化后的手势方向序列: {std_gesture_dirs}")
-                
-                # 比较方向序列
-                match = True
-                for i, (d1, d2) in enumerate(zip(std_directions, std_gesture_dirs)):
-                    if d1 != d2:
-                        log.info(f"{self.file_name} - 方向不匹配：位置 {i}, 输入 '{d1}' != 手势 '{d2}'")
-                        match = False
-                        break
-                
-                if match:
-                    log.info(f"{self.file_name} - 匹配到手势: {name}")
-                    return gesture.get('action')
+        # 将方向序列转换为字符串
+        arrow_str = "".join([self.DIRECTION_TO_ARROW.get(d, d) for d in directions])
+        direction_str = "".join(directions)
         
-        log.info(f"{self.file_name} - 未匹配到任何手势")
-        return None
+        try:
+            # 优先检查循环模式
+            pattern = self._find_repeating_pattern(directions)
+            if pattern and len(pattern) > 1:
+                pattern_arrows = "".join([self.DIRECTION_TO_ARROW.get(d, d) for d in pattern])
+                
+                if _DEBUG_MODE:
+                    log.debug(f"检测到循环模式: {pattern_arrows} (重复)")
+                    
+                # 查找循环手势
+                for gesture_name, gesture_data in self.gesture_lib.items():
+                    if gesture_data.get('type') == 'repeat' and gesture_data.get('pattern'):
+                        gesture_pattern = gesture_data.get('pattern')
+                        pattern_matched = False
+                        
+                        # 处理不同格式的模式定义
+                        if isinstance(gesture_pattern, list):
+                            # 方向名称列表格式
+                            pattern_str = "".join(gesture_pattern)
+                            pattern_matched = self._is_pattern_equivalent(pattern, gesture_pattern)
+                        elif isinstance(gesture_pattern, str):
+                            # 箭头符号字符串或方向名称字符串
+                            # 将箭头符号转换为方向名称
+                            converted_pattern = ""
+                            for c in gesture_pattern:
+                                converted_pattern += self.ARROW_TO_DIRECTION.get(c, c)
+                                
+                            pattern_matched = ("".join(pattern) == converted_pattern)
+                            
+                        if pattern_matched:
+                            if _DEBUG_MODE:
+                                log.debug(f"匹配到循环手势: {gesture_name}")
+                            return gesture_data.get('action')
+                            
+            # 如果没有匹配到循环模式，尝试匹配普通手势
+            for gesture_name, gesture_data in self.gesture_lib.items():
+                if gesture_data.get('type') != 'repeat':  # 只匹配非循环手势
+                    gesture_pattern = gesture_data.get('pattern')
+                    
+                    if not gesture_pattern:
+                        continue
+                        
+                    # 处理不同格式的模式定义
+                    if isinstance(gesture_pattern, list):
+                        # 方向名称列表格式
+                        if self._is_pattern_equivalent(directions, gesture_pattern):
+                            if _DEBUG_MODE:
+                                log.debug(f"匹配到手势: {gesture_name} (列表格式)")
+                            return gesture_data.get('action')
+                    elif isinstance(gesture_pattern, str):
+                        # 箭头字符串或方向名称字符串
+                        # 先尝试直接匹配箭头字符串
+                        if gesture_pattern == arrow_str:
+                            if _DEBUG_MODE:
+                                log.debug(f"匹配到手势: {gesture_name} (箭头字符串)")
+                            return gesture_data.get('action')
+                            
+                        # 再尝试将箭头转换为方向名称后匹配
+                        converted_pattern = ""
+                        for c in gesture_pattern:
+                            converted_pattern += self.ARROW_TO_DIRECTION.get(c, c)
+                            
+                        if converted_pattern == direction_str:
+                            if _DEBUG_MODE:
+                                log.debug(f"匹配到手势: {gesture_name} (转换后的方向名称)")
+                            return gesture_data.get('action')
+                
+            # 如果没有找到匹配
+            if _DEBUG_MODE:
+                log.debug(f"未找到匹配的手势，方向序列: {arrow_str}")
+            return None
+            
+        except Exception as e:
+            error_msg = f"手势匹配过程出错: {str(e)}"
+            log.error(error_msg)
+            if _DEBUG_MODE:
+                log.debug(f"详细错误: {traceback.format_exc()}")
+            return None
 
     def _vector_to_direction(self, vector: np.ndarray) -> str:
         """向量转8方向"""
@@ -537,6 +548,18 @@ class GestureParser:
         idx1 = self.DIRECTION_MAP.index(dir1)
         idx2 = self.DIRECTION_MAP.index(dir2)
         return min(abs(idx1 - idx2), 8 - abs(idx1 - idx2)) * 45
+
+    def _is_pattern_equivalent(self, pattern1: List[str], pattern2: List[str]) -> bool:
+        """检查两个方向序列是否等价"""
+        if len(pattern1) != len(pattern2):
+            return False
+        
+        # 将方向序列转换为字符串
+        arrow_str1 = "".join([self.DIRECTION_TO_ARROW.get(d, d) for d in pattern1])
+        arrow_str2 = "".join([self.DIRECTION_TO_ARROW.get(d, d) for d in pattern2])
+        
+        # 检查箭头字符串是否等价
+        return arrow_str1 == arrow_str2
 
 if __name__ == "__main__":
     print("请通过主程序运行。")

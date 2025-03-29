@@ -301,12 +301,45 @@ def main():
     # 设置调试模式
     debug_mode = args.debug
     setup_logger(debug_mode)
-    set_debug_mode(debug_mode)
+    
+    # 将调试模式传递给所有组件
+    set_debug_mode(debug_mode)  # 设置墨水绘制器的调试模式
+    
+    # 设置手势解析器和操作执行器的调试模式
+    try:
+        from app.gesture_parser import set_debug_mode as set_parser_debug
+        from app.operation_executor import set_debug_mode as set_executor_debug
+        set_parser_debug(debug_mode)
+        set_executor_debug(debug_mode)
+        if debug_mode:
+            log.debug("已将调试模式传递给所有组件")
+    except Exception as e:
+        log.error(f"设置组件调试模式时出错: {e}")
     
     # 记录启动信息
     log.info(f"{__title__} v{__version__} 启动中...")
     if debug_mode:
         log.info("调试模式已启用")
+        log.debug(f"系统信息: {os.name}, Python版本: {sys.version}")
+        log.debug(f"工作目录: {os.getcwd()}")
+        
+        # 记录命令行参数
+        log.debug(f"命令行参数: {sys.argv}")
+        
+        # 记录环境变量信息
+        log.debug(f"PYTHONPATH: {os.environ.get('PYTHONPATH', '未设置')}")
+        
+        # 记录屏幕分辨率
+        try:
+            import tkinter as tk
+            root = tk.Tk()
+            root.withdraw()
+            screen_width = root.winfo_screenwidth()
+            screen_height = root.winfo_screenheight()
+            log.debug(f"屏幕分辨率: {screen_width}x{screen_height}")
+            root.destroy()
+        except:
+            log.debug("无法获取屏幕分辨率")
     
     # 预初始化应用程序组件，提高后续响应速度
     startup_time = time.time()
@@ -328,6 +361,14 @@ def main():
     
     # 添加资源管理器初始化
     ResourceManager.register_resources()
+    
+    # 设置资源管理器的调试模式
+    try:
+        ResourceManager.set_debug_mode(debug_mode)
+        if debug_mode:
+            log.debug("已设置资源管理器的调试模式")
+    except Exception as e:
+        log.error(f"设置资源管理器调试模式时出错: {e}")
     
     # 初始化设置管理器
     settings_manager = SettingsManager()
