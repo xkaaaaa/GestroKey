@@ -11,9 +11,21 @@ from pynput import mouse
 try:
     from logger import get_logger
     from stroke_analyzer import StrokeAnalyzer
+    from ui.settings.settings import get_settings
 except ImportError:
     from core.logger import get_logger
     from core.stroke_analyzer import StrokeAnalyzer
+    try:
+        from ui.settings.settings import get_settings
+    except ImportError:
+        # 如果导入失败，使用默认值
+        def get_settings():
+            class DefaultSettings:
+                def get(self, key, default=None):
+                    if key == "pen_width":
+                        return 3
+                    return default
+            return DefaultSettings()
 
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
@@ -43,7 +55,7 @@ class TransparentDrawingOverlay(QWidget):
         
         # 绘制效果控制
         self.pen_color = QColor(0, 120, 255, 220)  # 线条颜色
-        self.pen_width = 2  # 线条宽度
+        self.pen_width = 2  # 线条宽度，将由DrawingManager设置
         
         # 缓冲区和更新控制
         self.image = None  # 绘图缓冲
@@ -61,6 +73,12 @@ class TransparentDrawingOverlay(QWidget):
         
         self.initUI()
         self.logger.debug("绘制覆盖层初始化完成")
+    
+    def set_pen_width(self, width):
+        """设置笔尖粗细"""
+        if width > 0:
+            self.pen_width = width
+            self.logger.debug(f"笔尖粗细已设置为: {width}")
     
     def initUI(self):
         # 创建一个全屏、透明、无边框的窗口，用于绘制
@@ -342,6 +360,15 @@ class DrawingManager:
             return
             
         self.logger.info("启动绘制功能")
+        
+        # 从设置中读取笔尖粗细
+        try:
+            settings = get_settings()
+            pen_width = settings.get("pen_width", 3)
+            self.overlay.set_pen_width(pen_width)
+            self.logger.debug(f"从设置中加载笔尖粗细: {pen_width}")
+        except Exception as e:
+            self.logger.error(f"加载笔尖粗细设置失败: {e}，使用默认值")
         
         # 初始化鼠标监听器
         self._init_mouse_hook()

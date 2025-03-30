@@ -1,10 +1,20 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QMainWindow
+from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QVBoxLayout, 
+                            QLabel, QMainWindow, QTabWidget, QHBoxLayout)
 from PyQt5.QtCore import Qt
 
 from core.drawer import DrawingManager
 from core.logger import get_logger
+
+# 导入选项卡模块
+try:
+    from ui.console import ConsoleTab
+    from ui.settings.settings_tab import SettingsTab
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from ui.console import ConsoleTab
+    from ui.settings.settings_tab import SettingsTab
 
 class GestroKeyApp(QMainWindow):
     """GestroKey应用程序主窗口"""
@@ -21,95 +31,58 @@ class GestroKeyApp(QMainWindow):
         """初始化用户界面"""
         # 设置窗口属性
         self.setWindowTitle('GestroKey')
-        self.setGeometry(300, 300, 300, 200)
+        self.setGeometry(300, 300, 400, 400)
         
         # 创建中央部件和布局
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
-        layout.setAlignment(Qt.AlignCenter)
+        main_layout = QVBoxLayout(central_widget)
         
-        # 标题标签
-        title_label = QLabel("GestroKey")
-        title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
-        title_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title_label)
+        # 创建选项卡小部件
+        self.tab_widget = QTabWidget()
         
-        # 状态标签
-        self.status_label = QLabel("准备就绪")
-        self.status_label.setStyleSheet("font-size: 10pt; margin-bottom: 20px;")
-        self.status_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.status_label)
+        # 创建控制台选项卡
+        self.console_tab = ConsoleTab()
+        self.tab_widget.addTab(self.console_tab, "控制台")
         
-        # 开始绘制按钮
-        self.start_button = QPushButton("开始绘制")
-        self.start_button.setFixedSize(150, 40)
-        self.start_button.clicked.connect(self.start_drawing)
-        layout.addWidget(self.start_button)
+        # 创建设置选项卡
+        self.settings_tab = SettingsTab()
+        self.tab_widget.addTab(self.settings_tab, "设置")
         
-        # 停止绘制按钮（初始禁用）
-        self.stop_button = QPushButton("停止绘制")
-        self.stop_button.setFixedSize(150, 40)
-        self.stop_button.clicked.connect(self.stop_drawing)
-        self.stop_button.setEnabled(False)
-        layout.addWidget(self.stop_button)
+        # 将选项卡添加到主布局
+        main_layout.addWidget(self.tab_widget)
         
-        # 退出按钮
+        # 添加底部状态栏
+        status_layout = QHBoxLayout()
+        
         self.exit_button = QPushButton("退出程序")
-        self.exit_button.setFixedSize(150, 40)
+        self.exit_button.setFixedSize(100, 30)
         self.exit_button.clicked.connect(self.close)
-        layout.addWidget(self.exit_button)
+        
+        self.version_label = QLabel("v1.0.0")
+        self.version_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        
+        status_layout.addWidget(self.exit_button)
+        status_layout.addStretch(1)
+        status_layout.addWidget(self.version_label)
+        
+        main_layout.addLayout(status_layout)
         
         # 显示窗口
         self.show()
-        
-    def start_drawing(self):
-        """开始绘制功能"""
-        try:
-            self.logger.info("启动绘制功能")
-            
-            # 创建绘制管理器（如果不存在）
-            if not self.drawing_manager:
-                self.drawing_manager = DrawingManager()
-            
-            # 开始绘制
-            success = self.drawing_manager.start()
-            
-            if success:
-                self.status_label.setText("绘制中 - 使用鼠标右键进行绘制")
-                self.start_button.setEnabled(False)
-                self.stop_button.setEnabled(True)
-                self.is_drawing_active = True
-                self.logger.debug("绘制功能已启动")
-            
-        except Exception as e:
-            self.logger.exception(f"启动绘制功能时发生错误: {e}")
-            self.status_label.setText(f"启动失败: {str(e)}")
-    
-    def stop_drawing(self):
-        """停止绘制功能"""
-        if self.drawing_manager and self.is_drawing_active:
-            try:
-                self.logger.info("停止绘制功能")
-                
-                # 停止绘制
-                success = self.drawing_manager.stop()
-                
-                if success:
-                    self.status_label.setText("准备就绪")
-                    self.start_button.setEnabled(True)
-                    self.stop_button.setEnabled(False)
-                    self.is_drawing_active = False
-                    self.logger.debug("绘制功能已停止")
-                
-            except Exception as e:
-                self.logger.exception(f"停止绘制功能时发生错误: {e}")
-                self.status_label.setText(f"停止失败: {str(e)}")
     
     def closeEvent(self, event):
         """关闭窗口事件处理"""
         self.logger.info("程序关闭")
-        self.stop_drawing()
+        # 如果控制台标签页存在，停止绘制
+        if hasattr(self, 'console_tab'):
+            self.console_tab.stop_drawing()
+        # 如果设置标签页存在，保存设置
+        if hasattr(self, 'settings_tab'):
+            try:
+                self.settings_tab.save_settings()
+            except Exception as e:
+                self.logger.warning(f"关闭时保存设置失败: {e}")
         event.accept()
 
 
@@ -121,4 +94,12 @@ if __name__ == "__main__":
         sys.exit(app.exec_())
     except Exception as e:
         error_logger = get_logger("MainError")
-        error_logger.exception(f"主程序发生未捕获的异常: {e}") 
+        error_logger.exception(f"主程序发生未捕获的异常: {e}")
+        # 显示错误消息框
+        from PyQt5.QtWidgets import QMessageBox
+        error_box = QMessageBox()
+        error_box.setIcon(QMessageBox.Critical)
+        error_box.setWindowTitle("错误")
+        error_box.setText("程序启动失败")
+        error_box.setDetailedText(f"错误详情: {str(e)}")
+        error_box.exec_() 
