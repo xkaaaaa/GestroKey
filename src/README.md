@@ -141,9 +141,9 @@ settings.reset_to_default()
 - `DrawingSignals`：信号类，处理线程间通信
 - `TransparentDrawingOverlay`：透明绘制覆盖层
   - `set_pen_width(width)`：设置笔尖粗细
-  - `startDrawing(x, y, pressure)`：开始绘制
+  - `startDrawing(x, y, pressure)`：开始绘制，同时停止任何正在进行的淡出效果
   - `continueDrawing(x, y, pressure)`：继续绘制轨迹
-  - `stopDrawing()`：停止绘制并启动淡出效果
+  - `stopDrawing()`：停止绘制并开始淡出效果
   - `get_stroke_direction(stroke_id)`：获取指定笔画的方向
 - `DrawingManager`：绘制管理器
   - `start()`：开始绘制功能，启动监听，并从设置加载笔尖粗细
@@ -174,6 +174,7 @@ drawer.stop()
 - 自动记录绘制点和分析方向
 - 自动计算压力值（基于移动速度）
 - 笔尖粗细可通过设置调整，每次启动时自动从设置加载
+- 修复了淡出效果冲突问题：当前一个线条淡出效果还在进行时，开始新线条绘制会自动停止淡出效果，确保新线条正常显示
 
 ### 7. core/stroke_analyzer.py
 
@@ -269,9 +270,10 @@ python src/main.py
 2. 在控制台选项卡中点击"开始绘制"按钮
 3. 使用鼠标右键进行绘制（按住右键移动）
 4. 绘制完成后释放右键，绘制会有淡出效果
-5. 完成后点击"停止绘制"按钮关闭绘制功能
-6. 可以在设置选项卡中调整笔尖粗细
-7. 点击"退出程序"按钮退出应用
+5. 可以在前一个线条淡出效果还在进行时立即开始新的绘制，系统会自动处理冲突
+6. 完成后点击"停止绘制"按钮关闭绘制功能
+7. 可以在设置选项卡中调整笔尖粗细
+8. 点击"退出程序"按钮退出应用
 
 ## 设置管理
 

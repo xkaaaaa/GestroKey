@@ -111,9 +111,17 @@ class TransparentDrawingOverlay(QWidget):
         
         self.logger.debug(f"开始绘制，坐标: ({x}, {y}), 压力: {pressure}")
         
-        # 重置状态
-        self.fading = False
-        self.fade_alpha = 255
+        # 停止任何正在进行的淡出效果
+        if self.fading:
+            self.logger.debug("检测到正在进行的淡出效果，正在停止")
+            self.fade_timer.stop()
+            self.fading = False
+            self.fade_alpha = 255  # 重置透明度
+            # 确保清除任何已有的淡出状态，避免影响新的绘制
+            if self.image:
+                painter = QPainter(self.image)
+                painter.setOpacity(1.0)  # 设置完全不透明
+                painter.end()
         
         # 确保创建新图像并清空画布（无论尺寸是否变化）
         if self.image is None or self.image.size() != self.size():
@@ -128,6 +136,10 @@ class TransparentDrawingOverlay(QWidget):
         self.current_line = [(x, y, pressure, current_time, self.current_stroke_id)]
         
         self.drawing = True
+        
+        # 停止更新计时器（如果正在运行）并重新启动
+        if self.update_timer.isActive():
+            self.update_timer.stop()
         
         # 显示窗口并启动更新计时器
         self.show()
@@ -201,6 +213,12 @@ class TransparentDrawingOverlay(QWidget):
         
         # 停止更新计时器，启动淡出计时器
         self.update_timer.stop()
+        
+        # 如果淡出计时器正在运行，先停止它
+        if self.fade_timer.isActive():
+            self.fade_timer.stop()
+            
+        # 启动淡出计时器
         self.fade_timer.start()
     
     def _log_stroke_data(self, stroke_data, direction_sequence=None, direction_description=None, direction_details=None):
@@ -260,6 +278,13 @@ class TransparentDrawingOverlay(QWidget):
             self.logger.info(f"绘制会话完成: 记录了 {len(self.points)} 个点, {len(self.lines)} 条线")
             return
         
+        # 如果已经重新开始绘制，则停止淡出效果
+        if self.drawing:
+            self.logger.debug("检测到新的绘制开始，停止淡出效果")
+            self.fading = False
+            self.fade_timer.stop()
+            return
+        
         # 更新透明度
         self.fade_alpha -= self.fade_speed
         
@@ -277,12 +302,18 @@ class TransparentDrawingOverlay(QWidget):
     
     def paintEvent(self, event):
         """绘制事件处理"""
+        if not self.image:
+            return
+            
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
         
         if self.fading:
             # 绘制淡出效果
             painter.setOpacity(self.fade_alpha / 255.0)
+        else:
+            # 确保在正常绘制时完全不透明
+            painter.setOpacity(1.0)
         
         # 绘制缓冲区内容
         painter.drawPixmap(0, 0, self.image)
