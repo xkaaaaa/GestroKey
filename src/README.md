@@ -68,9 +68,10 @@ console = ConsoleTab()
 **主要类和方法**：
 - `SettingsTab`：设置选项卡类，继承自`QWidget`
   - `initUI()`：初始化设置选项卡界面
-  - `pen_width_changed(value)`：处理笔尖粗细变化
-  - `reset_settings()`：重置为默认设置
-  - `save_settings()`：保存设置到文件
+  - `pen_width_changed(value)`：处理笔尖粗细变化，并实时更新绘制管理器参数
+  - `reset_settings()`：重置为默认设置，并更新绘制管理器参数
+  - `save_settings()`：保存设置到文件，并更新绘制管理器参数
+  - `_update_drawing_manager()`：内部方法，负责更新绘制管理器的参数
 - `PenPreviewWidget`：笔尖预览小部件，显示笔尖粗细效果
 
 **使用方法**：
@@ -148,6 +149,7 @@ settings.reset_to_default()
 - `DrawingManager`：绘制管理器
   - `start()`：开始绘制功能，启动监听，并从设置加载笔尖粗细
   - `stop()`：停止绘制功能，清理资源
+  - `update_settings()`：更新设置参数，无需重启绘制功能即可应用修改的参数（如笔尖粗细）
   - `get_last_direction()`：获取最后一次绘制的方向
 
 **使用方法**：
@@ -159,6 +161,9 @@ drawer = DrawingManager()
 
 # 开始绘制功能
 drawer.start()  # 此时可以使用鼠标右键进行绘制
+
+# 更新设置参数（无需重启绘制功能）
+drawer.update_settings()  # 从设置中重新读取参数并应用
 
 # 获取最后一次绘制的方向
 direction = drawer.get_last_direction()
@@ -174,6 +179,7 @@ drawer.stop()
 - 自动记录绘制点和分析方向
 - 自动计算压力值（基于移动速度）
 - 笔尖粗细可通过设置调整，每次启动时自动从设置加载
+- 支持动态更新参数，在设置变更后无需重启绘制功能
 - 修复了淡出效果冲突问题：当前一个线条淡出效果还在进行时，开始新线条绘制会自动停止淡出效果，确保新线条正常显示
 
 ### 7. core/stroke_analyzer.py
@@ -272,7 +278,7 @@ python src/main.py
 4. 绘制完成后释放右键，绘制会有淡出效果
 5. 可以在前一个线条淡出效果还在进行时立即开始新的绘制，系统会自动处理冲突
 6. 完成后点击"停止绘制"按钮关闭绘制功能
-7. 可以在设置选项卡中调整笔尖粗细
+7. 可以在设置选项卡中调整笔尖粗细，设置实时应用而无需重启绘制功能
 8. 点击"退出程序"按钮退出应用
 
 ## 设置管理
@@ -309,6 +315,14 @@ try:
     
     # 应用程序主循环
     # ...
+    
+    # 修改设置
+    settings.set("pen_width", 5)
+    settings.save()
+    
+    # 应用新设置，无需重启绘制功能
+    drawer.update_settings()
+    logger.info("已更新笔尖粗细设置")
     
     # 获取方向信息
     direction = drawer.get_last_direction()

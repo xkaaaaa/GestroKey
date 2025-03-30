@@ -411,6 +411,24 @@ class DrawingManager:
         
         return True
     
+    def update_settings(self):
+        """更新设置参数 - 无需重启绘制功能即可应用修改的参数"""
+        self.logger.info("更新绘制参数")
+        
+        try:
+            # 从设置中读取最新的笔尖粗细
+            settings = get_settings()
+            pen_width = settings.get("pen_width", 3)
+            
+            # 应用新的笔尖粗细设置
+            self.overlay.set_pen_width(pen_width)
+            self.logger.debug(f"已更新笔尖粗细: {pen_width}")
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"更新设置参数失败: {e}")
+            return False
+    
     def stop(self):
         """停止绘制功能 - 关闭绘制窗口并停止监听"""
         if not self.is_active:

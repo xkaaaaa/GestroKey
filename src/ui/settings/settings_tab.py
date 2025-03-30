@@ -89,6 +89,9 @@ class SettingsTab(QWidget):
         self.logger.debug(f"笔尖粗细已更改为: {value}")
         self.preview_widget.update_width(value)
         self.settings.set("pen_width", value)
+        
+        # 实时更新绘制管理器的参数
+        self._update_drawing_manager()
     
     def reset_settings(self):
         """重置为默认设置"""
@@ -98,11 +101,35 @@ class SettingsTab(QWidget):
         # 更新UI显示
         self.pen_width_spinner.setValue(self.settings.get("pen_width"))
         self.preview_widget.update_width(self.settings.get("pen_width"))
+        
+        # 更新绘制管理器的参数
+        self._update_drawing_manager()
     
     def save_settings(self):
         """保存设置到文件"""
         self.logger.info("保存设置到文件")
         self.settings.save()
+        
+        # 更新绘制管理器的参数
+        self._update_drawing_manager()
+    
+    def _update_drawing_manager(self):
+        """更新绘制管理器的参数（内部方法）"""
+        try:
+            # 尝试获取主窗口
+            main_window = self.window()
+            if hasattr(main_window, 'console_tab') and main_window.console_tab:
+                console_tab = main_window.console_tab
+                
+                # 如果console_tab有drawing_manager且处于活动状态，更新参数
+                if hasattr(console_tab, 'drawing_manager') and console_tab.drawing_manager:
+                    drawing_manager = console_tab.drawing_manager
+                    if drawing_manager.update_settings():
+                        self.logger.debug("已更新绘制管理器参数")
+                    else:
+                        self.logger.warning("更新绘制管理器参数失败")
+        except Exception as e:
+            self.logger.error(f"尝试更新绘制管理器参数时发生错误: {e}")
 
 
 class PenPreviewWidget(QWidget):
