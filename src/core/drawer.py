@@ -1,21 +1,21 @@
 import sys
 import time
+import math
+import numpy as np
 from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal, QObject
-from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QPixmap
+from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QPixmap, QBrush, QPainterPathStroker
 from pynput import mouse
 
-# 动态导入日志模块，处理不同运行方式下的导入路径问题
 try:
-    # 当作为包导入时（从主程序运行）
     from logger import get_logger
 except ImportError:
     from core.logger import get_logger
 
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
-    start_drawing_signal = pyqtSignal(int, int)
-    continue_drawing_signal = pyqtSignal(int, int)
+    start_drawing_signal = pyqtSignal(int, int, float)  # x, y, pressure
+    continue_drawing_signal = pyqtSignal(int, int, float)  # x, y, pressure
     stop_drawing_signal = pyqtSignal()
 
 class TransparentDrawingOverlay(QWidget):
@@ -24,25 +24,38 @@ class TransparentDrawingOverlay(QWidget):
     def __init__(self):
         super().__init__()
         self.logger = get_logger("DrawingOverlay")
-        self.path = QPainterPath()
-        self.drawing = False
-        self.last_point = QPoint()
-        self.points = []  # 存储所有轨迹点，每个元素为 (point, timestamp)
-        self.point_lifetime = 0.8  # 每个点的生存时间（秒）
-        self.buffer = None  # 绘图缓冲
-        self.update_timer = QTimer(self)  # 确保计时器与窗口在同一线程
-        self.update_timer.timeout.connect(self.delayed_update)
-        self.update_timer.setInterval(16)  # 约60fps的更新频率
         
-        # 优化绘图设置
-        self.simplified_path = True  # 使用简化路径
-        self.batch_update = True  # 批量更新
-        self.batch_size = 5  # 每5个点更新一次
-        self.point_counter = 0
+        # 绘制状态
+        self.drawing = False
+        self.last_point = None
+        
+        # 点和压力数据
+        self.points = []  # 存储所有轨迹点，每个元素为 [x, y, pressure, timestamp]
+        self.lines = []   # 存储完整线条，每条线由多个点组成
+        self.current_line = []  # 当前正在绘制的线条
+        self.current_stroke_id = 0  # 当前绘制的笔画ID
+        
+        # 绘制效果控制
+        self.pen_color = QColor(0, 120, 255, 220)  # 线条颜色
+        self.pen_width = 2  # 线条宽度
+        
+        # 缓冲区和更新控制
+        self.image = None  # 绘图缓冲
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.update)
+        self.update_timer.setInterval(16)  # 约60fps
+        
+        # 渐变消失效果
+        self.fade_timer = QTimer(self)
+        self.fade_timer.timeout.connect(self.fade_path)
+        self.fade_timer.setInterval(20)  # 每20ms淡出一次
+        self.fading = False  # 是否在淡出过程中
+        self.fade_alpha = 255  # 当前淡出透明度
+        self.fade_speed = 25  # 每次淡出减少的透明度
         
         self.initUI()
         self.logger.debug("绘制覆盖层初始化完成")
-        
+    
     def initUI(self):
         # 创建一个全屏、透明、无边框的窗口，用于绘制
         self.setWindowFlags(
@@ -52,197 +65,201 @@ class TransparentDrawingOverlay(QWidget):
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 完全透明，不影响鼠标事件
+        
         # 获取屏幕尺寸
         screen_geometry = QApplication.desktop().screenGeometry()
         self.setGeometry(screen_geometry)
+        
         # 创建绘图缓冲区
-        self.buffer = QPixmap(screen_geometry.width(), screen_geometry.height())
-        self.buffer.fill(Qt.transparent)
+        self.image = QPixmap(screen_geometry.width(), screen_geometry.height())
+        self.image.fill(Qt.transparent)
+        
         # 隐藏窗口，仅在绘制时显示
         self.hide()
         self.logger.debug(f"UI初始化完成，屏幕尺寸: {screen_geometry.width()}x{screen_geometry.height()}")
-
-    def startDrawing(self, x, y):
+    
+    def startDrawing(self, x, y, pressure=0.5):
         """开始绘制"""
-        # 验证坐标有效性，防止(0,0)点错误
+        # 验证坐标有效性
         if x <= 0 or y <= 0:
             self.logger.warning(f"忽略无效的起始坐标: ({x}, {y})")
             return
-            
-        point = QPoint(x, y)
-        self.path = QPainterPath()
-        self.path.moveTo(point)
-        self.last_point = point
-        self.points = [(point, time.time())]  # 存储点和时间戳
-        self.drawing = True
-        self.point_counter = 0
         
-        # 清空缓冲区
-        self.buffer.fill(Qt.transparent)
+        self.logger.debug(f"开始绘制，坐标: ({x}, {y}), 压力: {pressure}")
         
-        self.show()
-        # 确保计时器在UI线程启动
-        if not self.update_timer.isActive():
-            self.update_timer.start()
-        self.update()
-        self.logger.debug(f"开始绘制，坐标: ({x}, {y})")
+        # 重置状态
+        self.fading = False
+        self.fade_alpha = 255
         
-    def continueDrawing(self, x, y):
-        """继续绘制轨迹"""
-        if not self.drawing:
-            return
+        # 确保创建新图像并清空画布（无论尺寸是否变化）
+        if self.image is None or self.image.size() != self.size():
+            self.image = QPixmap(self.size())
+        # 始终清空画布，确保每次新绘制开始时没有旧内容
+        self.image.fill(Qt.transparent)
             
-        # 验证坐标有效性，防止无效坐标
-        if x <= 0 or y <= 0:
-            self.logger.warning(f"忽略无效的坐标: ({x}, {y})")
-            return
-            
-        # 添加额外的防护：检查坐标与上一点的距离，防止跳跃性连线
-        if self.last_point and not self.points:
-            # 如果没有点但有last_point，说明发生了异常情况
-            self.logger.warning("检测到异常状态：有last_point但points为空，重置路径")
-            self.path = QPainterPath()
-            self.path.moveTo(QPoint(x, y))
-            self.points = [(QPoint(x, y), time.time())]
-            self.last_point = QPoint(x, y)
-            return
-            
-        # 计算与上一点的距离
-        last_x = self.last_point.x()
-        last_y = self.last_point.y()
-        distance = ((x - last_x) ** 2 + (y - last_y) ** 2) ** 0.5
-        
-        # 如果距离过大(超过200像素)，说明可能是异常跳跃，不连接这两点
-        if distance > 200:
-            self.logger.warning(f"检测到点跳跃，距离: {distance:.2f}像素，重置路径")
-            # 结束当前路径，开始新路径
-            self.path = QPainterPath()
-            point = QPoint(x, y)
-            self.path.moveTo(point)
-            self.points = [(point, time.time())]
-            self.last_point = point
-            return
-            
+        # 记录起始点
         current_time = time.time()
-        point = QPoint(x, y)
+        self.last_point = QPoint(x, y)
+        self.current_stroke_id += 1  # 增加笔画ID
+        self.current_line = [(x, y, pressure, current_time, self.current_stroke_id)]
         
-        # 添加点到列表，带时间戳
-        self.points.append((point, current_time))
-        self.point_counter += 1
+        self.drawing = True
         
-        # 移除超过生存时间的点
-        self.prune_expired_points(current_time)
-        
-        # 如果是第一个点或者点列表被完全清空了（极少发生）
-        if not self.points:
-            self.logger.warning("所有点已过期，重置路径")
-            self.path = QPainterPath()
+        # 显示窗口并启动更新计时器
+        self.show()
+        self.update_timer.start()
+        self.update()
+    
+    def continueDrawing(self, x, y, pressure=0.5):
+        """继续绘制轨迹"""
+        if not self.drawing or not self.last_point:
             return
         
-        # 简化的路径更新方式
-        if self.simplified_path:
-            # 直接连接到新点，而不是使用曲线
-            self.path.lineTo(point)
-        else:
-            # 使用线性插值代替复杂的贝塞尔曲线
-            self.path.lineTo(point)
-        
-        self.last_point = point
-            
-        # 批量更新，而不是每个点都更新
-        if self.batch_update:
-            if self.point_counter >= self.batch_size:
-                self.point_counter = 0
-                self.update()
-    
-    def prune_expired_points(self, current_time=None):
-        """移除过期的点"""
-        if current_time is None:
-            current_time = time.time()
-            
-        # 计算超时时间点
-        expire_time = current_time - self.point_lifetime
-        
-        # 移除所有过期的点
-        old_count = len(self.points)
-        valid_points = [(pt, ts) for pt, ts in self.points if ts >= expire_time]
-        new_count = len(valid_points)
-        
-        # 如果有点被移除，需要重建路径
-        if new_count < old_count:
-            self.logger.debug(f"移除 {old_count - new_count} 个过期点，剩余 {new_count} 个点")
-            self.points = valid_points
-            if self.points:  # 确保还有点存在
-                self.rebuildPath()
-            else:
-                self.path = QPainterPath()
-        
-    def rebuildPath(self):
-        """重新构建路径，使用简化的算法"""
-        if not self.points:
+        # 验证坐标
+        if x <= 0 or y <= 0:
             return
             
-        self.path = QPainterPath()
-        first_point = self.points[0][0]  # 获取第一个点（不包括时间戳）
-        self.path.moveTo(first_point)
+        current_point = QPoint(x, y)
         
-        # 简化路径构建，只使用直线连接
-        for point_data in self.points[1:]:
-            point = point_data[0]  # 只获取点，不需要时间戳
-            self.path.lineTo(point)
+        # 在图像上绘制新线段
+        painter = QPainter(self.image)
+        painter.setRenderHint(QPainter.Antialiasing, True)
         
-        self.logger.debug(f"路径已重建，共 {len(self.points)} 个点")
-    
-    def delayed_update(self):
-        """计时器触发的延迟更新，用于控制重绘频率"""
-        if self.drawing:
-            # 每次更新时检查并移除过期点
-            self.prune_expired_points()
-            self.update()
-    
-    def stopDrawing(self):
-        """停止绘制并清除"""
-        if not self.drawing:
-            return
-            
-        self.drawing = False
-        self.path = QPainterPath()
-        self.points = []
-        # 清空缓冲区
-        self.buffer.fill(Qt.transparent)
-        
-        # 确保在UI线程停止计时器
-        if self.update_timer.isActive():
-            self.update_timer.stop()
-        
-        self.hide()
-        self.logger.debug("停止绘制，清除路径")
-    
-    def paintEvent(self, event):
-        """绘制事件处理 - 优化绘制性能"""
-        if not self.drawing:
-            return
-            
-        # 在缓冲区上绘制
-        buffer_painter = QPainter(self.buffer)
-        buffer_painter.setRenderHint(QPainter.Antialiasing, True)
-        
-        # 清除之前的绘制内容，保留透明背景
-        self.buffer.fill(Qt.transparent)
-        
-        # 简化绘制 - 只绘制一种线条样式
-        pen = QPen(QColor(0, 120, 255, 200), 3)
+        # 设置画笔
+        pen = QPen()
+        pen.setColor(self.pen_color)
+        pen.setWidth(self.pen_width)
         pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
-        buffer_painter.setPen(pen)
-        buffer_painter.drawPath(self.path)
+        painter.setPen(pen)
         
-        buffer_painter.end()
+        # 绘制线段
+        painter.drawLine(self.last_point, current_point)
+        painter.end()
         
-        # 将缓冲区内容绘制到窗口
+        # 记录当前点
+        current_time = time.time()
+        self.current_line.append((x, y, pressure, current_time, self.current_stroke_id))
+        
+        # 更新上一个点的位置
+        self.last_point = current_point
+        
+        # 更新显示
+        self.update()
+    
+    def stopDrawing(self):
+        """停止绘制并开始淡出效果"""
+        if not self.drawing:
+            return
+            
+        self.logger.debug("停止绘制，开始淡出")
+        
+        # 保存当前线条
+        if self.current_line:
+            self.lines.append(self.current_line.copy())
+            self.points.extend(self.current_line)
+            
+            # 记录本次绘制的点数据
+            self._log_stroke_data(self.current_line)
+            
+            self.current_line = []
+            
+        # 开始淡出效果
+        self.drawing = False
+        self.fading = True
+        self.fade_alpha = 255
+        
+        # 停止更新计时器，启动淡出计时器
+        self.update_timer.stop()
+        self.fade_timer.start()
+    
+    def _log_stroke_data(self, stroke_data):
+        """记录笔画数据到日志"""
+        if not stroke_data:
+            return
+            
+        stroke_id = stroke_data[0][4]  # 获取笔画ID
+        point_count = len(stroke_data)
+        start_time = stroke_data[0][3]
+        end_time = stroke_data[-1][3]
+        duration = end_time - start_time
+        
+        # 记录基本信息
+        self.logger.info(f"笔画 #{stroke_id} 完成: {point_count}个点, 用时:{duration:.2f}秒")
+        
+        # 计算统计数据
+        if point_count > 1:
+            # 计算总路径长度
+            total_distance = 0
+            for i in range(1, len(stroke_data)):
+                x1, y1 = stroke_data[i-1][0], stroke_data[i-1][1]
+                x2, y2 = stroke_data[i][0], stroke_data[i][1]
+                segment_distance = math.sqrt((x2-x1)**2 + (y2-y1)**2)
+                total_distance += segment_distance
+                
+            # 计算平均速度
+            avg_speed = total_distance / duration if duration > 0 else 0
+            
+            # 计算平均压力
+            avg_pressure = sum(point[2] for point in stroke_data) / len(stroke_data)
+            
+            # 记录统计数据
+            self.logger.debug(f"笔画 #{stroke_id} 统计: 长度={total_distance:.1f}像素, 平均速度={avg_speed:.1f}像素/秒, 平均压力={avg_pressure:.2f}")
+            
+            # 记录起点和终点
+            start_x, start_y = stroke_data[0][0], stroke_data[0][1]
+            end_x, end_y = stroke_data[-1][0], stroke_data[-1][1]
+            self.logger.debug(f"笔画 #{stroke_id} 轨迹: 起点=({start_x},{start_y}), 终点=({end_x},{end_y})")
+    
+    def fade_path(self):
+        """实现路径的淡出效果"""
+        if not self.fading:
+            self.fade_timer.stop()
+            self.hide()
+            self.logger.info(f"绘制会话完成: 记录了 {len(self.points)} 个点, {len(self.lines)} 条线")
+            return
+        
+        # 更新透明度
+        self.fade_alpha -= self.fade_speed
+        
+        if self.fade_alpha <= 0:
+            # 淡出完成
+            self.fade_alpha = 0
+            self.fading = False
+            self.fade_timer.stop()
+            self.hide()
+            self.logger.info(f"绘制会话完成: 记录了 {len(self.points)} 个点, {len(self.lines)} 条线")
+            return
+        
+        # 重绘
+        self.update()
+    
+    def paintEvent(self, event):
+        """绘制事件处理"""
         painter = QPainter(self)
-        painter.drawPixmap(0, 0, self.buffer)
-
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        
+        if self.fading:
+            # 绘制淡出效果
+            painter.setOpacity(self.fade_alpha / 255.0)
+        
+        # 绘制缓冲区内容
+        painter.drawPixmap(0, 0, self.image)
+    
+    def resizeEvent(self, event):
+        """窗口大小改变时调整画布大小"""
+        if self.size().width() > 0 and self.size().height() > 0:
+            new_image = QPixmap(self.size())
+            new_image.fill(Qt.transparent)
+            
+            if self.image:
+                # 将原有内容绘制到新画布上
+                painter = QPainter(new_image)
+                painter.drawPixmap(0, 0, self.image)
+                painter.end()
+            
+            self.image = new_image
+            self.logger.debug(f"画布大小已调整: {self.size().width()}x{self.size().height()}")
 
 class DrawingManager:
     """绘制管理器，只负责管理绘制功能"""
@@ -275,6 +292,9 @@ class DrawingManager:
         self.init_mouse_hook()
         
         self.right_mouse_down = False
+        self.last_position = None
+        self.last_pressure_time = 0
+        self.simulated_pressure = 0.5
         
         self.logger.info("绘制模块初始化完成")
     
@@ -286,7 +306,10 @@ class DrawingManager:
                 if self.right_mouse_down:
                     # 确保坐标有效
                     if x > 0 and y > 0:
-                        self.signals.continue_drawing_signal.emit(x, y)
+                        # 模拟压力值
+                        pressure = self.calculate_simulated_pressure(x, y)
+                        self.signals.continue_drawing_signal.emit(x, y, pressure)
+                        self.last_position = (x, y)
             
             def on_click(x, y, button, pressed):
                 # 右键按下时开始绘制，松开时停止
@@ -295,10 +318,14 @@ class DrawingManager:
                         # 确保坐标有效
                         if x > 0 and y > 0:
                             self.right_mouse_down = True
-                            self.signals.start_drawing_signal.emit(x, y)
+                            self.last_position = (x, y)
+                            self.last_pressure_time = time.time()
+                            self.simulated_pressure = 0.5  # 初始压力值
+                            self.signals.start_drawing_signal.emit(x, y, self.simulated_pressure)
                             self.logger.info(f"开始绘制，坐标: ({x}, {y})")
                     else:
                         self.right_mouse_down = False
+                        self.last_position = None
                         self.signals.stop_drawing_signal.emit()
                         self.logger.info("停止绘制")
             
@@ -316,6 +343,43 @@ class DrawingManager:
         except Exception as e:
             self.logger.exception(f"初始化鼠标监听器时发生错误: {e}")
             self.quit()
+    
+    def calculate_simulated_pressure(self, x, y):
+        """根据鼠标移动速度计算模拟压力值"""
+        if not self.last_position:
+            return 0.5
+            
+        # 计算移动距离和时间
+        last_x, last_y = self.last_position
+        distance = math.sqrt((x - last_x)**2 + (y - last_y)**2)
+        current_time = time.time()
+        time_diff = current_time - self.last_pressure_time
+        self.last_pressure_time = current_time
+        
+        if time_diff <= 0:
+            return self.simulated_pressure
+            
+        # 计算速度
+        speed = distance / time_diff
+        
+        # 速度越快，压力越小（反比关系）
+        # 设置一个速度阈值，当速度超过这个值时，压力接近0
+        max_speed = 2000
+        min_speed = 50
+        
+        if speed > max_speed:
+            pressure = 0.3
+        elif speed < min_speed:
+            pressure = 0.9
+        else:
+            # 线性映射
+            pressure = 0.9 - 0.6 * ((speed - min_speed) / (max_speed - min_speed))
+        
+        # 平滑压力变化，避免突变
+        self.simulated_pressure = self.simulated_pressure * 0.7 + pressure * 0.3
+        
+        # 确保在合理范围内
+        return max(0.3, min(0.9, self.simulated_pressure))
     
     def run(self):
         """运行应用程序"""
