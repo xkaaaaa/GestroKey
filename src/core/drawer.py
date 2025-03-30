@@ -7,10 +7,13 @@ from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal, QObject
 from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QPixmap, QBrush, QPainterPathStroker
 from pynput import mouse
 
+# 导入笔画分析器
 try:
     from logger import get_logger
+    from stroke_analyzer import StrokeAnalyzer
 except ImportError:
     from core.logger import get_logger
+    from core.stroke_analyzer import StrokeAnalyzer
 
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
@@ -34,6 +37,9 @@ class TransparentDrawingOverlay(QWidget):
         self.lines = []   # 存储完整线条，每条线由多个点组成
         self.current_line = []  # 当前正在绘制的线条
         self.current_stroke_id = 0  # 当前绘制的笔画ID
+        
+        # 笔画分析器
+        self.stroke_analyzer = StrokeAnalyzer()
         
         # 绘制效果控制
         self.pen_color = QColor(0, 120, 255, 220)  # 线条颜色
@@ -156,12 +162,18 @@ class TransparentDrawingOverlay(QWidget):
         
         # 保存当前线条
         if self.current_line:
+            # 分析笔画方向
+            direction_sequence, direction_details = self.stroke_analyzer.analyze_direction(self.current_line)
+            
+            # 获取人类可读描述
+            direction_description = self.stroke_analyzer.get_direction_description(direction_sequence)
+            
+            # 记录本次绘制的点数据和方向
+            self._log_stroke_data(self.current_line, direction_sequence, direction_description, direction_details)
+            
+            # 保存线条数据
             self.lines.append(self.current_line.copy())
             self.points.extend(self.current_line)
-            
-            # 记录本次绘制的点数据
-            self._log_stroke_data(self.current_line)
-            
             self.current_line = []
             
         # 开始淡出效果
@@ -173,7 +185,7 @@ class TransparentDrawingOverlay(QWidget):
         self.update_timer.stop()
         self.fade_timer.start()
     
-    def _log_stroke_data(self, stroke_data):
+    def _log_stroke_data(self, stroke_data, direction_sequence=None, direction_description=None, direction_details=None):
         """记录笔画数据到日志"""
         if not stroke_data:
             return
@@ -184,8 +196,19 @@ class TransparentDrawingOverlay(QWidget):
         end_time = stroke_data[-1][3]
         duration = end_time - start_time
         
-        # 记录基本信息
-        self.logger.info(f"笔画 #{stroke_id} 完成: {point_count}个点, 用时:{duration:.2f}秒")
+        # 记录基本信息和方向
+        direction_info = ""
+        if direction_sequence and direction_sequence != "无方向" and direction_sequence != "无明显方向":
+            direction_info = f", 方向序列: {direction_sequence}"
+        if direction_description:
+            direction_info += f", 描述: {direction_description}"
+            
+        self.logger.info(f"笔画 #{stroke_id} 完成: {point_count}个点, 用时:{duration:.2f}秒{direction_info}")
+        
+        # 记录方向详情
+        if direction_details:
+            details_str = ", ".join([f"{d}: {p:.1f}%" for d, p in sorted(direction_details.items(), key=lambda x: x[1], reverse=True)])
+            self.logger.debug(f"笔画 #{stroke_id} 方向详情: {details_str}")
         
         # 计算统计数据
         if point_count > 1:
@@ -260,6 +283,24 @@ class TransparentDrawingOverlay(QWidget):
             
             self.image = new_image
             self.logger.debug(f"画布大小已调整: {self.size().width()}x{self.size().height()}")
+            
+    def get_stroke_direction(self, stroke_id=None):
+        """获取指定笔画ID的方向，如不指定则获取最后一个笔画的方向"""
+        if not self.lines:
+            return "无笔画数据"
+            
+        if stroke_id is None:
+            # 分析最后一个笔画
+            stroke_data = self.lines[-1]
+        else:
+            # 查找匹配ID的笔画
+            matching_strokes = [line for line in self.lines if line and line[0][4] == stroke_id]
+            if not matching_strokes:
+                return f"未找到ID为{stroke_id}的笔画"
+            stroke_data = matching_strokes[0]
+            
+        direction_sequence, _ = self.stroke_analyzer.analyze_direction(stroke_data)
+        return direction_sequence
 
 class DrawingManager:
     """绘制管理器，只负责管理绘制功能"""
@@ -396,6 +437,10 @@ class DrawingManager:
             self.mouse_listener.stop()
             self.logger.debug("鼠标监听器已停止")
         self.app.quit()
+        
+    def get_last_stroke_direction(self):
+        """获取最后一次笔画的方向序列"""
+        return self.overlay.get_stroke_direction()
 
 
 if __name__ == "__main__":
