@@ -38,7 +38,7 @@ python src/main.py
 
 **GUI选项卡**：
 - 控制台选项卡：提供绘制功能的开启和停止控制
-- 设置选项卡：提供应用程序设置的配置，包括笔尖粗细设置
+- 设置选项卡：提供应用程序设置的配置，包括笔尖粗细和笔尖颜色设置
 
 ### 2. ui/console.py
 
@@ -69,10 +69,14 @@ console = ConsoleTab()
 - `SettingsTab`：设置选项卡类，继承自`QWidget`
   - `initUI()`：初始化设置选项卡界面
   - `pen_width_changed(value)`：处理笔尖粗细变化，并实时更新绘制管理器参数
+  - `show_color_dialog()`：显示颜色选择对话框，设置笔尖颜色
+  - `update_color_button(color)`：更新颜色按钮的外观显示
   - `reset_settings()`：重置为默认设置，并更新绘制管理器参数
   - `save_settings()`：保存设置到文件，并更新绘制管理器参数
   - `_update_drawing_manager()`：内部方法，负责更新绘制管理器的参数
-- `PenPreviewWidget`：笔尖预览小部件，显示笔尖粗细效果
+- `PenPreviewWidget`：笔尖预览小部件，显示笔尖粗细和颜色效果
+  - `update_width(width)`：更新笔尖粗细预览
+  - `update_color(color)`：更新笔尖颜色预览
 
 **使用方法**：
 ```python
@@ -99,6 +103,10 @@ settings = SettingsTab()
   - `reset_to_default()`：重置为默认设置
 - `get_settings()`：获取设置管理器的全局实例
 
+**特性说明**：
+- 默认设置完全从`default_settings.json`文件加载，不存在内置硬编码的默认值
+- 如果默认设置文件不存在或无法加载，程序将抛出异常
+
 **使用方法**：
 ```python
 from ui.settings.settings import get_settings
@@ -108,10 +116,13 @@ settings = get_settings()
 
 # 获取设置项
 pen_width = settings.get("pen_width")
+pen_color = settings.get("pen_color")
 print(f"当前笔尖粗细: {pen_width}")
+print(f"当前笔尖颜色: RGB({pen_color[0]},{pen_color[1]},{pen_color[2]})")
 
 # 修改设置项
 settings.set("pen_width", 5)
+settings.set("pen_color", [255, 0, 0])  # 红色
 
 # 保存设置
 settings.save()
@@ -122,17 +133,21 @@ settings.reset_to_default()
 
 ### 5. ui/settings/default_settings.json
 
-**功能说明**：默认设置定义文件（JSON格式），提供应用程序的默认设置值。
+**功能说明**：默认设置定义文件（JSON格式），提供应用程序的默认设置值。这是唯一的默认设置源，程序不包含任何内置默认值。
 
 **文件内容**：
 ```json
 {
-    "pen_width": 3
+    "pen_width": 3,
+    "pen_color": [0, 120, 255]
 }
 ```
 
 **使用方法**：
-文件由设置管理器（settings.py）自动加载，通常不需要直接操作此文件。
+文件由设置管理器（settings.py）自动加载，通常不需要直接操作此文件。如需修改默认设置，应当编辑此文件。
+
+**重要说明**：
+这个文件是必需的，程序启动时会尝试从这里加载所有默认设置。如果文件不存在或格式不正确，程序将无法正常启动。
 
 ### 6. core/drawer.py
 
@@ -142,15 +157,20 @@ settings.reset_to_default()
 - `DrawingSignals`：信号类，处理线程间通信
 - `TransparentDrawingOverlay`：透明绘制覆盖层
   - `set_pen_width(width)`：设置笔尖粗细
+  - `set_pen_color(color)`：设置笔尖颜色
   - `startDrawing(x, y, pressure)`：开始绘制，同时停止任何正在进行的淡出效果
   - `continueDrawing(x, y, pressure)`：继续绘制轨迹
   - `stopDrawing()`：停止绘制并开始淡出效果
   - `get_stroke_direction(stroke_id)`：获取指定笔画的方向
 - `DrawingManager`：绘制管理器
-  - `start()`：开始绘制功能，启动监听，并从设置加载笔尖粗细
+  - `start()`：开始绘制功能，启动监听，并从设置加载笔尖粗细和颜色
   - `stop()`：停止绘制功能，清理资源
-  - `update_settings()`：更新设置参数，无需重启绘制功能即可应用修改的参数（如笔尖粗细）
+  - `update_settings()`：更新设置参数，无需重启绘制功能即可应用修改的参数（如笔尖粗细和颜色）
   - `get_last_direction()`：获取最后一次绘制的方向
+
+**特性说明**：
+- 所有设置值完全从settings模块获取，不存在内置默认值
+- 如果设置模块不可用，会使用当前已设置的值继续工作，而不会回退到固定的默认值
 
 **使用方法**：
 ```python
@@ -178,7 +198,7 @@ drawer.stop()
 - 绘制完成后有淡出动画效果
 - 自动记录绘制点和分析方向
 - 自动计算压力值（基于移动速度）
-- 笔尖粗细可通过设置调整，每次启动时自动从设置加载
+- 笔尖粗细和颜色可通过设置调整，每次启动时自动从设置加载
 - 支持动态更新参数，在设置变更后无需重启绘制功能
 - 修复了淡出效果冲突问题：当前一个线条淡出效果还在进行时，开始新线条绘制会自动停止淡出效果，确保新线条正常显示
 
@@ -278,7 +298,7 @@ python src/main.py
 4. 绘制完成后释放右键，绘制会有淡出效果
 5. 可以在前一个线条淡出效果还在进行时立即开始新的绘制，系统会自动处理冲突
 6. 完成后点击"停止绘制"按钮关闭绘制功能
-7. 可以在设置选项卡中调整笔尖粗细，设置实时应用而无需重启绘制功能
+7. 可以在设置选项卡中调整笔尖粗细和颜色，设置实时应用而无需重启绘制功能
 8. 点击"退出程序"按钮退出应用
 
 ## 设置管理
@@ -289,6 +309,9 @@ python src/main.py
 
 设置项包括：
 - `pen_width`：笔尖粗细（默认为3像素）
+- `pen_color`：笔尖颜色，RGB格式的数组（默认为[0, 120, 255]，蓝色）
+
+**重要提示**：所有默认设置都保存在`default_settings.json`文件中，应用程序不包含任何硬编码的默认值。
 
 ## 编程接口使用示例
 
@@ -303,14 +326,16 @@ logger = get_logger("MyApp")
 # 获取设置
 settings = get_settings()
 pen_width = settings.get("pen_width")
+pen_color = settings.get("pen_color")
 logger.info(f"使用笔尖粗细: {pen_width}")
+logger.info(f"使用笔尖颜色: RGB({pen_color[0]},{pen_color[1]},{pen_color[2]})")
 
 # 创建绘制管理器
 drawer = DrawingManager()
 
 try:
     # 启动绘制功能
-    drawer.start()  # 此时会自动应用笔尖粗细设置
+    drawer.start()  # 此时会自动应用笔尖粗细和颜色设置
     logger.info("绘制功能已启动，可以使用鼠标右键绘制")
     
     # 应用程序主循环
@@ -318,11 +343,12 @@ try:
     
     # 修改设置
     settings.set("pen_width", 5)
+    settings.set("pen_color", [255, 0, 0])  # 红色
     settings.save()
     
     # 应用新设置，无需重启绘制功能
     drawer.update_settings()
-    logger.info("已更新笔尖粗细设置")
+    logger.info("已更新笔尖设置")
     
     # 获取方向信息
     direction = drawer.get_last_direction()

@@ -25,15 +25,11 @@ class Settings:
                 self.logger.info(f"已从 {default_settings_path} 加载默认设置")
                 return settings
             else:
-                self.logger.warning(f"默认设置文件 {default_settings_path} 不存在，使用内置默认设置")
+                self.logger.error(f"默认设置文件 {default_settings_path} 不存在")
+                raise FileNotFoundError(f"默认设置文件不存在: {default_settings_path}")
         except Exception as e:
             self.logger.error(f"加载默认设置失败: {e}")
-        
-        # 内置默认设置
-        default_settings = {
-            "pen_width": 3
-        }
-        return default_settings
+            raise
         
     def _get_settings_file_path(self):
         """获取设置文件路径"""

@@ -2,8 +2,9 @@ import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QPushButton, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QSpinBox, QFileDialog, 
-                            QGroupBox, QCheckBox, QSlider)
+                            QGroupBox, QCheckBox, QSlider, QColorDialog)
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 
 try:
     from core.logger import get_logger
@@ -53,10 +54,30 @@ class SettingsTab(QWidget):
         pen_layout.addStretch()
         drawing_layout.addLayout(pen_layout)
         
+        # 笔尖颜色设置
+        color_layout = QHBoxLayout()
+        color_label = QLabel("笔尖颜色:")
+        self.color_button = QPushButton("")
+        
+        # 设置当前颜色
+        current_color = self.settings.get("pen_color")
+        self.update_color_button(current_color)
+        
+        self.color_button.clicked.connect(self.show_color_dialog)
+        self.color_button.setFixedSize(50, 25)  # 设置按钮大小
+        
+        color_layout.addWidget(color_label)
+        color_layout.addWidget(self.color_button)
+        color_layout.addStretch()
+        drawing_layout.addLayout(color_layout)
+        
         # 绘制预览框
         preview_layout = QHBoxLayout()
         preview_label = QLabel("笔尖预览:")
-        self.preview_widget = PenPreviewWidget(self.settings.get("pen_width"))
+        self.preview_widget = PenPreviewWidget(
+            self.settings.get("pen_width"), 
+            self.settings.get("pen_color")
+        )
         
         preview_layout.addWidget(preview_label)
         preview_layout.addWidget(self.preview_widget)
@@ -84,6 +105,40 @@ class SettingsTab(QWidget):
         # 设置布局
         self.setLayout(main_layout)
     
+    def update_color_button(self, color):
+        """更新颜色按钮的背景色"""
+        if isinstance(color, list) and len(color) >= 3:
+            r, g, b = color[0], color[1], color[2]
+            self.color_button.setStyleSheet(
+                f"background-color: rgb({r},{g},{b}); "
+                f"border: 1px solid #888; "
+                f"color: {'black' if (r+g+b) > 384 else 'white'}"
+            )
+            self.color_button.setText("")
+    
+    def show_color_dialog(self):
+        """显示颜色选择对话框"""
+        current_color = self.settings.get("pen_color")
+        r, g, b = current_color[0], current_color[1], current_color[2]
+        
+        color = QColorDialog.getColor(
+            QColor(r, g, b), 
+            self, 
+            "选择笔尖颜色",
+            QColorDialog.DontUseNativeDialog
+        )
+        
+        if color.isValid():
+            new_color = [color.red(), color.green(), color.blue()]
+            self.settings.set("pen_color", new_color)
+            self.update_color_button(new_color)
+            self.preview_widget.update_color(new_color)
+            
+            # 实时更新绘制管理器的参数
+            self._update_drawing_manager()
+            
+            self.logger.debug(f"笔尖颜色已更改为: RGB({color.red()},{color.green()},{color.blue()})")
+    
     def pen_width_changed(self, value):
         """处理笔尖粗细变化"""
         self.logger.debug(f"笔尖粗细已更改为: {value}")
@@ -101,6 +156,11 @@ class SettingsTab(QWidget):
         # 更新UI显示
         self.pen_width_spinner.setValue(self.settings.get("pen_width"))
         self.preview_widget.update_width(self.settings.get("pen_width"))
+        
+        # 更新颜色按钮和预览
+        color = self.settings.get("pen_color")
+        self.update_color_button(color)
+        self.preview_widget.update_color(color)
         
         # 更新绘制管理器的参数
         self._update_drawing_manager()
@@ -135,14 +195,20 @@ class SettingsTab(QWidget):
 class PenPreviewWidget(QWidget):
     """笔尖预览小部件"""
     
-    def __init__(self, width=3, parent=None):
+    def __init__(self, width=3, color=[0, 120, 255], parent=None):
         super().__init__(parent)
         self.pen_width = width
+        self.pen_color = color
         self.setFixedSize(100, 50)
     
     def update_width(self, width):
         """更新笔尖粗细"""
         self.pen_width = width
+        self.update()  # 触发重绘
+    
+    def update_color(self, color):
+        """更新笔尖颜色"""
+        self.pen_color = color
         self.update()  # 触发重绘
     
     def paintEvent(self, event):
@@ -154,12 +220,13 @@ class PenPreviewWidget(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         
         # 设置画笔
-        pen = QPen(QColor(0, 0, 0))
+        r, g, b = self.pen_color[0], self.pen_color[1], self.pen_color[2]
+        pen = QPen(QColor(r, g, b))
         pen.setWidth(self.pen_width)
         pen.setCapStyle(Qt.RoundCap)
         painter.setPen(pen)
         
-        # 绘制正弦波来展示笔尖效果
+        # 绘制水平线
         w = self.width()
         h = self.height()
         mid_y = int(h / 2)  # 将浮点数转换为整数

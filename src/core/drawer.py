@@ -18,14 +18,14 @@ except ImportError:
     try:
         from ui.settings.settings import get_settings
     except ImportError:
-        # 如果导入失败，使用默认值
+        # 如果导入失败，记录错误但不提供默认实现
+        # 程序依赖于settings模块，没有它无法正常工作
+        logger = get_logger("DrawerImport")
+        logger.error("无法导入settings模块，程序可能无法正常工作")
+        
+        # 定义一个空的settings获取函数，避免语法错误，但不提供实际功能
         def get_settings():
-            class DefaultSettings:
-                def get(self, key, default=None):
-                    if key == "pen_width":
-                        return 3
-                    return default
-            return DefaultSettings()
+            return None
 
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
@@ -79,6 +79,19 @@ class TransparentDrawingOverlay(QWidget):
         if width > 0:
             self.pen_width = width
             self.logger.debug(f"笔尖粗细已设置为: {width}")
+    
+    def set_pen_color(self, color):
+        """设置笔尖颜色"""
+        if isinstance(color, list) and len(color) >= 3:
+            r, g, b = color[0], color[1], color[2]
+            # 确保透明度为220
+            alpha = 220
+            self.pen_color = QColor(r, g, b, alpha)
+            self.logger.debug(f"笔尖颜色已设置为: RGB({r},{g},{b})")
+            return True
+        else:
+            self.logger.warning(f"无效的颜色值: {color}")
+            return False
     
     def initUI(self):
         # 创建一个全屏、透明、无边框的窗口，用于绘制
@@ -392,14 +405,25 @@ class DrawingManager:
             
         self.logger.info("启动绘制功能")
         
-        # 从设置中读取笔尖粗细
+        # 从设置中读取笔尖粗细和颜色
         try:
             settings = get_settings()
-            pen_width = settings.get("pen_width", 3)
-            self.overlay.set_pen_width(pen_width)
-            self.logger.debug(f"从设置中加载笔尖粗细: {pen_width}")
+            if settings:
+                # 设置笔尖粗细
+                pen_width = settings.get("pen_width")
+                if pen_width:
+                    self.overlay.set_pen_width(pen_width)
+                    self.logger.debug(f"从设置中加载笔尖粗细: {pen_width}")
+                
+                # 设置笔尖颜色
+                pen_color = settings.get("pen_color")
+                if pen_color:
+                    self.overlay.set_pen_color(pen_color)
+                    self.logger.debug(f"从设置中加载笔尖颜色: {pen_color}")
+            else:
+                self.logger.warning("未能获取设置实例，使用当前默认值")
         except Exception as e:
-            self.logger.error(f"加载笔尖粗细设置失败: {e}，使用默认值")
+            self.logger.error(f"加载笔尖设置失败: {e}，使用当前设置")
         
         # 初始化鼠标监听器
         self._init_mouse_hook()
@@ -416,13 +440,23 @@ class DrawingManager:
         self.logger.info("更新绘制参数")
         
         try:
-            # 从设置中读取最新的笔尖粗细
+            # 从设置中读取最新的参数
             settings = get_settings()
-            pen_width = settings.get("pen_width", 3)
+            if not settings:
+                self.logger.warning("未能获取设置实例，无法更新设置")
+                return False
+                
+            # 更新笔尖粗细
+            pen_width = settings.get("pen_width")
+            if pen_width:
+                self.overlay.set_pen_width(pen_width)
+                self.logger.debug(f"已更新笔尖粗细: {pen_width}")
             
-            # 应用新的笔尖粗细设置
-            self.overlay.set_pen_width(pen_width)
-            self.logger.debug(f"已更新笔尖粗细: {pen_width}")
+            # 更新笔尖颜色
+            pen_color = settings.get("pen_color")
+            if pen_color:
+                self.overlay.set_pen_color(pen_color)
+                self.logger.debug(f"已更新笔尖颜色: {pen_color}")
             
             return True
         except Exception as e:

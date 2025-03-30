@@ -1,3 +1,4 @@
 {
-    "pen_width": 3
+    "pen_width": 3,
+    "pen_color": [0, 120, 255]
 } 
