@@ -329,26 +329,72 @@ class DrawingManager:
         self.signals.continue_drawing_signal.connect(self.overlay.continueDrawing)
         self.signals.stop_drawing_signal.connect(self.overlay.stopDrawing)
         
-        # 设置全局鼠标钩子
-        self.init_mouse_hook()
-        
-        self.right_mouse_down = False
-        self.last_position = None
-        self.last_pressure_time = 0
-        self.simulated_pressure = 0.5
+        # 绘制状态
+        self.is_active = False
+        self.mouse_listener = None
         
         self.logger.info("绘制模块初始化完成")
     
-    def init_mouse_hook(self):
-        """初始化全局鼠标监听"""
+    def start(self):
+        """开始绘制功能 - 弹出绘制窗口并开始监听鼠标动作"""
+        if self.is_active:
+            self.logger.debug("绘制功能已经处于活动状态")
+            return
+            
+        self.logger.info("启动绘制功能")
+        
+        # 初始化鼠标监听器
+        self._init_mouse_hook()
+        
+        # 设置状态为活动
+        self.is_active = True
+        
+        self.logger.debug("绘制功能已启动")
+        
+        return True
+    
+    def stop(self):
+        """停止绘制功能 - 关闭绘制窗口并停止监听"""
+        if not self.is_active:
+            self.logger.debug("绘制功能已经停止")
+            return
+            
+        self.logger.info("停止绘制功能")
+        
+        # 如果正在绘制中，先停止绘制
+        if hasattr(self, 'right_mouse_down') and self.right_mouse_down:
+            self.signals.stop_drawing_signal.emit()
+            self.right_mouse_down = False
+            self.last_position = None
+        
+        # 停止鼠标监听
+        if self.mouse_listener:
+            self.mouse_listener.stop()
+            self.mouse_listener = None
+            self.logger.debug("鼠标监听器已停止")
+        
+        # 设置状态为非活动
+        self.is_active = False
+        
+        self.logger.debug("绘制功能已停止")
+        
+        return True
+    
+    def _init_mouse_hook(self):
+        """初始化全局鼠标监听（内部方法）"""
         try:
+            self.right_mouse_down = False
+            self.last_position = None
+            self.last_pressure_time = 0
+            self.simulated_pressure = 0.5
+            
             def on_move(x, y):
                 # 鼠标移动时，如果正在绘制，则通过信号更新绘制路径
                 if self.right_mouse_down:
                     # 确保坐标有效
                     if x > 0 and y > 0:
                         # 模拟压力值
-                        pressure = self.calculate_simulated_pressure(x, y)
+                        pressure = self._calculate_simulated_pressure(x, y)
                         self.signals.continue_drawing_signal.emit(x, y, pressure)
                         self.last_position = (x, y)
             
@@ -380,13 +426,15 @@ class DrawingManager:
             
         except ImportError as e:
             self.logger.error(f"无法导入pynput库: {e}，请确保已安装: pip install pynput")
-            self.quit()
+            self.is_active = False
+            raise
         except Exception as e:
             self.logger.exception(f"初始化鼠标监听器时发生错误: {e}")
-            self.quit()
+            self.is_active = False
+            raise
     
-    def calculate_simulated_pressure(self, x, y):
-        """根据鼠标移动速度计算模拟压力值"""
+    def _calculate_simulated_pressure(self, x, y):
+        """根据鼠标移动速度计算模拟压力值（内部方法）"""
         if not self.last_position:
             return 0.5
             
@@ -422,31 +470,20 @@ class DrawingManager:
         # 确保在合理范围内
         return max(0.3, min(0.9, self.simulated_pressure))
     
-    def run(self):
-        """运行应用程序"""
-        self.logger.info("绘制模块已启动")
-        try:
-            sys.exit(self.app.exec_())
-        except Exception as e:
-            self.logger.exception(f"应用程序运行时发生错误: {e}")
-    
-    def quit(self):
-        """退出应用程序"""
-        self.logger.info("退出应用程序")
-        if hasattr(self, 'mouse_listener'):
-            self.mouse_listener.stop()
-            self.logger.debug("鼠标监听器已停止")
-        self.app.quit()
-        
-    def get_last_stroke_direction(self):
-        """获取最后一次笔画的方向序列"""
+    def get_last_direction(self):
+        """获取最后一次绘制的方向序列"""
         return self.overlay.get_stroke_direction()
 
 
 if __name__ == "__main__":
     try:
+        # 示例用法
         drawer = DrawingManager()
-        drawer.run()
+        drawer.start()  # 开始绘制功能
+        
+        # 运行应用程序主循环
+        app = QApplication.instance()
+        sys.exit(app.exec_())
     except Exception as e:
         # 获取一个独立的日志记录器记录主程序异常
         error_logger = get_logger("MainError")

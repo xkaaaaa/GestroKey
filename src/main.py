@@ -13,6 +13,7 @@ class GestroKeyApp(QMainWindow):
         super().__init__()
         self.logger = get_logger("MainApp")
         self.drawing_manager = None
+        self.is_drawing_active = False
         self.initUI()
         self.logger.info("GestroKey应用程序已启动")
         
@@ -40,14 +41,14 @@ class GestroKeyApp(QMainWindow):
         self.status_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.status_label)
         
-        # 开始按钮
-        self.start_button = QPushButton("开始监听")
+        # 开始绘制按钮
+        self.start_button = QPushButton("开始绘制")
         self.start_button.setFixedSize(150, 40)
         self.start_button.clicked.connect(self.start_drawing)
         layout.addWidget(self.start_button)
         
-        # 停止按钮（初始禁用）
-        self.stop_button = QPushButton("停止监听")
+        # 停止绘制按钮（初始禁用）
+        self.stop_button = QPushButton("停止绘制")
         self.stop_button.setFixedSize(150, 40)
         self.stop_button.clicked.connect(self.stop_drawing)
         self.stop_button.setEnabled(False)
@@ -64,27 +65,46 @@ class GestroKeyApp(QMainWindow):
         
     def start_drawing(self):
         """开始绘制功能"""
-        self.logger.info("启动绘制管理器")
-        self.status_label.setText("监听中 - 使用鼠标右键进行绘制")
-        self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-        
-        # 启动绘制管理器（在新线程中运行）
-        if not self.drawing_manager:
-            self.drawing_manager = DrawingManager()
+        try:
+            self.logger.info("启动绘制功能")
             
-        self.logger.debug("绘制管理器已启动")
+            # 创建绘制管理器（如果不存在）
+            if not self.drawing_manager:
+                self.drawing_manager = DrawingManager()
+            
+            # 开始绘制
+            success = self.drawing_manager.start()
+            
+            if success:
+                self.status_label.setText("绘制中 - 使用鼠标右键进行绘制")
+                self.start_button.setEnabled(False)
+                self.stop_button.setEnabled(True)
+                self.is_drawing_active = True
+                self.logger.debug("绘制功能已启动")
+            
+        except Exception as e:
+            self.logger.exception(f"启动绘制功能时发生错误: {e}")
+            self.status_label.setText(f"启动失败: {str(e)}")
     
     def stop_drawing(self):
         """停止绘制功能"""
-        if self.drawing_manager:
-            self.logger.info("停止绘制管理器")
-            self.drawing_manager.quit()
-            self.drawing_manager = None
-            
-        self.status_label.setText("准备就绪")
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
+        if self.drawing_manager and self.is_drawing_active:
+            try:
+                self.logger.info("停止绘制功能")
+                
+                # 停止绘制
+                success = self.drawing_manager.stop()
+                
+                if success:
+                    self.status_label.setText("准备就绪")
+                    self.start_button.setEnabled(True)
+                    self.stop_button.setEnabled(False)
+                    self.is_drawing_active = False
+                    self.logger.debug("绘制功能已停止")
+                
+            except Exception as e:
+                self.logger.exception(f"停止绘制功能时发生错误: {e}")
+                self.status_label.setText(f"停止失败: {str(e)}")
     
     def closeEvent(self, event):
         """关闭窗口事件处理"""
