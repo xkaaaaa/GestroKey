@@ -5,6 +5,13 @@ from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal, QObject
 from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QPixmap
 from pynput import mouse
 
+# 动态导入日志模块，处理不同运行方式下的导入路径问题
+try:
+    # 当作为包导入时（从主程序运行）
+    from logger import get_logger
+except ImportError:
+    from core.logger import get_logger
+
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
     start_drawing_signal = pyqtSignal(int, int)
@@ -16,6 +23,7 @@ class TransparentDrawingOverlay(QWidget):
     
     def __init__(self):
         super().__init__()
+        self.logger = get_logger("DrawingOverlay")
         self.path = QPainterPath()
         self.drawing = False
         self.last_point = QPoint()
@@ -33,6 +41,7 @@ class TransparentDrawingOverlay(QWidget):
         self.point_counter = 0
         
         self.initUI()
+        self.logger.debug("绘制覆盖层初始化完成")
         
     def initUI(self):
         # 创建一个全屏、透明、无边框的窗口，用于绘制
@@ -51,11 +60,13 @@ class TransparentDrawingOverlay(QWidget):
         self.buffer.fill(Qt.transparent)
         # 隐藏窗口，仅在绘制时显示
         self.hide()
+        self.logger.debug(f"UI初始化完成，屏幕尺寸: {screen_geometry.width()}x{screen_geometry.height()}")
 
     def startDrawing(self, x, y):
         """开始绘制"""
         # 验证坐标有效性，防止(0,0)点错误
         if x <= 0 or y <= 0:
+            self.logger.warning(f"忽略无效的起始坐标: ({x}, {y})")
             return
             
         point = QPoint(x, y)
@@ -74,6 +85,7 @@ class TransparentDrawingOverlay(QWidget):
         if not self.update_timer.isActive():
             self.update_timer.start()
         self.update()
+        self.logger.debug(f"开始绘制，坐标: ({x}, {y})")
         
     def continueDrawing(self, x, y):
         """继续绘制轨迹"""
@@ -82,11 +94,13 @@ class TransparentDrawingOverlay(QWidget):
             
         # 验证坐标有效性，防止无效坐标
         if x <= 0 or y <= 0:
+            self.logger.warning(f"忽略无效的坐标: ({x}, {y})")
             return
             
         # 添加额外的防护：检查坐标与上一点的距离，防止跳跃性连线
         if self.last_point and not self.points:
             # 如果没有点但有last_point，说明发生了异常情况
+            self.logger.warning("检测到异常状态：有last_point但points为空，重置路径")
             self.path = QPainterPath()
             self.path.moveTo(QPoint(x, y))
             self.points = [(QPoint(x, y), time.time())]
@@ -100,6 +114,7 @@ class TransparentDrawingOverlay(QWidget):
         
         # 如果距离过大(超过200像素)，说明可能是异常跳跃，不连接这两点
         if distance > 200:
+            self.logger.warning(f"检测到点跳跃，距离: {distance:.2f}像素，重置路径")
             # 结束当前路径，开始新路径
             self.path = QPainterPath()
             point = QPoint(x, y)
@@ -120,6 +135,7 @@ class TransparentDrawingOverlay(QWidget):
         
         # 如果是第一个点或者点列表被完全清空了（极少发生）
         if not self.points:
+            self.logger.warning("所有点已过期，重置路径")
             self.path = QPainterPath()
             return
         
@@ -148,10 +164,13 @@ class TransparentDrawingOverlay(QWidget):
         expire_time = current_time - self.point_lifetime
         
         # 移除所有过期的点
+        old_count = len(self.points)
         valid_points = [(pt, ts) for pt, ts in self.points if ts >= expire_time]
+        new_count = len(valid_points)
         
         # 如果有点被移除，需要重建路径
-        if len(valid_points) < len(self.points):
+        if new_count < old_count:
+            self.logger.debug(f"移除 {old_count - new_count} 个过期点，剩余 {new_count} 个点")
             self.points = valid_points
             if self.points:  # 确保还有点存在
                 self.rebuildPath()
@@ -171,6 +190,8 @@ class TransparentDrawingOverlay(QWidget):
         for point_data in self.points[1:]:
             point = point_data[0]  # 只获取点，不需要时间戳
             self.path.lineTo(point)
+        
+        self.logger.debug(f"路径已重建，共 {len(self.points)} 个点")
     
     def delayed_update(self):
         """计时器触发的延迟更新，用于控制重绘频率"""
@@ -195,6 +216,7 @@ class TransparentDrawingOverlay(QWidget):
             self.update_timer.stop()
         
         self.hide()
+        self.logger.debug("停止绘制，清除路径")
     
     def paintEvent(self, event):
         """绘制事件处理 - 优化绘制性能"""
@@ -226,10 +248,17 @@ class DrawingManager:
     """绘制管理器，只负责管理绘制功能"""
     
     def __init__(self):
+        # 初始化日志记录器
+        self.logger = get_logger("DrawingManager")
+        self.logger.info("初始化绘制管理器")
+        
         # 创建应用程序实例
         self.app = QApplication.instance()
         if not self.app:
             self.app = QApplication(sys.argv)
+            self.logger.debug("创建新的QApplication实例")
+        else:
+            self.logger.debug("使用现有的QApplication实例")
         
         # 创建信号对象，用于线程间通信
         self.signals = DrawingSignals()
@@ -247,7 +276,7 @@ class DrawingManager:
         
         self.right_mouse_down = False
         
-        self.log("绘制模块初始化完成")
+        self.logger.info("绘制模块初始化完成")
     
     def init_mouse_hook(self):
         """初始化全局鼠标监听"""
@@ -267,11 +296,11 @@ class DrawingManager:
                         if x > 0 and y > 0:
                             self.right_mouse_down = True
                             self.signals.start_drawing_signal.emit(x, y)
-                            self.log(f"开始绘制，坐标: ({x}, {y})")
+                            self.logger.info(f"开始绘制，坐标: ({x}, {y})")
                     else:
                         self.right_mouse_down = False
                         self.signals.stop_drawing_signal.emit()
-                        self.log("停止绘制")
+                        self.logger.info("停止绘制")
             
             # 设置监听器
             self.mouse_listener = mouse.Listener(
@@ -279,28 +308,37 @@ class DrawingManager:
                 on_click=on_click
             )
             self.mouse_listener.start()
-            self.log("鼠标监听器已启动")
+            self.logger.info("鼠标监听器已启动")
             
-        except ImportError:
-            self.log("错误: 无法导入pynput库，请确保已安装: pip install pynput")
+        except ImportError as e:
+            self.logger.error(f"无法导入pynput库: {e}，请确保已安装: pip install pynput")
+            self.quit()
+        except Exception as e:
+            self.logger.exception(f"初始化鼠标监听器时发生错误: {e}")
             self.quit()
     
     def run(self):
         """运行应用程序"""
-        self.log("绘制模块已启动")
-        sys.exit(self.app.exec_())
+        self.logger.info("绘制模块已启动")
+        try:
+            sys.exit(self.app.exec_())
+        except Exception as e:
+            self.logger.exception(f"应用程序运行时发生错误: {e}")
     
     def quit(self):
         """退出应用程序"""
+        self.logger.info("退出应用程序")
         if hasattr(self, 'mouse_listener'):
             self.mouse_listener.stop()
+            self.logger.debug("鼠标监听器已停止")
         self.app.quit()
-    
-    def log(self, message):
-        """日志记录"""
-        print(f"[绘制模块] {message}")
 
 
 if __name__ == "__main__":
-    drawer = DrawingManager()
-    drawer.run() 
+    try:
+        drawer = DrawingManager()
+        drawer.run()
+    except Exception as e:
+        # 获取一个独立的日志记录器记录主程序异常
+        error_logger = get_logger("MainError")
+        error_logger.exception(f"主程序发生未捕获的异常: {e}") 
