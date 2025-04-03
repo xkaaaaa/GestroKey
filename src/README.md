@@ -9,19 +9,21 @@ src/
 ├── core/                    # 核心功能模块
 │   ├── drawer.py            # 绘画核心模块
 │   ├── stroke_analyzer.py   # 笔画分析模块
-│   ├── gesture_library.py   # 手势库管理模块
 │   ├── gesture_executor.py  # 手势执行模块
-│   ├── default_gestures.json # 默认手势库配置文件
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
 │   ├── console.py           # 控制台选项卡
 │   ├── components/          # UI组件模块
 │   │   ├── button.py        # 自定义动画按钮组件
 │   │   └── side_tab.py      # 左侧选项卡组件
-│   └── settings/            # 设置相关界面
-│       ├── settings_tab.py  # 设置选项卡
-│       ├── settings.py      # 设置管理模块
-│       └── default_settings.json # 默认设置定义（JSON格式）
+│   ├── settings/            # 设置相关界面
+│   │   ├── settings_tab.py  # 设置选项卡
+│   │   ├── settings.py      # 设置管理模块
+│   │   └── default_settings.json # 默认设置定义（JSON格式）
+│   └── gestures/            # 手势管理相关界面
+│       ├── gestures_tab.py  # 手势管理选项卡
+│       ├── gestures.py      # 手势库管理模块
+│       └── default_gestures.json # 默认手势库定义（JSON格式）
 └── main.py                  # 主程序入口
 ```
 
@@ -271,7 +273,116 @@ settings.reset_to_default()
 **重要说明**：
 这个文件是必需的，程序启动时会尝试从这里加载所有默认设置。如果文件不存在或格式不正确，程序将无法正常启动。
 
-### 7. core/drawer.py
+### 7. ui/gestures/gestures.py
+
+**功能说明**：手势库管理模块，负责加载、保存和管理用户定义的手势，包括对手势的增加、删除、查询等操作。
+
+**主要类和方法**：
+- `GestureLibrary`：手势库管理器类
+  - `load()`：从文件加载手势库，如不存在则创建默认手势库
+  - `save()`：保存手势库到文件
+  - `get_gesture(name)`：根据名称获取特定手势
+  - `get_gesture_by_direction(direction)`：根据方向序列获取匹配的手势
+  - `add_gesture(name, direction, action_type, action_value)`：添加新手势
+  - `remove_gesture(name)`：删除指定名称的手势
+  - `get_all_gestures()`：获取所有手势的字典
+  - `reset_to_default()`：重置为默认手势库
+  - `_load_default_gestures()`：加载默认手势库
+- `get_gesture_library()`：获取手势库的全局单例实例
+
+**使用方法**：
+```python
+from ui.gestures.gestures import get_gesture_library
+
+# 获取手势库
+gesture_lib = get_gesture_library()
+
+# 获取所有手势
+gestures = gesture_lib.get_all_gestures()
+print(f"当前手势库中共有 {len(gestures)} 个手势")
+
+# 获取特定手势
+copy_gesture = gesture_lib.get_gesture("复制")
+if copy_gesture:
+    print(f"复制手势的方向是: {copy_gesture['direction']}")
+    print(f"复制手势执行的动作是: {copy_gesture['action']['value']}")
+
+# 添加新手势
+gesture_lib.add_gesture(
+    name="我的手势",
+    direction="上-右-下",
+    action_type="shortcut",
+    action_value="ctrl+alt+t"
+)
+
+# 根据方向获取手势
+name, gesture = gesture_lib.get_gesture_by_direction("上-右-下")
+if gesture:
+    print(f"识别到手势: {name}")
+
+# 保存手势库
+gesture_lib.save()
+
+# 重置为默认手势库
+gesture_lib.reset_to_default()
+```
+
+**手势库结构**：
+- 手势库以JSON格式存储在用户目录下的`.gestrokey/config/gestures.json`文件中
+- 每个手势包含名称、方向序列和要执行的动作
+- 如果手势库文件不存在或损坏，程序会自动创建默认手势库
+
+### 8. ui/gestures/default_gestures.json
+
+**功能说明**：默认手势库配置文件（JSON格式），包含预定义的常用手势及其对应的操作，作为初始手势库或备用手势库。
+
+**文件内容**：包含以下预定义手势：
+- 复制 (Ctrl+C)：右-下方向
+- 粘贴 (Ctrl+V)：下-右方向
+- 剪切 (Ctrl+X)：左-下方向
+- 撤销 (Ctrl+Z)：左-上方向
+- 重做 (Ctrl+Y)：右-上方向
+- 保存 (Ctrl+S)：下-左方向
+- 全选 (Ctrl+A)：上-左方向
+- 新建 (Ctrl+N)：上-右方向
+- 刷新 (F5)：上-下方向
+
+**使用方法**：
+文件由手势库管理器（gestures.py）自动加载，通常不需要直接操作此文件。当需要修改默认手势库时，可编辑此文件。
+
+### 9. ui/gestures/gestures_tab.py
+
+**功能说明**：手势管理选项卡模块，提供手势库的可视化管理界面，允许用户查看、添加、删除和编辑手势。
+
+**主要类和方法**：
+- `GesturesTab`：手势管理选项卡类，继承自`QWidget`
+  - `initUI()`：初始化选项卡界面
+  - `update_gesture_list()`：更新手势列表显示
+  - `add_gesture()`：添加新手势
+  - `edit_gesture()`：编辑选中的手势
+  - `delete_gesture()`：删除选中的手势
+  - `reset_gestures()`：重置为默认手势库
+  - `save_gestures()`：保存手势库修改
+
+**特性说明**：
+- 使用列表显示所有已定义的手势，包括名称、方向和操作
+- 提供添加、编辑、删除手势的功能
+- 支持重置为默认手势库
+- 即时保存所有修改
+- 使用自定义AnimatedButton组件作为操作按钮，保持统一的视觉风格
+
+**使用方法**：
+```python
+from ui.gestures.gestures_tab import GesturesTab
+
+# 创建手势管理选项卡
+gestures_tab = GesturesTab()
+
+# 将选项卡添加到主界面
+# ...
+```
+
+### 10. core/drawer.py
 
 **功能说明**：绘画核心模块，实现了透明绘制覆盖层、右键绘制功能和绘制管理。
 
@@ -282,7 +393,7 @@ settings.reset_to_default()
   - `set_pen_color(color)`：设置笔尖颜色
   - `startDrawing(x, y, pressure)`：开始绘制，同时停止任何正在进行的淡出效果
   - `continueDrawing(x, y, pressure)`：继续绘制轨迹
-  - `stopDrawing()`：停止绘制并开始淡出效果
+  - `stopDrawing()`：停止绘制并开始淡出效果，同时分析手势并执行
   - `get_stroke_direction(stroke_id)`：获取指定笔画的方向
 - `DrawingManager`：绘制管理器
   - `start()`：开始绘制功能，启动监听，并从设置加载笔尖粗细和颜色
@@ -293,6 +404,8 @@ settings.reset_to_default()
 **特性说明**：
 - 所有设置值完全从settings模块获取，不存在内置默认值
 - 如果设置模块不可用，会使用当前已设置的值继续工作，而不会回退到固定的默认值
+- 绘制结束后会自动分析笔画方向，并在手势库中查找匹配的手势进行执行
+- 手势执行功能集成在绘制流程中，无需额外调用
 
 **使用方法**：
 ```python
@@ -315,16 +428,7 @@ print(f"最后绘制的方向: {direction}")
 drawer.stop()
 ```
 
-**特性说明**：
-- 鼠标右键按住可以绘制
-- 绘制完成后有淡出动画效果
-- 自动记录绘制点和分析方向
-- 自动计算压力值（基于移动速度）
-- 笔尖粗细和颜色可通过设置调整，每次启动时自动从设置加载
-- 支持动态更新参数，在设置变更后无需重启绘制功能
-- 修复了淡出效果冲突问题：当前一个线条淡出效果还在进行时，开始新线条绘制会自动停止淡出效果，确保新线条正常显示
-
-### 8. core/stroke_analyzer.py
+### 11. core/stroke_analyzer.py
 
 **功能说明**：笔画分析模块，负责分析用户绘制的笔画轨迹，识别方向变化和绘制趋势。
 
@@ -366,84 +470,7 @@ print(f"描述: {description}")  # 例如: "先右后上"
 - `DOWN_LEFT`：左下
 - `DOWN_RIGHT`：右下
 
-### 9. core/gesture_library.py
-
-**功能说明**：手势库管理模块，负责加载、保存和管理用户定义的手势，包括对手势的增加、删除、查询等操作。
-
-**主要类和方法**：
-- `GestureLibrary`：手势库管理器类
-  - `load()`：从文件加载手势库，如不存在则创建默认手势库
-  - `save()`：保存手势库到文件
-  - `get_gesture(name)`：根据名称获取特定手势
-  - `get_gesture_by_direction(direction)`：根据方向序列获取匹配的手势
-  - `add_gesture(name, direction, action_type, action_value)`：添加新手势
-  - `remove_gesture(name)`：删除指定名称的手势
-  - `list_gestures()`：获取所有手势名称列表
-  - `reset_to_default()`：重置为默认手势库
-  - `_load_default_gestures()`：加载默认手势库
-- `get_gesture_library()`：获取手势库的全局单例实例
-
-**使用方法**：
-```python
-from core.gesture_library import get_gesture_library
-
-# 获取手势库
-gesture_lib = get_gesture_library()
-
-# 获取所有手势
-gestures = gesture_lib.list_gestures()
-print(f"当前手势库中共有 {len(gestures)} 个手势")
-
-# 获取特定手势
-copy_gesture = gesture_lib.get_gesture("复制")
-if copy_gesture:
-    print(f"复制手势的方向是: {copy_gesture['direction']}")
-    print(f"复制手势执行的动作是: {copy_gesture['action']['value']}")
-
-# 添加新手势
-gesture_lib.add_gesture(
-    name="我的手势",
-    direction="上-右-下",
-    action_type="shortcut",
-    action_value="ctrl+alt+t"
-)
-
-# 根据方向获取手势
-name, gesture = gesture_lib.get_gesture_by_direction("上-右-下")
-if gesture:
-    print(f"识别到手势: {name}")
-
-# 保存手势库
-gesture_lib.save()
-
-# 重置为默认手势库
-gesture_lib.reset_to_default()
-```
-
-**手势库结构**：
-- 手势库以JSON格式存储在用户目录下的`.gestrokey/config/gestures.json`文件中
-- 每个手势包含名称、方向序列和要执行的动作
-- 如果手势库文件不存在或损坏，程序会自动创建默认手势库
-
-### 10. core/default_gestures.json
-
-**功能说明**：默认手势库配置文件（JSON格式），包含预定义的常用手势及其对应的操作，作为初始手势库或备用手势库。
-
-**文件内容**：包含以下预定义手势：
-- 复制 (Ctrl+C)：右-下方向
-- 粘贴 (Ctrl+V)：下-右方向
-- 剪切 (Ctrl+X)：左-下方向
-- 撤销 (Ctrl+Z)：左-上方向
-- 重做 (Ctrl+Y)：右-上方向
-- 保存 (Ctrl+S)：下-左方向
-- 全选 (Ctrl+A)：上-左方向
-- 新建 (Ctrl+N)：上-右方向
-- 刷新 (F5)：上-下方向
-
-**使用方法**：
-文件由手势库管理器（gesture_library.py）自动加载，通常不需要直接操作此文件。当需要修改默认手势库时，可编辑此文件。
-
-### 11. core/gesture_executor.py
+### 12. core/gesture_executor.py
 
 **功能说明**：手势执行模块，负责根据识别的手势方向执行相应的操作，目前主要支持快捷键操作。
 
@@ -475,8 +502,9 @@ print(f"手势执行{'成功' if result else '失败'}")
 - 支持大量特殊键（如功能键、修饰键等）
 - 自动处理按键的正确顺序（先修饰键，后普通键）和释放顺序（先普通键，后修饰键）
 - 集成到绘画模块中，能够自动识别并执行与绘制方向匹配的手势
+- 从ui.gestures.gestures模块获取手势库，确保使用统一的手势管理系统
 
-### 12. core/logger.py
+### 13. core/logger.py
 
 **功能说明**：日志记录模块，提供统一的日志记录功能，支持不同日志级别和输出目标。
 
@@ -563,8 +591,11 @@ GestroKey实现了完整的手势识别和执行系统：
 
 3. **手势库管理**：
    - 手势库存储于`%USERPROFILE%\.gestrokey\config\gestures.json`
+   - 手势库管理模块位于`ui/gestures/gestures.py`，提供完整的手势管理API
+   - 默认手势库定义在`ui/gestures/default_gestures.json`
    - 如果文件不存在或损坏，系统自动创建包含常用操作的默认手势库
-   - 支持对手势库的修改、扩展和重置
+   - 通过手势管理选项卡(`ui/gestures/gestures_tab.py`)提供可视化的手势管理界面
+   - 支持对手势库的添加、编辑、删除和重置操作
 
 4. **支持的手势动作**：
    - 快捷键执行：支持绝大多数单键和组合键操作

@@ -11,13 +11,19 @@ from core.logger import get_logger
 # 导入选项卡模块
 try:
     from ui.console import ConsoleTab
+    from ui.settings.settings import get_settings
     from ui.settings.settings_tab import SettingsTab
+    from ui.gestures.gestures import get_gesture_library  # 导入手势库
+    from ui.gestures.gestures_tab import GesturesTab  # 导入手势管理选项卡
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.side_tab import SideTabWidget  # 导入左侧选项卡组件
 except ImportError:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from ui.console import ConsoleTab
+    from ui.settings.settings import get_settings
     from ui.settings.settings_tab import SettingsTab
+    from ui.gestures.gestures import get_gesture_library  # 导入手势库
+    from ui.gestures.gestures_tab import GesturesTab  # 导入手势管理选项卡
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.side_tab import SideTabWidget  # 导入左侧选项卡组件
 
@@ -29,14 +35,32 @@ class GestroKeyApp(QMainWindow):
         self.logger = get_logger("MainApp")
         self.drawing_manager = None
         self.is_drawing_active = False
+        
+        # 在程序启动时初始化设置和手势库
+        self.init_global_resources()
+        
         self.initUI()
         self.logger.info("GestroKey应用程序已启动")
+    
+    def init_global_resources(self):
+        """初始化全局资源 - 设置和手势库"""
+        try:
+            # 初始化设置管理器
+            settings = get_settings()
+            self.logger.info("设置管理器初始化完成")
+            
+            # 初始化手势库管理器
+            gestures = get_gesture_library()
+            self.logger.info("手势库管理器初始化完成")
+        except Exception as e:
+            self.logger.error(f"初始化全局资源失败: {e}")
+            raise
         
     def initUI(self):
         """初始化用户界面"""
         # 设置窗口属性
         self.setWindowTitle('GestroKey')
-        self.setGeometry(300, 300, 650, 500)  # 调整窗口大小以适应左侧选项卡
+        self.setGeometry(300, 300, 750, 550)  # 调整窗口大小以适应左侧选项卡
         
         # 创建中央部件和布局
         central_widget = QWidget()
@@ -51,6 +75,9 @@ class GestroKeyApp(QMainWindow):
         self.logger.debug("创建设置选项卡")
         self.settings_tab = SettingsTab()
         
+        self.logger.debug("创建手势管理选项卡")
+        self.gestures_tab = GesturesTab()
+        
         # 创建左侧选项卡小部件
         self.logger.debug("创建左侧选项卡组件")
         self.tab_widget = SideTabWidget()
@@ -58,14 +85,16 @@ class GestroKeyApp(QMainWindow):
         # 创建选项卡图标
         console_icon = QIcon.fromTheme("utilities-terminal", QIcon())  # 使用系统图标或默认的空图标
         settings_icon = QIcon.fromTheme("preferences-system", QIcon())
+        gestures_icon = QIcon.fromTheme("input-mouse", QIcon())
         
         # 添加选项卡到左侧选项卡组件
         self.logger.debug("添加选项卡到左侧选项卡组件")
         console_index = self.tab_widget.addTab(self.console_tab, "控制台", console_icon)
         settings_index = self.tab_widget.addTab(self.settings_tab, "设置", settings_icon)
+        gestures_index = self.tab_widget.addTab(self.gestures_tab, "手势管理", gestures_icon)
         
         # 记录初始添加的选项卡索引
-        self.logger.debug(f"控制台索引: {console_index}, 设置索引: {settings_index}")
+        self.logger.debug(f"控制台索引: {console_index}, 设置索引: {settings_index}, 手势索引: {gestures_index}")
         
         # 选项卡切换事件连接
         self.tab_widget.currentChanged.connect(self.onTabChanged)
@@ -114,7 +143,7 @@ class GestroKeyApp(QMainWindow):
     
     def onTabChanged(self, index):
         """选项卡切换事件处理"""
-        tab_name = "控制台" if index == 0 else "设置" if index == 1 else f"未知({index})"
+        tab_name = "控制台" if index == 0 else "设置" if index == 1 else "手势管理" if index == 2 else f"未知({index})"
         self.logger.debug(f"切换到选项卡: {index} ({tab_name})")
     
     def closeEvent(self, event):
@@ -129,6 +158,12 @@ class GestroKeyApp(QMainWindow):
                 self.settings_tab.save_settings()
             except Exception as e:
                 self.logger.warning(f"关闭时保存设置失败: {e}")
+        # 如果手势管理标签页存在，保存手势库
+        if hasattr(self, 'gestures_tab'):
+            try:
+                self.gestures_tab.saveGestureLibrary()
+            except Exception as e:
+                self.logger.warning(f"关闭时保存手势库失败: {e}")
         event.accept()
 
 

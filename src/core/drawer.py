@@ -14,22 +14,24 @@ try:
     from logger import get_logger
     from stroke_analyzer import StrokeAnalyzer
     from ui.settings.settings import get_settings
-    from gesture_executor import get_gesture_executor  # 导入手势执行器
+    from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
+    from core.gesture_executor import get_gesture_executor
 except ImportError:
     from core.logger import get_logger
     from core.stroke_analyzer import StrokeAnalyzer
     try:
         from ui.settings.settings import get_settings
+        from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
+        from core.gesture_executor import get_gesture_executor
     except ImportError:
         # 如果导入失败，记录错误但不提供默认实现
         # 程序依赖于settings模块，没有它无法正常工作
         logger = get_logger("DrawerImport")
-        logger.error("无法导入settings模块，程序可能无法正常工作")
+        logger.error("无法导入settings或gestures模块，程序可能无法正常工作")
         
         # 定义一个空的settings获取函数，避免语法错误，但不提供实际功能
         def get_settings():
             return None
-    from core.gesture_executor import get_gesture_executor  # 导入手势执行器
 
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""

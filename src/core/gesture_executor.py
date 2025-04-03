@@ -6,10 +6,10 @@ import traceback
 
 try:
     from logger import get_logger
-    from gesture_library import get_gesture_library
+    from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
 except ImportError:
     from core.logger import get_logger
-    from core.gesture_library import get_gesture_library
+    from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
 
 class GestureExecutor:
     """
@@ -43,7 +43,7 @@ class GestureExecutor:
             
         try:
             self.gesture_library = get_gesture_library()
-            # 修正：使用get_all_gestures().keys()代替不存在的list_gestures()方法
+            # 获取所有手势
             gestures = self.gesture_library.get_all_gestures()
             self.logger.info(f"成功加载手势库，包含 {len(gestures)} 个手势")
             
