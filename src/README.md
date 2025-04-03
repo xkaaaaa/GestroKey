@@ -12,6 +12,8 @@ src/
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
 │   ├── console.py           # 控制台选项卡
+│   ├── components/          # UI组件模块
+│   │   └── button.py        # 自定义动画按钮组件
 │   └── settings/            # 设置相关界面
 │       ├── settings_tab.py  # 设置选项卡
 │       ├── settings.py      # 设置管理模块
@@ -61,7 +63,62 @@ console = ConsoleTab()
 # ...
 ```
 
-### 3. ui/settings/settings_tab.py
+### 3. ui/components/button.py
+
+**功能说明**：自定义动画按钮组件，提供美观的、带有动画效果的按钮，可以轻松集成到任何界面。
+
+**主要类和方法**：
+- `AnimatedButton`：动画按钮类，继承自`QPushButton`
+  - `__init__(text, parent, icon, primary_color, ...)`：初始化按钮，支持多种自定义参数
+  - `set_primary_color(color)`：设置按钮主色调
+  - `set_hover_color(color)`：设置按钮悬停色调
+  - `set_text_color(color)`：设置按钮文本颜色
+  - `set_border_radius(radius)`：设置按钮边框圆角半径
+
+**特性说明**：
+- 精美的扁平化设计，主题色为蓝色系
+- 鼠标悬停时文字轻微上浮和放大的动画效果
+- 按下时文字下沉和缩小的动画效果，与按钮主体动画保持一致
+- 平滑的鼠标离开过渡动画，避免视觉上的生硬跳变
+- 支持自定义颜色、图标、文本颜色和圆角半径
+- 自动计算悬停色调，如未指定则基于主色调生成更亮的颜色，保持色彩统一性
+- 阴影和高光效果，提供现代感视觉体验
+- 可直接运行文件查看示例效果，便于单独调试
+- 已应用于整个应用程序的界面按钮，提供统一的视觉风格
+
+**应用场景**：
+- 主窗口的退出按钮
+- 控制台选项卡的开始和停止绘制按钮，均使用主题蓝色保持统一风格
+- 设置选项卡的保存和重置设置按钮
+
+**使用方法**：
+```python
+from ui.components.button import AnimatedButton
+
+# 创建基本按钮
+button = AnimatedButton("按钮文本")
+
+# 创建自定义按钮
+custom_button = AnimatedButton(
+    text="自定义按钮", 
+    primary_color=[41, 128, 185],  # 扁平化蓝色
+    hover_color=[52, 152, 219],    # 悬停时的颜色（可选，不提供时会自动基于主色计算）
+    text_color=[255, 255, 255],    # 白色文本
+    icon="path/to/icon.png",       # 设置图标
+    border_radius=12,              # 设置圆角半径
+    min_width=120,                 # 最小宽度
+    min_height=40                  # 最小高度
+)
+
+# 添加到布局
+layout.addWidget(button)
+
+# 动态修改按钮属性
+button.set_primary_color([25, 80, 160])  # 修改为深蓝色
+button.set_border_radius(16)             # 修改圆角半径
+```
+
+### 4. ui/settings/settings_tab.py
 
 **功能说明**：设置选项卡模块，提供应用程序设置的配置界面。
 
@@ -78,6 +135,13 @@ console = ConsoleTab()
   - `update_width(width)`：更新笔尖粗细预览
   - `update_color(color)`：更新笔尖颜色预览
 
+**特性说明**：
+- 笔尖粗细设置使用数字微调框 (QSpinBox)，支持1-20像素范围
+- 笔尖颜色设置使用标准QPushButton显示当前颜色，点击后打开颜色对话框
+- 笔尖预览实时显示当前设置的效果
+- 使用自定义AnimatedButton组件作为重置和保存设置按钮
+- 所有设置变更都实时应用到绘制管理器，无需重启绘制功能
+
 **使用方法**：
 ```python
 from ui.settings.settings_tab import SettingsTab
@@ -89,7 +153,7 @@ settings = SettingsTab()
 # ...
 ```
 
-### 4. ui/settings/settings.py
+### 5. ui/settings/settings.py
 
 **功能说明**：设置管理模块，负责保存和加载用户设置。
 
@@ -131,7 +195,7 @@ settings.save()
 settings.reset_to_default()
 ```
 
-### 5. ui/settings/default_settings.json
+### 6. ui/settings/default_settings.json
 
 **功能说明**：默认设置定义文件（JSON格式），提供应用程序的默认设置值。这是唯一的默认设置源，程序不包含任何内置默认值。
 
@@ -149,7 +213,7 @@ settings.reset_to_default()
 **重要说明**：
 这个文件是必需的，程序启动时会尝试从这里加载所有默认设置。如果文件不存在或格式不正确，程序将无法正常启动。
 
-### 6. core/drawer.py
+### 7. core/drawer.py
 
 **功能说明**：绘画核心模块，实现了透明绘制覆盖层、右键绘制功能和绘制管理。
 
@@ -202,7 +266,7 @@ drawer.stop()
 - 支持动态更新参数，在设置变更后无需重启绘制功能
 - 修复了淡出效果冲突问题：当前一个线条淡出效果还在进行时，开始新线条绘制会自动停止淡出效果，确保新线条正常显示
 
-### 7. core/stroke_analyzer.py
+### 8. core/stroke_analyzer.py
 
 **功能说明**：笔画分析模块，负责分析用户绘制的笔画轨迹，识别方向变化和绘制趋势。
 
@@ -244,7 +308,7 @@ print(f"描述: {description}")  # 例如: "先右后上"
 - `DOWN_LEFT`：左下
 - `DOWN_RIGHT`：右下
 
-### 8. core/logger.py
+### 9. core/logger.py
 
 **功能说明**：日志记录模块，提供统一的日志记录功能，支持不同日志级别和输出目标。
 
@@ -313,12 +377,30 @@ python src/main.py
 
 **重要提示**：所有默认设置都保存在`default_settings.json`文件中，应用程序不包含任何硬编码的默认值。
 
+## UI组件系统
+
+GestroKey使用模块化UI组件系统，所有自定义UI组件都位于`ui/components`目录下：
+
+- `button.py`：精美的动画按钮组件，可用于替代标准QPushButton
+  - 特性：扁平化设计、文字动画效果、点击缩放、阴影效果
+  - 优点：现代感的UI体验，简单的接口，可单独测试
+  - 应用：已在整个应用程序中替代标准按钮，包括主窗口、控制台和设置面板
+
+**使用组件的优势**：
+- 统一的视觉风格
+- 可重复使用的代码
+- 简化的接口
+- 独立测试能力
+- 提升用户体验
+- 一致的动画效果
+
 ## 编程接口使用示例
 
 ```python
 from core.drawer import DrawingManager
 from core.logger import get_logger
 from ui.settings.settings import get_settings
+from ui.components.button import AnimatedButton
 
 # 创建日志记录器
 logger = get_logger("MyApp")
@@ -332,6 +414,14 @@ logger.info(f"使用笔尖颜色: RGB({pen_color[0]},{pen_color[1]},{pen_color[2
 
 # 创建绘制管理器
 drawer = DrawingManager()
+
+# 创建自定义按钮
+start_button = AnimatedButton("开始绘制", primary_color=[41, 128, 185])
+stop_button = AnimatedButton("停止绘制", primary_color=[52, 73, 94])
+
+# 连接信号
+start_button.clicked.connect(drawer.start)
+stop_button.clicked.connect(drawer.stop)
 
 try:
     # 启动绘制功能

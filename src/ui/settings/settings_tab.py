@@ -1,18 +1,20 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QWidget, QPushButton, QVBoxLayout, QHBoxLayout, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QSpinBox, QFileDialog, 
-                            QGroupBox, QCheckBox, QSlider, QColorDialog)
+                            QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 
 try:
     from core.logger import get_logger
     from ui.settings.settings import get_settings
+    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
 except ImportError:
     sys.path.append('../../')
     from core.logger import get_logger
     from ui.settings.settings import get_settings
+    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
 
 class SettingsTab(QWidget):
     """设置选项卡，提供应用程序设置管理功能"""
@@ -57,14 +59,15 @@ class SettingsTab(QWidget):
         # 笔尖颜色设置
         color_layout = QHBoxLayout()
         color_label = QLabel("笔尖颜色:")
-        self.color_button = QPushButton("")
         
-        # 设置当前颜色
+        # 使用原生QPushButton而不是AnimatedButton作为颜色选择按钮
         current_color = self.settings.get("pen_color")
+        self.color_button = QPushButton("")
+        self.color_button.setFixedSize(50, 25)  # 设置按钮大小
+        self.color_button.setCursor(Qt.PointingHandCursor)  # 设置光标为手型
         self.update_color_button(current_color)
         
         self.color_button.clicked.connect(self.show_color_dialog)
-        self.color_button.setFixedSize(50, 25)  # 设置按钮大小
         
         color_layout.addWidget(color_label)
         color_layout.addWidget(self.color_button)
@@ -90,10 +93,11 @@ class SettingsTab(QWidget):
         # 重置和保存按钮
         buttons_layout = QHBoxLayout()
         
-        reset_button = QPushButton("重置为默认设置")
+        # 使用自定义动画按钮替换标准按钮
+        reset_button = AnimatedButton("重置为默认设置", primary_color=[108, 117, 125])  # 灰色
         reset_button.clicked.connect(self.reset_settings)
         
-        save_button = QPushButton("保存设置")
+        save_button = AnimatedButton("保存设置", primary_color=[41, 128, 185])  # 蓝色
         save_button.clicked.connect(self.save_settings)
         
         buttons_layout.addWidget(reset_button)
@@ -109,11 +113,15 @@ class SettingsTab(QWidget):
         """更新颜色按钮的背景色"""
         if isinstance(color, list) and len(color) >= 3:
             r, g, b = color[0], color[1], color[2]
+            
+            # 使用样式表设置按钮背景色
             self.color_button.setStyleSheet(
-                f"background-color: rgb({r},{g},{b}); "
-                f"border: 1px solid #888; "
-                f"color: {'black' if (r+g+b) > 384 else 'white'}"
+                f"background-color: rgb({r}, {g}, {b}); "
+                f"border: 1px solid #888888; "
+                f"border-radius: 4px;"
             )
+            
+            # 空文本
             self.color_button.setText("")
     
     def show_color_dialog(self):

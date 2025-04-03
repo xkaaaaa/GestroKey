@@ -1,6 +1,6 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton, QVBoxLayout, 
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
                             QLabel, QMainWindow, QTabWidget, QHBoxLayout)
 from PyQt5.QtCore import Qt
 
@@ -11,10 +11,12 @@ from core.logger import get_logger
 try:
     from ui.console import ConsoleTab
     from ui.settings.settings_tab import SettingsTab
+    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
 except ImportError:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from ui.console import ConsoleTab
     from ui.settings.settings_tab import SettingsTab
+    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
 
 class GestroKeyApp(QMainWindow):
     """GestroKey应用程序主窗口"""
@@ -55,8 +57,9 @@ class GestroKeyApp(QMainWindow):
         # 添加底部状态栏
         status_layout = QHBoxLayout()
         
-        self.exit_button = QPushButton("退出程序")
-        self.exit_button.setFixedSize(100, 30)
+        # 使用自定义动画按钮替换标准按钮
+        self.exit_button = AnimatedButton("退出程序", primary_color=[220, 53, 69])  # 红色按钮
+        self.exit_button.setFixedSize(120, 36)
         self.exit_button.clicked.connect(self.close)
         
         self.version_label = QLabel("v1.0.0")

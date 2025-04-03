@@ -1,14 +1,16 @@
 import sys
-from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel, QApplication
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
 from PyQt5.QtCore import Qt
 
 try:
     from core.logger import get_logger
     from core.drawer import DrawingManager
+    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
 except ImportError:
     sys.path.append('../')
     from core.logger import get_logger
     from core.drawer import DrawingManager
+    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
 
 class ConsoleTab(QWidget):
     """控制台选项卡，提供基本的绘制控制功能"""
@@ -42,14 +44,15 @@ class ConsoleTab(QWidget):
         self.status_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.status_label)
         
-        # 开始绘制按钮
-        self.start_button = QPushButton("开始绘制")
+        # 使用自定义动画按钮替换标准按钮
+        # 开始绘制按钮 - 使用主题蓝色
+        self.start_button = AnimatedButton("开始绘制", primary_color=[41, 128, 185])
         self.start_button.setFixedSize(150, 40)
         self.start_button.clicked.connect(self.start_drawing)
         layout.addWidget(self.start_button)
         
-        # 停止绘制按钮（初始禁用）
-        self.stop_button = QPushButton("停止绘制")
+        # 停止绘制按钮（初始禁用） - 使用红色
+        self.stop_button = AnimatedButton("停止绘制", primary_color=[220, 53, 69])
         self.stop_button.setFixedSize(150, 40)
         self.stop_button.clicked.connect(self.stop_drawing)
         self.stop_button.setEnabled(False)
