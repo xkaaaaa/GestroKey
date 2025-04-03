@@ -9,6 +9,9 @@ src/
 ├── core/                    # 核心功能模块
 │   ├── drawer.py            # 绘画核心模块
 │   ├── stroke_analyzer.py   # 笔画分析模块
+│   ├── gesture_library.py   # 手势库管理模块
+│   ├── gesture_executor.py  # 手势执行模块
+│   ├── default_gestures.json # 默认手势库配置文件
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
 │   ├── console.py           # 控制台选项卡
@@ -363,7 +366,117 @@ print(f"描述: {description}")  # 例如: "先右后上"
 - `DOWN_LEFT`：左下
 - `DOWN_RIGHT`：右下
 
-### 9. core/logger.py
+### 9. core/gesture_library.py
+
+**功能说明**：手势库管理模块，负责加载、保存和管理用户定义的手势，包括对手势的增加、删除、查询等操作。
+
+**主要类和方法**：
+- `GestureLibrary`：手势库管理器类
+  - `load()`：从文件加载手势库，如不存在则创建默认手势库
+  - `save()`：保存手势库到文件
+  - `get_gesture(name)`：根据名称获取特定手势
+  - `get_gesture_by_direction(direction)`：根据方向序列获取匹配的手势
+  - `add_gesture(name, direction, action_type, action_value)`：添加新手势
+  - `remove_gesture(name)`：删除指定名称的手势
+  - `list_gestures()`：获取所有手势名称列表
+  - `reset_to_default()`：重置为默认手势库
+  - `_load_default_gestures()`：加载默认手势库
+- `get_gesture_library()`：获取手势库的全局单例实例
+
+**使用方法**：
+```python
+from core.gesture_library import get_gesture_library
+
+# 获取手势库
+gesture_lib = get_gesture_library()
+
+# 获取所有手势
+gestures = gesture_lib.list_gestures()
+print(f"当前手势库中共有 {len(gestures)} 个手势")
+
+# 获取特定手势
+copy_gesture = gesture_lib.get_gesture("复制")
+if copy_gesture:
+    print(f"复制手势的方向是: {copy_gesture['direction']}")
+    print(f"复制手势执行的动作是: {copy_gesture['action']['value']}")
+
+# 添加新手势
+gesture_lib.add_gesture(
+    name="我的手势",
+    direction="上-右-下",
+    action_type="shortcut",
+    action_value="ctrl+alt+t"
+)
+
+# 根据方向获取手势
+name, gesture = gesture_lib.get_gesture_by_direction("上-右-下")
+if gesture:
+    print(f"识别到手势: {name}")
+
+# 保存手势库
+gesture_lib.save()
+
+# 重置为默认手势库
+gesture_lib.reset_to_default()
+```
+
+**手势库结构**：
+- 手势库以JSON格式存储在用户目录下的`.gestrokey/config/gestures.json`文件中
+- 每个手势包含名称、方向序列和要执行的动作
+- 如果手势库文件不存在或损坏，程序会自动创建默认手势库
+
+### 10. core/default_gestures.json
+
+**功能说明**：默认手势库配置文件（JSON格式），包含预定义的常用手势及其对应的操作，作为初始手势库或备用手势库。
+
+**文件内容**：包含以下预定义手势：
+- 复制 (Ctrl+C)：右-下方向
+- 粘贴 (Ctrl+V)：下-右方向
+- 剪切 (Ctrl+X)：左-下方向
+- 撤销 (Ctrl+Z)：左-上方向
+- 重做 (Ctrl+Y)：右-上方向
+- 保存 (Ctrl+S)：下-左方向
+- 全选 (Ctrl+A)：上-左方向
+- 新建 (Ctrl+N)：上-右方向
+- 刷新 (F5)：上-下方向
+
+**使用方法**：
+文件由手势库管理器（gesture_library.py）自动加载，通常不需要直接操作此文件。当需要修改默认手势库时，可编辑此文件。
+
+### 11. core/gesture_executor.py
+
+**功能说明**：手势执行模块，负责根据识别的手势方向执行相应的操作，目前主要支持快捷键操作。
+
+**主要类和方法**：
+- `GestureExecutor`：手势执行器类
+  - `execute_gesture(direction)`：根据方向序列执行对应的手势动作
+  - `_execute_shortcut(shortcut_str)`：执行快捷键操作
+  - `_press_keys(modifier_keys, regular_keys)`：内部方法，按下并释放指定的按键
+- `get_gesture_executor()`：获取手势执行器的全局单例实例
+
+**支持的动作类型**：
+- `shortcut`：执行键盘快捷键，如"ctrl+c"、"alt+tab"等
+
+**使用方法**：
+```python
+from core.gesture_executor import get_gesture_executor
+
+# 获取手势执行器
+executor = get_gesture_executor()
+
+# 执行特定方向的手势
+result = executor.execute_gesture("右-下")
+print(f"手势执行{'成功' if result else '失败'}")
+```
+
+**特性说明**：
+- 支持组合键快捷方式（如Ctrl+Alt+Del）
+- 使用独立线程执行按键操作，不会阻塞主线程
+- 支持大量特殊键（如功能键、修饰键等）
+- 自动处理按键的正确顺序（先修饰键，后普通键）和释放顺序（先普通键，后修饰键）
+- 集成到绘画模块中，能够自动识别并执行与绘制方向匹配的手势
+
+### 12. core/logger.py
 
 **功能说明**：日志记录模块，提供统一的日志记录功能，支持不同日志级别和输出目标。
 
@@ -414,10 +527,10 @@ python src/main.py
 
 2. 在控制台选项卡中点击"开始绘制"按钮
 3. 使用鼠标右键进行绘制（按住右键移动）
-4. 绘制完成后释放右键，绘制会有淡出效果
-5. 可以在前一个线条淡出效果还在进行时立即开始新的绘制，系统会自动处理冲突
-6. 完成后点击"停止绘制"按钮关闭绘制功能
-7. 可以在设置选项卡中调整笔尖粗细和颜色，设置实时应用而无需重启绘制功能
+4. 绘制完成后释放右键，系统会自动识别绘制方向
+5. 如果识别的方向与手势库中的手势匹配，系统会自动执行相应的操作（如快捷键）
+6. 可以在设置选项卡中调整笔尖粗细和颜色，设置实时应用而无需重启绘制功能
+7. 点击"停止绘制"按钮关闭绘制功能
 8. 点击"退出程序"按钮退出应用
 
 ## 设置管理
@@ -431,6 +544,37 @@ python src/main.py
 - `pen_color`：笔尖颜色，RGB格式的数组（默认为[0, 120, 255]，蓝色）
 
 **重要提示**：所有默认设置都保存在`default_settings.json`文件中，应用程序不包含任何硬编码的默认值。
+
+## 手势系统
+
+GestroKey实现了完整的手势识别和执行系统：
+
+1. **手势识别流程**：
+   - 用户使用鼠标右键绘制手势
+   - 系统记录绘制的点坐标
+   - StrokeAnalyzer模块分析绘制轨迹，识别方向变化
+   - 生成方向序列描述（如"上-右-下"）
+
+2. **手势执行流程**：
+   - 系统将识别出的方向序列与手势库中定义的手势进行匹配
+   - 如找到匹配的手势，获取其对应的动作类型和值
+   - GestureExecutor模块执行相应的动作（如按下快捷键）
+   - 执行结果记录到日志中
+
+3. **手势库管理**：
+   - 手势库存储于`%USERPROFILE%\.gestrokey\config\gestures.json`
+   - 如果文件不存在或损坏，系统自动创建包含常用操作的默认手势库
+   - 支持对手势库的修改、扩展和重置
+
+4. **支持的手势动作**：
+   - 快捷键执行：支持绝大多数单键和组合键操作
+   - 未来可扩展支持：程序启动、文件操作、自定义脚本等
+
+**手势示例**：
+- "右-下"手势执行"复制"操作（Ctrl+C）
+- "下-右"手势执行"粘贴"操作（Ctrl+V）
+- "左-上"手势执行"撤销"操作（Ctrl+Z）
+- "上-下"手势执行"刷新"操作（F5）
 
 ## UI组件系统
 

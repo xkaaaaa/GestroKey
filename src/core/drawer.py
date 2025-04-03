@@ -1,8 +1,10 @@
 import sys
 import time
 import math
+import os
+import traceback
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QWidget
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout
 from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal, QObject
 from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QPixmap, QBrush, QPainterPathStroker
 from pynput import mouse
@@ -12,6 +14,7 @@ try:
     from logger import get_logger
     from stroke_analyzer import StrokeAnalyzer
     from ui.settings.settings import get_settings
+    from gesture_executor import get_gesture_executor  # 导入手势执行器
 except ImportError:
     from core.logger import get_logger
     from core.stroke_analyzer import StrokeAnalyzer
@@ -26,6 +29,7 @@ except ImportError:
         # 定义一个空的settings获取函数，避免语法错误，但不提供实际功能
         def get_settings():
             return None
+    from core.gesture_executor import get_gesture_executor  # 导入手势执行器
 
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
@@ -213,6 +217,36 @@ class TransparentDrawingOverlay(QWidget):
             
             # 记录本次绘制的点数据和方向
             self._log_stroke_data(self.current_line, direction_sequence, direction_description, direction_details)
+            
+            # 执行与方向匹配的手势动作
+            if direction_sequence and direction_sequence not in ["无方向", "无明显方向"]:
+                try:
+                    # 获取手势执行器
+                    self.logger.debug(f"尝试获取手势执行器...")
+                    gesture_executor = get_gesture_executor()
+                    self.logger.debug(f"手势执行器获取成功，尝试执行手势: {direction_sequence}")
+                    
+                    # 检查手势库是否正确加载
+                    if gesture_executor and hasattr(gesture_executor, 'gesture_library') and gesture_executor.gesture_library:
+                        # 获取手势库中的匹配手势
+                        name, gesture = gesture_executor.gesture_library.get_gesture_by_direction(direction_sequence)
+                        if gesture:
+                            self.logger.info(f"找到匹配的手势: {name}，方向: {direction_sequence}")
+                            
+                            # 执行手势
+                            result = gesture_executor.execute_gesture(direction_sequence)
+                            if result:
+                                self.logger.info(f"成功执行手势动作: {direction_sequence} -> {name if name else '未知手势'}")
+                            else:
+                                self.logger.info(f"手势动作执行失败: {direction_sequence}")
+                        else:
+                            self.logger.info(f"手势库中未找到匹配的手势方向: {direction_sequence}")
+                    else:
+                        self.logger.warning("手势库未正确加载，跳过手势执行")
+                except Exception as e:
+                    self.logger.error(f"执行手势动作时出错: {e}")
+                    import traceback
+                    self.logger.error(f"详细错误: {traceback.format_exc()}")
             
             # 保存线条数据
             self.lines.append(self.current_line.copy())
