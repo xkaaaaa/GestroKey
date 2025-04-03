@@ -13,7 +13,8 @@ src/
 ├── ui/                      # 用户界面模块
 │   ├── console.py           # 控制台选项卡
 │   ├── components/          # UI组件模块
-│   │   └── button.py        # 自定义动画按钮组件
+│   │   ├── button.py        # 自定义动画按钮组件
+│   │   └── side_tab.py      # 左侧选项卡组件
 │   └── settings/            # 设置相关界面
 │       ├── settings_tab.py  # 设置选项卡
 │       ├── settings.py      # 设置管理模块
@@ -116,6 +117,60 @@ layout.addWidget(button)
 # 动态修改按钮属性
 button.set_primary_color([25, 80, 160])  # 修改为深蓝色
 button.set_border_radius(16)             # 修改圆角半径
+```
+
+### 3.1 ui/components/side_tab.py
+
+**功能说明**：左侧选项卡组件，提供美观的垂直选项卡界面，包含切换动画效果，符合应用主题风格。
+
+**主要类和方法**：
+- `AnimatedTabButton`：动画选项卡按钮类，用于显示单个选项卡
+  - `setSelected(selected)`：设置选项卡选中状态，并触发动画
+  - `setText(text)`：设置选项卡文本
+  - `setIcon(icon)`：设置选项卡图标
+- `SideTabWidget`：左侧选项卡容器类
+  - `addTab(widget, text, icon=None)`：添加新的选项卡
+  - `setCurrentIndex(index)`：设置当前选项卡，触发动画切换
+  - `currentIndex()`：获取当前选项卡索引
+  - `widget(index)`：获取指定索引的内容窗口
+  - `setTabText(index, text)`：设置指定索引的选项卡文本
+  - `setTabIcon(index, icon)`：设置指定索引的选项卡图标
+
+**特性说明**：
+- 精美的扁平化设计，与应用主题风格一致
+- 垂直布局的选项卡位于窗口左侧
+- 选项卡切换时的平滑动画过渡效果
+- 选项卡支持图标和文本
+- 选中状态和悬停状态的动画效果
+- 选中选项卡的高亮指示器动画
+- 自动适应内容区域大小
+- 可直接运行文件查看示例效果，便于单独调试
+- 已应用于整个应用程序的主界面，替代了标准的QTabWidget
+
+**使用方法**：
+```python
+from ui.components.side_tab import SideTabWidget
+
+# 创建左侧选项卡组件
+tab_widget = SideTabWidget()
+
+# 添加带图标的选项卡
+console_tab = QWidget()  # 或任何QWidget子类
+console_icon = QIcon("path/to/icon.png")  # 也可使用QIcon.fromTheme获取系统图标
+tab_widget.addTab(console_tab, "控制台", console_icon)
+
+# 添加不带图标的选项卡
+settings_tab = QWidget()
+tab_widget.addTab(settings_tab, "设置")
+
+# 切换到指定选项卡
+tab_widget.setCurrentIndex(1)  # 切换到第二个选项卡（索引从0开始）
+
+# 监听选项卡切换事件
+tab_widget.currentChanged.connect(onTabChanged)
+
+# 添加到界面布局
+layout.addWidget(tab_widget)
 ```
 
 ### 4. ui/settings/settings_tab.py
@@ -386,6 +441,11 @@ GestroKey使用模块化UI组件系统，所有自定义UI组件都位于`ui/com
   - 优点：现代感的UI体验，简单的接口，可单独测试
   - 应用：已在整个应用程序中替代标准按钮，包括主窗口、控制台和设置面板
 
+- `side_tab.py`：左侧垂直选项卡组件，替代标准QTabWidget
+  - 特性：垂直布局、平滑切换动画、选中状态指示、扁平化设计
+  - 优点：更好的空间利用率，更现代的界面布局，符合主题风格
+  - 应用：已用于主窗口，整合了控制台选项卡和设置选项卡
+
 **使用组件的优势**：
 - 统一的视觉风格
 - 可重复使用的代码
@@ -393,6 +453,7 @@ GestroKey使用模块化UI组件系统，所有自定义UI组件都位于`ui/com
 - 独立测试能力
 - 提升用户体验
 - 一致的动画效果
+- 更好的空间布局和组织
 
 ## 编程接口使用示例
 
