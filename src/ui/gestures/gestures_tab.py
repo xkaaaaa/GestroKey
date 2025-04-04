@@ -14,6 +14,7 @@ try:
     from ui.components.card import CardWidget
     from ui.components.scrollbar import AnimatedScrollArea
     from ui.components.combobox.qcustomcombobox import QCustomComboBox
+    from ui.components.animated_stacked_widget import AnimatedStackedWidget
 except ImportError:
     sys.path.append('../../')
     from core.logger import get_logger
@@ -22,6 +23,7 @@ except ImportError:
     from ui.components.card import CardWidget
     from ui.components.scrollbar import AnimatedScrollArea
     from ui.components.combobox.qcustomcombobox import QCustomComboBox
+    from ui.components.animated_stacked_widget import AnimatedStackedWidget
 
 class GestureContentWidget(QWidget):
     """自定义的手势内容显示组件，专门用于解决刷新问题"""
@@ -245,7 +247,34 @@ class GesturesTab(QWidget):
         title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         right_layout.addWidget(title_label)
         
+        # 创建动画堆栈组件，用于管理不同的选项卡内容
+        self.content_stack = AnimatedStackedWidget()
+        self.content_stack.setAnimationType(AnimatedStackedWidget.ANIMATION_RIGHT_TO_LEFT)
+        self.content_stack.setAnimationDuration(300)
+        
+        # 创建手势编辑选项卡
+        edit_tab = self._createEditTab()
+        
+        # 添加选项卡到堆栈
+        self.content_stack.addWidget(edit_tab)
+        
+        # 可以在这里添加更多的选项卡
+        # 例如：预览选项卡、帮助选项卡等
+        
+        # 将堆栈添加到布局
+        right_layout.addWidget(self.content_stack)
+        
+        # 设置布局
+        parent_widget.setLayout(right_layout)
+        parent_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    
+    def _createEditTab(self):
+        """创建手势编辑选项卡"""
         # 创建滚动区域，以便在窗口较小时可以滚动查看表单
+        edit_widget = QWidget()
+        edit_layout = QVBoxLayout(edit_widget)
+        edit_layout.setContentsMargins(0, 0, 0, 0)
+        
         # 使用自定义动画滚动区域替代标准滚动区域
         scroll_area = AnimatedScrollArea()
         scroll_area.setFrameShape(QFrame.NoFrame)
@@ -393,11 +422,11 @@ class GesturesTab(QWidget):
         buttons_layout.addWidget(self.clear_button)
         buttons_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         buttons_layout.addWidget(self.delete_button)
-
+        
         # 设置表单布局
         form_group.setLayout(form_layout)
         form_content_layout.addWidget(form_group)
-
+        
         # 添加按钮布局到内容布局
         form_content_layout.addLayout(buttons_layout)
         
@@ -409,13 +438,9 @@ class GesturesTab(QWidget):
         
         # 添加到滚动区域
         scroll_area.setWidget(form_content)
+        edit_layout.addWidget(scroll_area)
         
-        # 添加到右侧布局
-        right_layout.addWidget(scroll_area)
-        
-        # 设置布局
-        parent_widget.setLayout(right_layout)
-        parent_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        return edit_widget
     
     def resizeEvent(self, event):
         """窗口尺寸变化事件处理，用于调整UI布局"""

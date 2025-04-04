@@ -17,6 +17,7 @@ GestroKey是一款功能强大的手势控制工具，允许用户通过鼠标�
     - [2.2.3 滚动条组件](#223-uicomponentsscrollbar.py)
     - [2.2.4 侧边选项卡](#224-uicomponentsside_tab.py)
     - [2.2.5 下拉菜单](#225-uicomponentscombobox)
+    - [2.2.6 动画堆栈组件](#226-uicomponentsanimated_stacked_widget.py)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 drawer.py](#31-coredrawerpy)
   - [3.2 stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -47,9 +48,17 @@ src/
 │   │   ├── card.py          # 自定义卡片组件
 │   │   ├── scrollbar.py     # 自定义滚动条和滚动区域组件
 │   │   ├── side_tab.py      # 左侧选项卡组件
-│   │   └── combobox/        # 下拉菜单组件
-│   │       ├── icons/       # 下拉菜单图标文件
-│   │       └── qcustomcombobox.py  # 自定义下拉菜单实现
+│   │   ├── combobox/        # 下拉菜单组件
+│   │   │       ├── icons/       # 下拉菜单图标文件
+│   │   │       └── qcustomcombobox.py  # 自定义下拉菜单实现
+│   │   ├── settings/            # 设置相关界面
+│   │   │   ├── settings_tab.py  # 设置选项卡
+│   │   │   ├── settings.py      # 设置管理模块
+│   │   │   └── default_settings.json # 默认设置定义（JSON格式）
+│   │   └── gestures/            # 手势管理相关界面
+│       ├── gestures_tab.py  # 手势管理选项卡
+│       ├── gestures.py      # 手势库管理模块
+│       └── default_gestures.json # 默认手势库定义（JSON格式）
 │   ├── settings/            # 设置相关界面
 │   │   ├── settings_tab.py  # 设置选项卡
 │   │   ├── settings.py      # 设置管理模块
@@ -1358,6 +1367,114 @@ main_layout.addLayout(direction_layout)
 
 # 设置选中项
 direction_combo.setCurrentText("上-下")
+```
+
+##### 2.2.6 ui/components/animated_stacked_widget.py
+
+**功能说明**：动画堆栈组件，提供界面切换时的平滑动画效果，支持多种动画方式。
+
+**主要类和方法**：
+- `AnimatedStackedWidget`：动画堆栈组件，继承自QStackedWidget
+  - `__init__(parent=None)`：初始化动画堆栈组件
+    - `parent`：父窗口组件
+  - `setAnimationEnabled(enabled)`：设置是否启用动画效果
+    - `enabled`：布尔值，True表示启用动画，False表示禁用
+  - `setAnimationType(animation_type)`：设置动画类型
+    - `animation_type`：动画类型常量
+      - `ANIMATION_LEFT_TO_RIGHT`：从左到右滑动
+      - `ANIMATION_RIGHT_TO_LEFT`：从右到左滑动
+      - `ANIMATION_TOP_TO_BOTTOM`：从上到下滑动
+      - `ANIMATION_BOTTOM_TO_TOP`：从下到上滑动
+      - `ANIMATION_FADE`：淡入淡出效果
+  - `setAnimationDuration(duration)`：设置动画持续时间
+    - `duration`：动画持续时间（毫秒）
+  - `setAnimationCurve(curve)`：设置动画曲线
+    - `curve`：QEasingCurve对象，定义动画的加速和减速方式
+  - `setCurrentIndex(index)`：设置当前显示的部件索引
+    - `index`：部件索引，整数值
+  - `animationFinished`：信号，动画完成时触发
+
+**特性说明**：
+- 支持多种动画效果：滑动（左右/上下）和淡入淡出
+- 可自定义动画持续时间和动画曲线
+- 无缝集成到PyQt5应用程序
+- 兼容所有QWidget子类作为内容部件
+- 平滑过渡效果，提升用户体验
+- 内部使用QPropertyAnimation进行动画处理，保证流畅性能
+- 可以根据需要启用或禁用动画效果
+- 提供动画完成信号，方便执行后续操作
+- 自动处理部件的可见性，确保正确显示
+- 可单独运行作为演示程序
+
+**使用方法**：
+```python
+from ui.components.animated_stacked_widget import AnimatedStackedWidget
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
+
+# 创建动画堆栈组件
+stacked_widget = AnimatedStackedWidget()
+
+# 设置动画类型
+stacked_widget.setAnimationType(AnimatedStackedWidget.ANIMATION_RIGHT_TO_LEFT)
+
+# 设置动画持续时间（毫秒）
+stacked_widget.setAnimationDuration(300)
+
+# 添加页面
+page1 = QWidget()
+page1_layout = QVBoxLayout(page1)
+page1_layout.addWidget(QLabel("第一页"))
+
+page2 = QWidget()
+page2_layout = QVBoxLayout(page2)
+page2_layout.addWidget(QLabel("第二页"))
+
+stacked_widget.addWidget(page1)
+stacked_widget.addWidget(page2)
+
+# 切换到指定页面（带动画效果）
+stacked_widget.setCurrentIndex(1)
+
+# 添加动画完成处理
+def on_animation_finished():
+    print("动画已完成")
+    
+stacked_widget.animationFinished.connect(on_animation_finished)
+```
+
+**实际应用示例**（在手势选项卡中的使用）：
+```python
+from ui.components.animated_stacked_widget import AnimatedStackedWidget
+
+class GesturesTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # 初始化UI
+        self.initUI()
+    
+    def createGestureEditor(self, parent_widget):
+        """创建右侧手势编辑区域"""
+        # 创建右侧布局
+        right_layout = QVBoxLayout(parent_widget)
+        
+        # 创建标题
+        title_label = QLabel("编辑手势")
+        right_layout.addWidget(title_label)
+        
+        # 创建动画堆栈组件
+        self.content_stack = AnimatedStackedWidget()
+        self.content_stack.setAnimationType(AnimatedStackedWidget.ANIMATION_RIGHT_TO_LEFT)
+        self.content_stack.setAnimationDuration(300)
+        
+        # 创建并添加编辑选项卡
+        edit_tab = self._createEditTab()
+        self.content_stack.addWidget(edit_tab)
+        
+        # 创建并添加其他选项卡（如预览、帮助等）
+        # ...
+        
+        # 添加到布局
+        right_layout.addWidget(self.content_stack)
 ```
 
 ### 3. 核心功能模块

@@ -9,10 +9,12 @@ from PyQt5.QtGui import (QColor, QPainter, QFont, QIcon, QPainterPath,
 
 try:
     from core.logger import get_logger
+    from ui.components.animated_stacked_widget import AnimatedStackedWidget
 except ImportError:
     # 相对导入处理，便于直接运行此文件进行测试
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
+    from ui.components.animated_stacked_widget import AnimatedStackedWidget
 
 class AnimatedTabButton(QWidget):
     """
@@ -331,8 +333,11 @@ class SideTabWidget(QWidget):
         self._tab_layout.addStretch(1)  # 底部区域固定在底部
         self._tab_layout.addWidget(self._bottom_container)
         
-        # 内容窗口容器
-        self._stack = QStackedWidget()
+        # 内容窗口容器 - 使用动画堆栈组件替代普通堆栈组件
+        self._stack = AnimatedStackedWidget()
+        self._stack.setAnimationType(AnimatedStackedWidget.ANIMATION_RIGHT_TO_LEFT)
+        self._stack.setAnimationDuration(300)
+        self._stack.setAnimationCurve(QEasingCurve.OutCubic)
         
         # 添加到主布局
         self._main_layout.addWidget(self._tab_area, 0)  # 固定宽度
@@ -420,12 +425,15 @@ class SideTabWidget(QWidget):
         for i, button in enumerate(self._buttons):
             button.setSelected(i == index)
         
-        # 切换堆栈窗口
+        # 切换堆栈窗口 - 使用动画效果
         if self._animations_enabled:
-            # 如果需要添加动画可以在这里实现
+            # 使用动画堆栈组件的切换方法，自动应用动画效果
             self._stack.setCurrentIndex(index)
         else:
+            # 禁用动画时，使用标准切换
+            self._stack.setAnimationEnabled(False)
             self._stack.setCurrentIndex(index)
+            self._stack.setAnimationEnabled(True)
         
         # 发射信号
         self.currentChanged.emit(index)
