@@ -2,7 +2,7 @@ import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QLineEdit, QComboBox,
-                            QScrollArea, QSizePolicy, QSpacerItem,
+                            QSizePolicy, QSpacerItem,
                             QGroupBox, QMessageBox, QPushButton,
                             QFrame, QSplitter)
 from PyQt5.QtCore import Qt
@@ -13,12 +13,14 @@ try:
     from ui.gestures.gestures import get_gesture_library
     from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
+    from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
 except ImportError:
     sys.path.append('../../')
     from core.logger import get_logger
     from ui.gestures.gestures import get_gesture_library
     from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
+    from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
 
 class GestureContentWidget(QWidget):
     """自定义的手势内容显示组件，专门用于解决刷新问题"""
@@ -121,7 +123,7 @@ class GesturesTab(QWidget):
         
         # 更新手势列表
         self.updateGestureCards()
-        
+    
         # 启用响应式设计
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.logger.debug("手势管理选项卡启用了响应式设计")
@@ -140,8 +142,8 @@ class GesturesTab(QWidget):
         left_layout.addWidget(title_label)
         
         # 创建滚动区域，放置卡片
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
+        # 使用自定义动画滚动区域替代标准滚动区域
+        scroll_area = AnimatedScrollArea()
         scroll_area.setFrameShape(QFrame.NoFrame)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 改为需要时才显示滚动条
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -209,8 +211,8 @@ class GesturesTab(QWidget):
         right_layout.addWidget(title_label)
         
         # 创建滚动区域，以便在窗口较小时可以滚动查看表单
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
+        # 使用自定义动画滚动区域替代标准滚动区域
+        scroll_area = AnimatedScrollArea()
         scroll_area.setFrameShape(QFrame.NoFrame)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -287,12 +289,12 @@ class GesturesTab(QWidget):
         self.delete_button.setMinimumSize(120, 36)
         self.delete_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self.delete_button.clicked.connect(self.deleteGesture)
-
+        
         self.clear_button = AnimatedButton("清空表单", primary_color=[149, 165, 166])
         self.clear_button.setMinimumSize(120, 36)
         self.clear_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self.clear_button.clicked.connect(self.clearEditor)
-
+        
         # 添加按钮到布局
         buttons_layout = QHBoxLayout()
         buttons_layout.setContentsMargins(0, 10, 0, 0)

@@ -16,6 +16,7 @@ src/
 │   ├── components/          # UI组件模块
 │   │   ├── button.py        # 自定义动画按钮组件
 │   │   ├── card.py          # 自定义卡片组件
+│   │   ├── scrollbar.py     # 自定义滚动条和滚动区域组件
 │   │   └── side_tab.py      # 左侧选项卡组件
 │   ├── settings/            # 设置相关界面
 │   │   ├── settings_tab.py  # 设置选项卡
@@ -113,7 +114,7 @@ console = ConsoleTab()
 # ...
 ```
 
-### 4. ui/components/button.py
+### 3.1 ui/components/button.py
 
 **功能说明**：自定义动画按钮组件，提供美观的、带有动画效果的按钮，可以轻松集成到任何界面。
 
@@ -166,75 +167,6 @@ layout.addWidget(button)
 # 动态修改按钮属性
 button.set_primary_color([25, 80, 160])  # 修改为深蓝色
 button.set_border_radius(16)             # 修改圆角半径
-```
-
-### 3.1 ui/components/side_tab.py
-
-**功能说明**：左侧选项卡组件，提供美观的垂直选项卡界面，包含切换动画效果，符合应用主题风格。
-
-**主要类和方法**：
-- `AnimatedTabButton`：动画选项卡按钮类，用于显示单个选项卡
-  - `setSelected(selected)`：设置选项卡选中状态，并触发动画
-  - `setText(text)`：设置选项卡文本
-  - `setIcon(icon)`：设置选项卡图标
-- `SideTabWidget`：左侧选项卡容器类
-  - `addTab(widget, text, icon=None, position=POSITION_TOP)`：添加新的选项卡，支持指定位置
-  - `setCurrentIndex(index)`：设置当前选项卡，触发动画切换
-  - `currentIndex()`：获取当前选项卡索引
-  - `widget(index)`：获取指定索引的内容窗口
-  - `setTabText(index, text)`：设置指定索引的选项卡文本
-  - `setTabIcon(index, icon)`：设置指定索引的选项卡图标
-  - `setTabPosition(index, position)`：更改已有选项卡的位置
-  - `tabPosition(index)`：获取选项卡的位置
-
-**特性说明**：
-- 精美的扁平化设计，与应用主题风格一致
-- 垂直布局的选项卡位于窗口左侧
-- 选项卡支持两种位置定位：顶部(POSITION_TOP)和底部(POSITION_BOTTOM)
-- 支持将重要和常用选项卡（如控制台）放在顶部，将设置等辅助功能放在底部，优化用户体验
-- 可灵活调整选项卡位置，无需改变选项卡的添加顺序
-- 选项卡切换时的平滑动画过渡效果
-- 选项卡支持图标和文本
-- 选中状态和悬停状态的动画效果
-- 鼠标离开选项卡时的平滑过渡动画效果，避免视觉上的生硬变化
-- 选中选项卡的高亮指示器动画
-- 自动适应内容区域大小
-- 可直接运行文件查看示例效果，便于单独调试
-- 已应用于整个应用程序的主界面，替代了标准的QTabWidget
-
-**使用方法**：
-```python
-from ui.components.side_tab import SideTabWidget
-
-# 创建左侧选项卡组件
-tab_widget = SideTabWidget()
-
-# 添加带图标的选项卡（放在顶部）
-console_tab = QWidget()  # 或任何QWidget子类
-console_icon = QIcon("path/to/icon.png")
-tab_widget.addTab(console_tab, "控制台", console_icon, tab_widget.POSITION_TOP)
-
-# 添加手势管理选项卡（也放在顶部）
-gestures_tab = QWidget()
-gestures_icon = QIcon("path/to/gestures_icon.png")
-tab_widget.addTab(gestures_tab, "手势管理", gestures_icon, tab_widget.POSITION_TOP)
-
-# 将设置选项卡放在底部
-settings_tab = QWidget()
-settings_icon = QIcon("path/to/settings_icon.png")
-tab_widget.addTab(settings_tab, "设置", settings_icon, tab_widget.POSITION_BOTTOM)
-
-# 切换到指定选项卡
-tab_widget.setCurrentIndex(0)  # 切换到控制台选项卡
-
-# 监听选项卡切换事件
-tab_widget.currentChanged.connect(onTabChanged)
-
-# 动态更改选项卡位置
-tab_widget.setTabPosition(1, tab_widget.POSITION_BOTTOM)  # 将手势管理选项卡移到底部
-
-# 添加到界面布局
-layout.addWidget(tab_widget)
 ```
 
 ### 3.2 ui/components/card.py
@@ -304,6 +236,142 @@ card.clicked.connect(on_card_clicked)
 # 动态修改卡片属性
 card.set_title("新标题")
 card.set_primary_color([240, 255, 240])  # 淡绿色
+```
+
+### 3.3 ui/components/scrollbar.py
+
+**功能说明**：自定义滚动条和滚动区域组件，提供精美的、带有动画效果的滚动体验，替代标准的QScrollBar和QScrollArea。
+
+**主要类和方法**：
+- `AnimatedScrollBar`：自定义滚动条类，继承自`QScrollBar`
+  - `__init__(orientation, parent)`：初始化滚动条，orientation可以是Qt.Vertical或Qt.Horizontal
+  - `enterEvent(event)`：处理鼠标进入事件，触发透明度增加动画和展开动画
+  - `leaveEvent(event)`：处理鼠标离开事件，触发透明度减少动画和延迟收缩
+  - `_startCollapseAnimation()`：开始收缩动画，将滚动条收缩为细线
+  - `_startExpandAnimation()`：开始展开动画，将滚动条恢复为正常宽度
+  - `mousePressEvent(event)`：处理鼠标按下事件，更新滚动条样式并取消收缩
+  - `mouseReleaseEvent(event)`：处理鼠标释放事件，恢复滚动条样式并启动收缩延时
+  - `wheelEvent(event)`：实现平滑滚动效果，优化滚轮体验并重置收缩计时器
+  - `set_color_alpha(alpha)`：设置滚动条颜色的透明度，用于动画效果
+  - `set_current_width(width)`：设置滚动条当前宽度，用于折叠/展开动画
+- `AnimatedScrollArea`：自定义滚动区域类，继承自`QScrollArea`
+  - `__init__(parent)`：初始化滚动区域，集成自定义滚动条
+  - `eventFilter(obj, event)`：事件过滤器，拦截滚轮事件以实现平滑滚动
+  - `_handleWheelEvent(event)`：处理滚轮事件，实现丝滑的动画滚动效果
+  - `setVerticalScrollBarPolicy(policy)`：设置并记录垂直滚动条显示策略
+  - `setHorizontalScrollBarPolicy(policy)`：设置并记录水平滚动条显示策略
+
+**特性说明**：
+- 精美的扁平化设计，使用应用程序主题蓝色保持风格一致
+- **默认以折叠状态显示**：滚动条初始化时即以折叠状态（细线）显示，最大程度节省界面空间
+- **自动折叠功能**：鼠标离开滚动条区域后，滚动条会在短暂延迟后平滑收缩为细小的线条，节省界面空间
+- **高效滚动响应**：优化的滚动参数，提供更大的滚动步长，便于快速浏览长内容
+- **丝滑平滑滚动**：滚动内容时实现平滑渐变过渡，而非传统的瞬间跳转，提供更好的视觉体验
+- 滚动条宽度自适应，收缩和展开时有平滑过渡动画
+- 圆角滑块设计，现代感强，视觉效果优雅
+- 透明度动画效果，鼠标悬停时变为完全不透明，离开时恢复半透明
+- 无边框设计，隐藏了传统滚动条的箭头和槽轨道
+- 自动适应垂直和水平方向，提供一致的视觉体验
+- 动画使用缓出曲线(OutCubic)，提供自然的减速效果
+- 滑块最小长度限制，确保在内容较多时仍能轻松操作
+- 智能延迟系统，防止频繁使用时的折叠/展开抖动
+- 交互优化，滚动或点击时自动展开，使用完毕后自动收缩
+- 滚动区域无缝集成自定义滚动条，使用方式与标准QScrollArea一致
+- 可直接运行文件查看示例效果，便于单独调试
+- 日志记录功能，记录滚动条状态变化，便于调试
+
+**使用方法**：
+```python
+from ui.components.scrollbar import AnimatedScrollBar, AnimatedScrollArea
+
+# 方法1：使用AnimatedScrollArea（推荐）
+scroll_area = AnimatedScrollArea()
+scroll_area.setFrameShape(AnimatedScrollArea.NoFrame)
+scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+# 设置内容
+content_widget = QWidget()
+content_layout = QVBoxLayout(content_widget)
+# 添加内容到content_layout...
+scroll_area.setWidget(content_widget)
+
+# 添加到界面
+layout.addWidget(scroll_area)
+
+# 方法2：单独使用AnimatedScrollBar
+scroll_bar = AnimatedScrollBar(Qt.Vertical)
+# 可以手动指定为某个QScrollArea的滚动条
+some_scroll_area.setVerticalScrollBar(scroll_bar)
+```
+
+### 3.4 ui/components/side_tab.py
+
+**功能说明**：左侧选项卡组件，提供美观的垂直选项卡界面，包含切换动画效果，符合应用主题风格。
+
+**主要类和方法**：
+- `AnimatedTabButton`：动画选项卡按钮类，用于显示单个选项卡
+  - `setSelected(selected)`：设置选项卡选中状态，并触发动画
+  - `setText(text)`：设置选项卡文本
+  - `setIcon(icon)`：设置选项卡图标
+- `SideTabWidget`：左侧选项卡容器类
+  - `addTab(widget, text, icon=None, position=POSITION_TOP)`：添加新的选项卡，支持指定位置
+  - `setCurrentIndex(index)`：设置当前选项卡，触发动画切换
+  - `currentIndex()`：获取当前选项卡索引
+  - `widget(index)`：获取指定索引的内容窗口
+  - `setTabText(index, text)`：设置指定索引的选项卡文本
+  - `setTabIcon(index, icon)`：设置指定索引的选项卡图标
+  - `setTabPosition(index, position)`：更改已有选项卡的位置
+  - `tabPosition(index)`：获取选项卡的位置
+
+**特性说明**：
+- 精美的扁平化设计，与应用主题风格一致
+- 垂直布局的选项卡位于窗口左侧
+- 选项卡支持两种位置定位：顶部(POSITION_TOP)和底部(POSITION_BOTTOM)
+- 支持将重要和常用选项卡（如控制台）放在顶部，将设置等辅助功能放在底部，优化用户体验
+- 可灵活调整选项卡位置，无需改变选项卡的添加顺序
+- 选项卡切换时的平滑动画过渡效果
+- 选项卡支持图标和文本
+- 选中状态和悬停状态的动画效果
+- 鼠标离开选项卡时的平滑过渡动画效果，避免视觉上的生硬变化
+- 选中选项卡的高亮指示器动画
+- 自动适应内容区域大小
+- 可直接运行文件查看示例效果，便于单独调试
+- 已应用于整个应用程序的主界面，替代了标准的QTabWidget
+
+**使用方法**：
+```python
+from ui.components.side_tab import SideTabWidget
+
+# 创建左侧选项卡组件
+tab_widget = SideTabWidget()
+
+# 添加带图标的选项卡（放在顶部）
+console_tab = QWidget()  # 或任何QWidget子类
+console_icon = QIcon("path/to/icon.png")
+tab_widget.addTab(console_tab, "控制台", console_icon, tab_widget.POSITION_TOP)
+
+# 添加手势管理选项卡（也放在顶部）
+gestures_tab = QWidget()
+gestures_icon = QIcon("path/to/gestures_icon.png")
+tab_widget.addTab(gestures_tab, "手势管理", gestures_icon, tab_widget.POSITION_TOP)
+
+# 将设置选项卡放在底部
+settings_tab = QWidget()
+settings_icon = QIcon("path/to/settings_icon.png")
+tab_widget.addTab(settings_tab, "设置", settings_icon, tab_widget.POSITION_BOTTOM)
+
+# 切换到指定选项卡
+tab_widget.setCurrentIndex(0)  # 切换到控制台选项卡
+
+# 监听选项卡切换事件
+tab_widget.currentChanged.connect(onTabChanged)
+
+# 动态更改选项卡位置
+tab_widget.setTabPosition(1, tab_widget.POSITION_BOTTOM)  # 将手势管理选项卡移到底部
+
+# 添加到界面布局
+layout.addWidget(tab_widget)
 ```
 
 ### 4. ui/settings/settings_tab.py
@@ -827,6 +895,14 @@ GestroKey使用模块化UI组件系统，所有自定义UI组件都位于`ui/com
   - 特性：垂直布局、平滑切换动画、选中状态指示、扁平化设计
   - 优点：更好的空间利用率，更现代的界面布局，符合主题风格
   - 应用：已用于主窗口，整合了控制台选项卡和设置选项卡
+
+- `scrollbar.py`：自定义滚动条和滚动区域组件，提供精美的、带有动画效果的滚动体验，替代标准的QScrollBar和QScrollArea
+  - 特性：平滑动画过渡、扁平化设计、悬停效果、透明度变化、圆角设计、自动折叠功能、丝滑滚动效果
+  - 优点：更现代化的UI体验、优雅的滚动效果、与应用主题保持一致、节省界面空间、提升用户视觉体验
+  - 应用：已在设置选项卡和手势管理选项卡中使用，增强用户体验
+  - 包含组件：
+    - `AnimatedScrollBar`：自定义滚动条，提供平滑动画效果，支持鼠标离开时自动收缩为细线
+    - `AnimatedScrollArea`：自定义滚动区域，集成动画滚动条，实现滚动时的平滑过渡效果
 
 **使用组件的优势**：
 - 统一的视觉风格

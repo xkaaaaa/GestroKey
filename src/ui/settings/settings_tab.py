@@ -3,7 +3,7 @@ import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QSpinBox, QFileDialog, 
                             QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton, QMessageBox,
-                            QSizePolicy, QSpacerItem, QScrollArea)
+                            QSizePolicy, QSpacerItem)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 
@@ -11,12 +11,14 @@ try:
     from core.logger import get_logger
     from ui.settings.settings import get_settings
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
+    from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append('../../')
     from core.logger import get_logger
     from ui.settings.settings import get_settings
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
+    from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
     from version import APP_NAME  # 导入应用名称
 
 class SettingsTab(QWidget):
@@ -37,9 +39,9 @@ class SettingsTab(QWidget):
         main_layout.setAlignment(Qt.AlignTop)
         
         # 创建滚动区域，以便在窗口较小时可以滚动查看所有设置
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        # 使用自定义动画滚动区域替代标准滚动区域
+        scroll_area = AnimatedScrollArea()
+        scroll_area.setFrameShape(AnimatedScrollArea.NoFrame)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
