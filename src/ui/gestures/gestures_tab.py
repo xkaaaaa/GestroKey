@@ -41,7 +41,9 @@ class GestureContentWidget(QWidget):
         self.layout.addWidget(self.direction_label)
         
         # 动作标签
-        self.action_label = QLabel(f"动作: {action_type} - {action_value}")
+        # 如果动作类型为shortcut，显示为"执行快捷键"
+        display_action_type = "执行快捷键" if action_type == "shortcut" else action_type
+        self.action_label = QLabel(f"动作: {display_action_type} - {action_value}")
         self.action_label.setWordWrap(True)
         self.layout.addWidget(self.action_label)
         
@@ -53,7 +55,9 @@ class GestureContentWidget(QWidget):
     def updateContent(self, direction="", action_type="", action_value=""):
         """更新内容"""
         self.direction_label.setText(f"方向: {direction}")
-        self.action_label.setText(f"动作: {action_type} - {action_value}")
+        # 如果动作类型为shortcut，显示为"执行快捷键"
+        display_action_type = "执行快捷键" if action_type == "shortcut" else action_type
+        self.action_label.setText(f"动作: {display_action_type} - {action_value}")
         
         # 强制刷新
         self.direction_label.repaint()
@@ -73,7 +77,7 @@ class GesturesTab(QWidget):
     ]
     
     # 定义动作类型
-    ACTION_TYPES = ["shortcut"]
+    ACTION_TYPES = ["执行快捷键"]
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -121,7 +125,7 @@ class GesturesTab(QWidget):
         
         # 连接实时更新信号
         self.name_input.textChanged.connect(self.name_input_textChanged)
-        self.direction_combo.currentIndexChanged.connect(self.direction_combo_changed)
+        self.direction_text.textChanged.connect(self.direction_text_changed)
         self.action_type_combo.currentIndexChanged.connect(self.action_type_combo_changed)
         self.action_value_input.textChanged.connect(self.action_value_input_textChanged)
         
@@ -157,7 +161,6 @@ class GesturesTab(QWidget):
             "popupAnimationDuration": 300
         }
         
-        self.direction_combo.customizeQCustomComboBox(**combo_style)
         self.action_type_combo.customizeQCustomComboBox(**combo_style)
     
     def createGestureCardsList(self, parent_widget):
@@ -275,17 +278,74 @@ class GesturesTab(QWidget):
         form_layout.addLayout(name_layout)
         
         # 方向选择
-        direction_layout = QHBoxLayout()
+        direction_layout = QVBoxLayout()
+        direction_header_layout = QHBoxLayout()
         direction_label = QLabel("方向:")
         direction_label.setMinimumWidth(80)
         direction_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         
-        self.direction_combo = QCustomComboBox()
-        self.direction_combo.addItems(self.DIRECTIONS)
-        self.direction_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # 只读文本框显示当前方向
+        self.direction_text = QLineEdit()
+        self.direction_text.setReadOnly(True)
+        self.direction_text.setPlaceholderText("点击下方按钮添加方向")
+        self.direction_text.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
-        direction_layout.addWidget(direction_label)
-        direction_layout.addWidget(self.direction_combo)
+        direction_header_layout.addWidget(direction_label)
+        direction_header_layout.addWidget(self.direction_text)
+        direction_layout.addLayout(direction_header_layout)
+        
+        # 创建方向按钮网格
+        direction_grid = QGridLayout()
+        direction_grid.setSpacing(5)
+        
+        # 方向按钮定义
+        self.direction_buttons = {}
+        directions = {
+            (0, 0): ("左上", "↖"),
+            (0, 1): ("上", "↑"),
+            (0, 2): ("右上", "↗"),
+            (1, 0): ("左", "←"),
+            (1, 1): ("删除", "×"),
+            (1, 2): ("右", "→"),
+            (2, 0): ("左下", "↙"),
+            (2, 1): ("下", "↓"),
+            (2, 2): ("右下", "↘")
+        }
+        
+        # 创建并添加方向按钮
+        for pos, (dir_name, symbol) in directions.items():
+            if dir_name == "删除":
+                # 删除按钮使用红色主题
+                btn = AnimatedButton(
+                    text=symbol,
+                    primary_color=[231, 76, 60],  # 红色
+                    hover_color=[192, 57, 43],    # 深红色
+                    text_color=[255, 255, 255],   # 白色文本
+                    border_radius=5,
+                    min_width=40,
+                    min_height=40
+                )
+                btn.setToolTip(dir_name)
+                btn.clicked.connect(self.remove_last_direction)
+            else:
+                # 方向按钮使用蓝色主题
+                btn = AnimatedButton(
+                    text=symbol,
+                    primary_color=[52, 152, 219],  # 蓝色
+                    hover_color=[41, 128, 185],    # 深蓝色
+                    text_color=[255, 255, 255],    # 白色文本
+                    border_radius=5,
+                    min_width=40,
+                    min_height=40
+                )
+                btn.setToolTip(dir_name)
+                # 使用lambda捕获当前方向
+                btn.clicked.connect(lambda checked, d=dir_name: self.add_direction(d))
+            
+            direction_grid.addWidget(btn, pos[0], pos[1])
+            self.direction_buttons[dir_name] = btn
+        
+        direction_layout.addLayout(direction_grid)
         form_layout.addLayout(direction_layout)
         
         # 动作类型选择
@@ -400,7 +460,7 @@ class GesturesTab(QWidget):
                     
                     # 更新表单内容
                     self.name_input.setText(name)
-                    self.direction_combo.setCurrentText(direction)
+                    self.direction_text.setText(direction)
                     self.action_type_combo.setCurrentText(action_type)
                     self.action_value_input.setText(action_value)
         except Exception as e:
@@ -445,7 +505,7 @@ class GesturesTab(QWidget):
         if gesture:
             # 更新表单内容
             self.name_input.setText(name)
-            self.direction_combo.setCurrentText(gesture.get("direction", ""))
+            self.direction_text.setText(gesture.get("direction", ""))
             action_type = gesture.get("action", {}).get("type", "")
             action_value = gesture.get("action", {}).get("value", "")
             self.action_type_combo.setCurrentText(action_type)
@@ -465,8 +525,10 @@ class GesturesTab(QWidget):
         try:
             # 获取表单数据
             name = self.name_input.text().strip()
-            direction = self.direction_combo.currentText()
-            action_type = self.action_type_combo.currentText()
+            direction = self.direction_text.text()
+            action_type_display = self.action_type_combo.currentText()
+            # 将UI显示的"执行快捷键"转换为内部使用的"shortcut"
+            action_type = "shortcut" if action_type_display == "执行快捷键" else action_type_display
             action_value = self.action_value_input.text().strip()
             
             # 验证数据
@@ -521,18 +583,18 @@ class GesturesTab(QWidget):
         """清空编辑区域"""
         # 暂时断开信号连接，避免触发onFormChanged
         self.name_input.blockSignals(True)
-        self.direction_combo.blockSignals(True)
+        self.direction_text.blockSignals(True)
         self.action_type_combo.blockSignals(True)
         self.action_value_input.blockSignals(True)
         
         self.name_input.clear()
-        self.direction_combo.setCurrentIndex(0)
+        self.direction_text.clear()
         self.action_type_combo.setCurrentIndex(0)
         self.action_value_input.clear()
         
         # 恢复信号连接
         self.name_input.blockSignals(False)
-        self.direction_combo.blockSignals(False)
+        self.direction_text.blockSignals(False)
         self.action_type_combo.blockSignals(False)
         self.action_value_input.blockSignals(False)
         
@@ -584,8 +646,10 @@ class GesturesTab(QWidget):
         """表单内容变化时自动应用更改"""
         # 获取表单数据
         name = self.name_input.text().strip()
-        direction = self.direction_combo.currentText()
-        action_type = self.action_type_combo.currentText()
+        direction = self.direction_text.text()
+        action_type_display = self.action_type_combo.currentText()
+        # 将UI显示的"执行快捷键"转换为内部使用的"shortcut"
+        action_type = "shortcut" if action_type_display == "执行快捷键" else action_type_display
         action_value = self.action_value_input.text().strip()
         
         # 表单数据不完整，不处理
@@ -758,8 +822,8 @@ class GesturesTab(QWidget):
         """名称输入框文本变化时的处理"""
         self.onFormChanged()
 
-    def direction_combo_changed(self):
-        """方向下拉框变化时的处理"""
+    def direction_text_changed(self):
+        """方向文本框文本变化时的处理"""
         self.onFormChanged()
 
     def action_type_combo_changed(self):
@@ -857,6 +921,59 @@ class GesturesTab(QWidget):
         self.gesture_cards[name] = card
         
         return card
+
+    def add_direction(self, direction):
+        """添加方向到方向序列
+        
+        Args:
+            direction: 要添加的方向名称(如"上","下","左"等)
+        """
+        current_directions = self.direction_text.text().strip()
+        
+        # 检查是否已经有方向
+        if current_directions:
+            # 分割为方向列表
+            directions = current_directions.split("-")
+            
+            # 检查最后一个方向是否与新添加的相同，相同就不添加
+            if directions[-1] == direction:
+                self.logger.debug(f"连续添加了相同的方向，忽略: {direction}")
+                return
+                
+            # 添加新方向，用'-'连接
+            new_directions = current_directions + "-" + direction
+        else:
+            # 第一个方向
+            new_directions = direction
+        
+        # 更新方向文本
+        self.direction_text.setText(new_directions)
+        
+        # 触发表单变化事件
+        self.onFormChanged()
+        
+    def remove_last_direction(self):
+        """删除方向序列中的最后一个方向"""
+        current_directions = self.direction_text.text().strip()
+        
+        # 检查是否有方向可以删除
+        if not current_directions:
+            return
+            
+        # 分割方向序列
+        directions = current_directions.split("-")
+        
+        # 如果只有一个方向，清空
+        if len(directions) <= 1:
+            self.direction_text.clear()
+        else:
+            # 移除最后一个方向，重新连接
+            directions.pop()
+            new_directions = "-".join(directions)
+            self.direction_text.setText(new_directions)
+        
+        # 触发表单变化事件
+        self.onFormChanged()
 
 # 以下代码用于测试手势管理选项卡
 if __name__ == "__main__":
