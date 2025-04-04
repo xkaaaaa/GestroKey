@@ -1,26 +1,27 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
-                            QLabel, QApplication, QLineEdit, QComboBox,
-                            QSizePolicy, QSpacerItem,
-                            QGroupBox, QMessageBox, QPushButton,
-                            QFrame, QSplitter)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, 
+                           QLabel, QApplication, QLineEdit, QComboBox, 
+                           QMessageBox, QPushButton, QScrollArea, QGroupBox,
+                           QSizePolicy, QSpacerItem, QFrame, QSplitter)
+from PyQt5.QtCore import Qt, QTimer, QRect, QEvent, QSize
+from PyQt5.QtGui import QIcon, QColor
 
 try:
     from core.logger import get_logger
     from ui.gestures.gestures import get_gesture_library
     from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
-    from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
+    from ui.components.scrollbar import AnimatedScrollArea
+    from ui.components.combobox.qcustomcombobox import QCustomComboBox
 except ImportError:
     sys.path.append('../../')
     from core.logger import get_logger
     from ui.gestures.gestures import get_gesture_library
     from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
-    from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
+    from ui.components.scrollbar import AnimatedScrollArea
+    from ui.components.combobox.qcustomcombobox import QCustomComboBox
 
 class GestureContentWidget(QWidget):
     """自定义的手势内容显示组件，专门用于解决刷新问题"""
@@ -115,6 +116,9 @@ class GesturesTab(QWidget):
         # 设置布局
         self.setLayout(main_layout)
         
+        # 应用自定义样式到下拉菜单
+        self._customize_combo_box_style()
+        
         # 连接实时更新信号
         self.name_input.textChanged.connect(self.name_input_textChanged)
         self.direction_combo.currentIndexChanged.connect(self.direction_combo_changed)
@@ -127,6 +131,34 @@ class GesturesTab(QWidget):
         # 启用响应式设计
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.logger.debug("手势管理选项卡启用了响应式设计")
+    
+    def _customize_combo_box_style(self):
+        """自定义下拉菜单样式"""
+        combo_style = {
+            "backgroundColor": "#ffffff",
+            "backgroundHoverColor": "#f5f5f5",
+            "backgroundPressColor": "#e5e5e5",
+            "borderColor": "#dddddd",
+            "hoverBorderColor": "#3498db",
+            "pressBorderColor": "#2980b9",
+            "textColor": "#333333",
+            "textHoverColor": "#000000",
+            "borderRadius": 4,
+            "borderWidth": 1,
+            "dropdownBorderRadius": 4,
+            "arrowColor": "#888888",
+            "arrowHoverColor": "#3498db",
+            "arrowPressColor": "#2980b9",
+            "dropShadowColor": QColor(0, 0, 0, 80),
+            "dropShadowRadius": 15,
+            "hoverAnimationDuration": 300,
+            "pressAnimationDuration": 200,
+            "arrowAnimationDuration": 400,
+            "popupAnimationDuration": 300
+        }
+        
+        self.direction_combo.customizeQCustomComboBox(**combo_style)
+        self.action_type_combo.customizeQCustomComboBox(**combo_style)
     
     def createGestureCardsList(self, parent_widget):
         """创建左侧手势卡片列表区域"""
@@ -248,7 +280,7 @@ class GesturesTab(QWidget):
         direction_label.setMinimumWidth(80)
         direction_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         
-        self.direction_combo = QComboBox()
+        self.direction_combo = QCustomComboBox()
         self.direction_combo.addItems(self.DIRECTIONS)
         self.direction_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
@@ -262,7 +294,7 @@ class GesturesTab(QWidget):
         action_type_label.setMinimumWidth(80)
         action_type_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         
-        self.action_type_combo = QComboBox()
+        self.action_type_combo = QCustomComboBox()
         self.action_type_combo.addItems(self.ACTION_TYPES)
         self.action_type_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
