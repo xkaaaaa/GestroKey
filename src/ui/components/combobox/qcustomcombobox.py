@@ -139,12 +139,12 @@ class QCustomComboBox(QComboBox):
         
         # 箭头旋转动画
         self._arrowRotationAnimation = QPropertyAnimation(self, b"arrowRotation")
-        self._arrowRotationAnimation.setDuration(300)
+        self._arrowRotationAnimation.setDuration(400)  # 增加箭头旋转动画时间
         self._arrowRotationAnimation.setEasingCurve(QEasingCurve.OutBack)
         
         # 下拉框显示动画
         self._popupAnimation = QPropertyAnimation(self, b"popupProgress")
-        self._popupAnimation.setDuration(250)
+        self._popupAnimation.setDuration(400)  # 增加下拉显示动画时间
         self._popupAnimation.setEasingCurve(QEasingCurve.OutCubic)
     
     def _onHoverEnter(self):
@@ -234,7 +234,8 @@ class QCustomComboBox(QComboBox):
         :param index: 选中项的索引
         """
         # 在项目被选中后，使用延迟关闭下拉框，确保选择动作完成
-        QTimer.singleShot(10, self.hidePopup)
+        # 增加延迟时间，确保交互完成后再关闭
+        QTimer.singleShot(100, self.hidePopup)
     
     # 属性存取器
     def _getHoverProgress(self):
@@ -311,7 +312,7 @@ class QCustomComboBox(QComboBox):
             elif event.type() == QEvent.MouseButtonRelease:
                 # 如果在列表项上松开鼠标，应该隐藏下拉框
                 # 在下一个事件循环中执行，确保项目选择完成后再隐藏
-                QTimer.singleShot(50, self.hidePopup)
+                QTimer.singleShot(150, self.hidePopup)
         # 处理窗口外点击
         elif event.type() == QEvent.MouseButtonPress and self._popupVisible:
             # 如果下拉框显示时，点击了其他位置，则隐藏下拉框
@@ -356,7 +357,7 @@ class QCustomComboBox(QComboBox):
             
             # 配置收回动画
             animation = QPropertyAnimation(popup, b"geometry")
-            animation.setDuration(200)  # 收回动画持续时间
+            animation.setDuration(400)  # 收回动画持续时间延长到400毫秒
             animation.setStartValue(original_geometry)
             animation.setEndValue(end_geometry)
             animation.setEasingCurve(QEasingCurve.InCubic)
