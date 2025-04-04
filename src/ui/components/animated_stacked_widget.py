@@ -228,20 +228,18 @@ class AnimatedStackedWidget(QStackedWidget):
             super().setCurrentIndex(index)
             return
         
-        # 确保当前窗口可见，这样才能创建快照
+        # 创建快照并设置可见性
         current_widget.setVisible(True)
-        
-        # 创建当前窗口的快照
         self._current_widget_snapshot = current_widget.grab()
         
-        # 临时显示目标窗口以创建快照，然后隐藏它
+        # 临时显示目标窗口以创建快照，然后隐藏所有窗口
         for i in range(self.count()):
-            self.widget(i).setVisible(i == index)
+            widget = self.widget(i)
+            widget.setVisible(i == index)
+            if i == index:
+                self._next_widget_snapshot = widget.grab()
         
-        # 创建目标窗口的快照
-        self._next_widget_snapshot = next_widget.grab()
-        
-        # 隐藏所有窗口，我们将通过绘制快照来展示它们
+        # 隐藏所有窗口，将通过绘制快照来展示
         for i in range(self.count()):
             self.widget(i).setVisible(False)
         

@@ -52,17 +52,19 @@ class AnimatedProgressBar(QProgressBar):
         if value <= 50:
             # 从绿色到黄色的渐变 (0-50%)
             ratio = value / 50.0
-            r = int(self._base_color.red() + (self._mid_color.red() - self._base_color.red()) * ratio)
-            g = int(self._base_color.green() + (self._mid_color.green() - self._base_color.green()) * ratio)
-            b = int(self._base_color.blue() + (self._mid_color.blue() - self._base_color.blue()) * ratio)
-            current_color = QColor(r, g, b)
+            current_color = QColor(
+                int(self._base_color.red() + (self._mid_color.red() - self._base_color.red()) * ratio),
+                int(self._base_color.green() + (self._mid_color.green() - self._base_color.green()) * ratio),
+                int(self._base_color.blue() + (self._mid_color.blue() - self._base_color.blue()) * ratio)
+            )
         else:
             # 从黄色到红色的渐变 (50-100%)
             ratio = (value - 50) / 50.0
-            r = int(self._mid_color.red() + (self._high_color.red() - self._mid_color.red()) * ratio)
-            g = int(self._mid_color.green() + (self._high_color.green() - self._mid_color.green()) * ratio)
-            b = int(self._mid_color.blue() + (self._high_color.blue() - self._mid_color.blue()) * ratio)
-            current_color = QColor(r, g, b)
+            current_color = QColor(
+                int(self._mid_color.red() + (self._high_color.red() - self._mid_color.red()) * ratio),
+                int(self._mid_color.green() + (self._high_color.green() - self._mid_color.green()) * ratio),
+                int(self._mid_color.blue() + (self._high_color.blue() - self._mid_color.blue()) * ratio)
+            )
         
         # 设置进度条样式
         self.setStyleSheet(f"""

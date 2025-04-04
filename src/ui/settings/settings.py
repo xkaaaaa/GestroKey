@@ -24,6 +24,12 @@ class Settings:
         """加载默认设置"""
         default_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
                                            "default_settings.json")
+        # 默认设置，无论何种情况下都会使用这些值作为备选
+        default_values = {
+            "pen_width": 3,
+            "pen_color": [0, 120, 255]
+        }
+        
         try:
             if os.path.exists(default_settings_path):
                 with open(default_settings_path, 'r', encoding='utf-8') as f:
@@ -31,19 +37,11 @@ class Settings:
                 self.logger.info(f"已从 {default_settings_path} 加载默认设置")
                 return settings
             else:
-                # 如果默认设置文件不存在，使用内置默认值
                 self.logger.warning(f"默认设置文件 {default_settings_path} 不存在，使用内置默认值")
-                return {
-                    "pen_width": 3,
-                    "pen_color": [0, 120, 255]
-                }
+                return default_values
         except Exception as e:
             self.logger.error(f"加载默认设置失败: {e}，使用内置默认值")
-            # 发生异常时也使用内置默认值
-            return {
-                "pen_width": 3,
-                "pen_color": [0, 120, 255]
-            }
+            return default_values
         
     def _get_settings_file_path(self):
         """获取设置文件路径"""

@@ -240,14 +240,8 @@ class AnimatedScrollBar(QScrollBar):
             self._collapse_timer.stop()
             self._collapse_timer.start(self._collapse_delay)
         
-        # 获取当前值
-        value = self.value()
-        
-        # 计算滚动步长 - 使用较大的步长实现更快的滚动
-        delta = event.angleDelta().y() // 3  # 比原来滚动速度更快
-        
-        # 更新值
-        self.setValue(value - delta)
+        # 更新值：直接使用事件的angleDelta来调整滚动条位置
+        self.setValue(self.value() - event.angleDelta().y() // 3)
         
         # 阻止事件传播
         event.accept()

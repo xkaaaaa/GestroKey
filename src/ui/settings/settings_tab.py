@@ -239,11 +239,8 @@ class SettingsTab(QWidget):
             # 获取设置值
             pen_width = self.pen_width_spinner.value()
             
-            # 从按钮样式表中提取颜色值
-            style = self.color_button.styleSheet()
-            color_str = style.split('rgb(')[1].split(')')[0]
-            color_parts = color_str.split(',')
-            pen_color = [int(color_parts[0]), int(color_parts[1]), int(color_parts[2])]
+            # 直接从preview_widget获取颜色值
+            pen_color = self.preview_widget.pen_color
             
             # 确保设置值更新
             self.settings.set("pen_width", pen_width)

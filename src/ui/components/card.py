@@ -55,15 +55,11 @@ class CardWidget(QWidget):
             self._hover_color = self._parse_color(hover_color)
         else:
             # 基于主色调自动计算悬停色，将RGB值提高10%，但不超过255
-            primary_r = self._primary_color.red()
-            primary_g = self._primary_color.green()
-            primary_b = self._primary_color.blue()
-            
-            hover_r = min(255, int(primary_r * 1.1))
-            hover_g = min(255, int(primary_g * 1.1))
-            hover_b = min(255, int(primary_b * 1.1))
-            
-            self._hover_color = QColor(hover_r, hover_g, hover_b)
+            self._hover_color = QColor(
+                min(255, int(self._primary_color.red() * 1.1)),
+                min(255, int(self._primary_color.green() * 1.1)),
+                min(255, int(self._primary_color.blue() * 1.1))
+            )
         
         # 选中状态颜色 - 如果未指定则使用更淡的主题色
         self._selected_color = self._parse_color(selected_color) if selected_color else QColor(180, 220, 250)  # 更浅的主题蓝色
@@ -112,9 +108,8 @@ class CardWidget(QWidget):
     def _parse_color(self, color):
         """解析颜色参数，支持RGB列表和十六进制颜色字符串"""
         if isinstance(color, list) and len(color) >= 3:
-            r, g, b = color[0], color[1], color[2]
             alpha = color[3] if len(color) > 3 else 255
-            return QColor(r, g, b, alpha)
+            return QColor(color[0], color[1], color[2], alpha)
         elif isinstance(color, str) and color.startswith("#"):
             return QColor(color)
         else:
@@ -335,15 +330,9 @@ class CardWidget(QWidget):
         # 当缩放比例变化时更新阴影效果
         shadow = self.graphicsEffect()
         if shadow and isinstance(shadow, QGraphicsDropShadowEffect):
-            # 如果按下，减小阴影
-            if self._pressed:
-                shadow.setBlurRadius(10)
-                shadow.setOffset(0, 1)
-            else:
-                # 根据悬停状态调整阴影
-                blur_radius = 10 + self._elevation * 0.8
-                shadow.setBlurRadius(blur_radius)
-                shadow.setOffset(0, self._elevation / 3)
+            blur_radius = 10 + self._elevation * 0.8
+            shadow.setBlurRadius(blur_radius)
+            shadow.setOffset(0, self._pressed and 1 or self._elevation / 3)
     
     # 选中状态控制
     def is_selected(self):

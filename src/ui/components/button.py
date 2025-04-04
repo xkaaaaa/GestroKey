@@ -52,15 +52,11 @@ class AnimatedButton(QPushButton):
             self._hover_color = self._parse_color(hover_color)
         else:
             # 基于主色调自动计算悬停色，将RGB值提高20%，但不超过255
-            primary_r = self._primary_color.red()
-            primary_g = self._primary_color.green()
-            primary_b = self._primary_color.blue()
-            
-            hover_r = min(255, int(primary_r * 1.2))
-            hover_g = min(255, int(primary_g * 1.2))
-            hover_b = min(255, int(primary_b * 1.2))
-            
-            self._hover_color = QColor(hover_r, hover_g, hover_b)
+            self._hover_color = QColor(
+                min(255, int(self._primary_color.red() * 1.2)),
+                min(255, int(self._primary_color.green() * 1.2)),
+                min(255, int(self._primary_color.blue() * 1.2))
+            )
         
         self._text_color = self._parse_color(text_color) if text_color else QColor(255, 255, 255)
         self._border_color = self._parse_color(border_color) if border_color else self._primary_color.darker(110)
@@ -115,9 +111,8 @@ class AnimatedButton(QPushButton):
     def _parse_color(self, color):
         """解析颜色参数，支持RGB列表和十六进制颜色字符串"""
         if isinstance(color, list) and len(color) >= 3:
-            r, g, b = color[0], color[1], color[2]
             alpha = color[3] if len(color) > 3 else 255
-            return QColor(r, g, b, alpha)
+            return QColor(color[0], color[1], color[2], alpha)
         elif isinstance(color, str) and color.startswith("#"):
             return QColor(color)
         else:

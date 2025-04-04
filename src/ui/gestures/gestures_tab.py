@@ -56,15 +56,13 @@ class GestureContentWidget(QWidget):
     
     def updateContent(self, direction="", action_type="", action_value=""):
         """更新内容"""
-        self.direction_label.setText(f"方向: {direction}")
         # 如果动作类型为shortcut，显示为"执行快捷键"
         display_action_type = "执行快捷键" if action_type == "shortcut" else action_type
+        
+        self.direction_label.setText(f"方向: {direction}")
         self.action_label.setText(f"动作: {display_action_type} - {action_value}")
         
-        # 强制刷新
-        self.direction_label.repaint()
-        self.action_label.repaint()
-        self.repaint()
+        self.repaint()  # 仅需一次repaint
         return True
 
 class GesturesTab(QWidget):
