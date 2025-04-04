@@ -125,6 +125,7 @@ console = ConsoleTab()
   - `set_hover_color(color)`：设置按钮悬停色调
   - `set_text_color(color)`：设置按钮文本颜色
   - `set_border_radius(radius)`：设置按钮边框圆角半径
+  - `setEnabled(enabled)`：重写的设置按钮可用状态方法，提供禁用状态的视觉反馈
 
 **特性说明**：
 - 精美的扁平化设计，主题色为蓝色系
@@ -134,6 +135,7 @@ console = ConsoleTab()
 - 支持自定义颜色、图标、文本颜色和圆角半径
 - 自动计算悬停色调，如未指定则基于主色调生成更亮的颜色，保持色彩统一性
 - 阴影和高光效果，提供现代感视觉体验
+- 支持禁用状态，灰色外观设计，禁用时无动画效果，鼠标指针变为普通箭头
 - 可直接运行文件查看示例效果，便于单独调试
 - 已应用于整个应用程序的界面按钮，提供统一的视觉风格
 
@@ -167,6 +169,9 @@ layout.addWidget(button)
 # 动态修改按钮属性
 button.set_primary_color([25, 80, 160])  # 修改为深蓝色
 button.set_border_radius(16)             # 修改圆角半径
+
+# 设置按钮为禁用状态
+button.setEnabled(False)  # 按钮变为灰色，不再响应鼠标事件和显示动画效果
 ```
 
 ### 3.2 ui/components/card.py

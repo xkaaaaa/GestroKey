@@ -66,6 +66,11 @@ class AnimatedButton(QPushButton):
         self._border_color = self._parse_color(border_color) if border_color else self._primary_color.darker(110)
         self._shadow_color = self._parse_color(shadow_color) if shadow_color else QColor(0, 0, 0, 60)
         
+        # 禁用状态的颜色
+        self._disabled_bg_color = QColor(160, 160, 160)  # 灰色背景
+        self._disabled_text_color = QColor(200, 200, 200)  # 浅灰色文本
+        self._disabled_border_color = QColor(140, 140, 140)  # 深灰色边框
+        
         self._border_radius = border_radius
         
         # 设置按钮图标
@@ -162,6 +167,41 @@ class AnimatedButton(QPushButton):
         self._press_animation_group.addAnimation(self._press_text_y_animation)
         self._press_animation_group.addAnimation(self._press_text_scale_animation)
     
+    def setEnabled(self, enabled):
+        """
+        重写设置按钮可用状态的方法
+        
+        参数:
+            enabled (bool): 是否启用按钮
+        """
+        was_enabled = self.isEnabled()
+        super().setEnabled(enabled)
+        
+        # 状态发生变化时更新按钮样式
+        if was_enabled != enabled:
+            self.logger.debug(f"按钮 '{self.text()}' 状态变更为 {'启用' if enabled else '禁用'}")
+            
+            # 更新鼠标指针样式
+            if enabled:
+                self.setCursor(Qt.PointingHandCursor)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+                # 禁用时重置所有动画状态
+                self._hovered = False
+                self._pressed = False
+                self._opacity = 0.0
+                self._text_y_offset = 0.0
+                self._text_scale = 1.0
+                self._scale_factor = 1.0
+                
+                # 停止所有动画
+                self._hover_animation_group.stop()
+                self._press_animation_group.stop()
+                self._scale_animation.stop()
+            
+            # 重绘按钮以应用新样式
+            self.update()
+    
     def sizeHint(self):
         """返回首选大小"""
         size = super().sizeHint()
@@ -170,6 +210,11 @@ class AnimatedButton(QPushButton):
     
     def enterEvent(self, event):
         """鼠标进入事件"""
+        # 禁用状态下不触发悬停动画
+        if not self.isEnabled():
+            super().enterEvent(event)
+            return
+            
         self._hovered = True
         self._hover_animation_group.stop()
         
@@ -192,6 +237,11 @@ class AnimatedButton(QPushButton):
     
     def leaveEvent(self, event):
         """鼠标离开事件"""
+        # 禁用状态下不触发离开动画
+        if not self.isEnabled():
+            super().leaveEvent(event)
+            return
+            
         self._hovered = False
         
         # 停止所有可能正在运行的动画
@@ -223,6 +273,10 @@ class AnimatedButton(QPushButton):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
+        # 禁用状态下不响应鼠标按下事件
+        if not self.isEnabled():
+            return
+            
         if event.button() == Qt.LeftButton:
             self._pressed = True
             
@@ -249,6 +303,10 @@ class AnimatedButton(QPushButton):
     
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
+        # 禁用状态下不响应鼠标释放事件
+        if not self.isEnabled():
+            return
+            
         if event.button() == Qt.LeftButton and self._pressed:
             self._pressed = False
             
@@ -285,15 +343,26 @@ class AnimatedButton(QPushButton):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # 计算当前使用的颜色
-        current_color = self._primary_color
-        if self._hovered:
-            # 使用透明度混合颜色
-            current_color = QColor(
-                int(self._primary_color.red() * (1 - self._opacity) + self._hover_color.red() * self._opacity),
-                int(self._primary_color.green() * (1 - self._opacity) + self._hover_color.green() * self._opacity),
-                int(self._primary_color.blue() * (1 - self._opacity) + self._hover_color.blue() * self._opacity)
-            )
+        # 确定要使用的颜色 - 根据按钮状态选择
+        if not self.isEnabled():
+            # 禁用状态使用灰色
+            current_color = self._disabled_bg_color
+            text_color = self._disabled_text_color
+            border_color = self._disabled_border_color
+        else:
+            # 启用状态使用正常颜色
+            current_color = self._primary_color
+            text_color = self._text_color
+            border_color = self._border_color
+            
+            # 悬停效果
+            if self._hovered:
+                # 使用透明度混合颜色
+                current_color = QColor(
+                    int(self._primary_color.red() * (1 - self._opacity) + self._hover_color.red() * self._opacity),
+                    int(self._primary_color.green() * (1 - self._opacity) + self._hover_color.green() * self._opacity),
+                    int(self._primary_color.blue() * (1 - self._opacity) + self._hover_color.blue() * self._opacity)
+                )
         
         # 应用动画缩放
         painter.save()
@@ -306,7 +375,7 @@ class AnimatedButton(QPushButton):
         shadow_rect = self.rect().adjusted(4, 6, -4, -2)  # 阴影偏移
         shadow_path.addRoundedRect(QRectF(shadow_rect), self._border_radius, self._border_radius)
         shadow_color = QColor(self._shadow_color)
-        shadow_color.setAlpha(50)
+        shadow_color.setAlpha(50 if self.isEnabled() else 20)  # 禁用状态阴影更淡
         painter.fillPath(shadow_path, shadow_color)
         
         # 绘制按钮背景 - 扁平化设计，不使用渐变
@@ -318,14 +387,14 @@ class AnimatedButton(QPushButton):
         painter.fillPath(button_path, QBrush(current_color))
         
         # 绘制边框 - 更细的边框
-        if not self._pressed:
-            pen = QPen(self._border_color)
+        if not self._pressed or not self.isEnabled():
+            pen = QPen(border_color)
             pen.setWidth(1)
             painter.setPen(pen)
             painter.drawRoundedRect(button_rect, self._border_radius, self._border_radius)
         
         # 绘制微妙的高光效果 - 扁平化设计中的微妙细节
-        if not self._pressed:
+        if (not self._pressed) and self.isEnabled():
             highlight_path = QPainterPath()
             highlight_rect = button_rect.adjusted(1, 1, -1, button_rect.height() // 3 - 1)
             highlight_path.addRoundedRect(QRectF(highlight_rect), self._border_radius - 1, self._border_radius - 1)
@@ -333,7 +402,7 @@ class AnimatedButton(QPushButton):
             painter.fillPath(highlight_path, highlight_color)
         
         # 如果按下，添加一个微妙的内阴影效果
-        if self._pressed:
+        if self._pressed and self.isEnabled():
             inner_shadow = QPainterPath()
             inner_shadow_rect = button_rect.adjusted(1, 1, -1, -1)
             inner_shadow.addRoundedRect(QRectF(inner_shadow_rect), self._border_radius, self._border_radius)
@@ -346,13 +415,18 @@ class AnimatedButton(QPushButton):
         if not self.icon().isNull():
             icon_rect = QRect(8, (self.height() - self.iconSize().height()) // 2,
                              self.iconSize().width(), self.iconSize().height())
-            self.icon().paint(painter, icon_rect)
+            
+            # 禁用状态时使用灰色图标
+            if not self.isEnabled():
+                self.icon().paint(painter, icon_rect, Qt.AlignCenter, QIcon.Disabled)
+            else:
+                self.icon().paint(painter, icon_rect)
         
         # 绘制文本 - 带动画效果
         painter.save()
         
         # 设置文本颜色
-        painter.setPen(self._text_color)
+        painter.setPen(text_color)
         
         # 获取字体并调整大小
         font = self.font()
@@ -363,13 +437,14 @@ class AnimatedButton(QPushButton):
         has_icon = not self.icon().isNull()
         text_rect = self.rect().adjusted(self.iconSize().width() + 8 if has_icon else 8, 0, -4, 0)
         
-        # 应用文本动画效果 - 位置和大小
-        painter.translate(text_rect.center())
-        painter.scale(self._text_scale, self._text_scale)
-        painter.translate(-text_rect.center())
-        
-        # 应用文本Y轴偏移
-        text_rect = text_rect.adjusted(0, int(self._text_y_offset), 0, int(self._text_y_offset))
+        # 应用文本动画效果 - 禁用状态下不应用动画效果
+        if self.isEnabled():
+            painter.translate(text_rect.center())
+            painter.scale(self._text_scale, self._text_scale)
+            painter.translate(-text_rect.center())
+            
+            # 应用文本Y轴偏移
+            text_rect = text_rect.adjusted(0, int(self._text_y_offset), 0, int(self._text_y_offset))
         
         # 居中绘制文本
         painter.drawText(text_rect, Qt.AlignCenter, self.text())
@@ -495,6 +570,51 @@ if __name__ == "__main__":
     # 添加网格到主布局
     layout.addLayout(grid_layout)
     
+    # 添加禁用状态按钮展示
+    disabled_section_title = QLabel("禁用状态按钮示例")
+    disabled_section_title.setAlignment(Qt.AlignCenter)
+    font = disabled_section_title.font()
+    font.setPointSize(16)
+    font.setBold(True)
+    disabled_section_title.setFont(font)
+    disabled_section_title.setMargin(10)
+    layout.addWidget(disabled_section_title)
+    
+    # 创建禁用状态按钮展示区域
+    disabled_layout = QHBoxLayout()
+    layout.addLayout(disabled_layout)
+    
+    # 创建各种样式的禁用按钮
+    disabled_buttons = [
+        AnimatedButton("标准按钮-禁用", primary_color=[41, 128, 185]),
+        AnimatedButton("带图标按钮-禁用", primary_color=[25, 80, 160]),
+        AnimatedButton("深色按钮-禁用", primary_color=[52, 73, 94])
+    ]
+    
+    # 添加图标并禁用按钮
+    for i, button in enumerate(disabled_buttons):
+        if i == 1:  # 为中间的按钮添加图标
+            button.setIcon(button.style().standardIcon(QStyle.SP_DialogSaveButton))
+            button.setIconSize(QSize(20, 20))
+        button.setEnabled(False)  # 禁用按钮
+        disabled_layout.addWidget(button)
+    
+    # 添加切换禁用状态的测试按钮
+    toggle_section = QHBoxLayout()
+    layout.addLayout(toggle_section)
+    
+    test_button = AnimatedButton("测试按钮")
+    toggle_button = AnimatedButton("切换禁用状态")
+    
+    toggle_section.addWidget(test_button)
+    toggle_section.addWidget(toggle_button)
+    
+    # 切换按钮状态的函数
+    def toggle_button_state():
+        test_button.setEnabled(not test_button.isEnabled())
+    
+    toggle_button.clicked.connect(toggle_button_state)
+    
     # 添加说明文本
     info = QLabel("""
     <html>
@@ -505,10 +625,12 @@ if __name__ == "__main__":
     - 点击时按钮缩放动画<br/>
     - 支持自定义颜色、图标和边框圆角<br/>
     - 扁平化设计，精美的阴影和高光效果<br/>
+    - 禁用状态显示灰色，无动画效果<br/>
     </p>
     <p style='text-align:center; margin-top:10px;'>
     <b>使用示例:</b><br/>
-    <code>button = AnimatedButton("按钮文本", primary_color=[41, 128, 185], icon="path/to/icon.png")</code>
+    <code>button = AnimatedButton("按钮文本", primary_color=[41, 128, 185], icon="path/to/icon.png")</code><br/>
+    <code>button.setEnabled(False)  # 设置为禁用状态</code>
     </p>
     </html>
     """)
@@ -520,8 +642,8 @@ if __name__ == "__main__":
     layout.addLayout(control_layout)
     
     # 实时修改按钮
-    test_button = AnimatedButton("测试按钮")
-    control_layout.addWidget(test_button, 1)
+    test_button2 = AnimatedButton("测试按钮")
+    control_layout.addWidget(test_button2, 1)
     
     # 控制按钮
     color_button = AnimatedButton("切换颜色", primary_color=[41, 128, 185])
@@ -545,7 +667,7 @@ if __name__ == "__main__":
     def toggle_color():
         global current_color_index
         current_color_index = (current_color_index + 1) % len(colors)
-        test_button.set_primary_color(colors[current_color_index])
+        test_button2.set_primary_color(colors[current_color_index])
     
     color_button.clicked.connect(toggle_color)
     
@@ -556,7 +678,7 @@ if __name__ == "__main__":
     def toggle_radius():
         global current_radius_index
         current_radius_index = (current_radius_index + 1) % len(radiuses)
-        test_button.set_border_radius(radiuses[current_radius_index])
+        test_button2.set_border_radius(radiuses[current_radius_index])
     
     radius_button.clicked.connect(toggle_radius)
     
@@ -565,8 +687,8 @@ if __name__ == "__main__":
         global current_color_index, current_radius_index
         current_color_index = 0
         current_radius_index = 0
-        test_button.set_primary_color(colors[current_color_index])
-        test_button.set_border_radius(radiuses[current_radius_index])
+        test_button2.set_primary_color(colors[current_color_index])
+        test_button2.set_border_radius(radiuses[current_radius_index])
     
     reset_button.clicked.connect(reset_test_button)
     
