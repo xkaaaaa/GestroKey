@@ -146,6 +146,22 @@ class AnimatedTabButton(QWidget):
         self._highlight_animation.setEndValue(0.0)
         self._highlight_animation.start()
         
+        # 添加过渡动画效果
+        current_text_color = painter_text_color = None
+        if self._selected:
+            painter_text_color = self._text_selected_color
+        else:
+            if self._highlight_opacity > 0:
+                r = int(self._text_color.red() * (1 - self._highlight_opacity) + 
+                      self._text_selected_color.red() * self._highlight_opacity)
+                g = int(self._text_color.green() * (1 - self._highlight_opacity) + 
+                      self._text_selected_color.green() * self._highlight_opacity)
+                b = int(self._text_color.blue() * (1 - self._highlight_opacity) + 
+                      self._text_selected_color.blue() * self._highlight_opacity)
+                current_text_color = QColor(r, g, b)
+            else:
+                current_text_color = self._text_color
+        
         super().leaveEvent(event)
     
     def mousePressEvent(self, event):

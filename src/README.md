@@ -15,6 +15,7 @@ src/
 │   ├── console.py           # 控制台选项卡
 │   ├── components/          # UI组件模块
 │   │   ├── button.py        # 自定义动画按钮组件
+│   │   ├── card.py          # 自定义卡片组件
 │   │   └── side_tab.py      # 左侧选项卡组件
 │   ├── settings/            # 设置相关界面
 │   │   ├── settings_tab.py  # 设置选项卡
@@ -31,7 +32,7 @@ src/
 
 ### 1. main.py
 
-**功能说明**：程序的主入口文件，提供带有选项卡的图形用户界面，包含控制台和设置界面。
+**功能说明**：程序的主入口文件，提供带有选项卡的图形用户界面，包含控制台、设置界面和手势管理界面。
 
 **主要类和方法**：
 - `GestroKeyApp`：主窗口类，继承自`QMainWindow`
@@ -47,6 +48,7 @@ python src/main.py
 **GUI选项卡**：
 - 控制台选项卡：提供绘制功能的开启和停止控制
 - 设置选项卡：提供应用程序设置的配置，包括笔尖粗细和笔尖颜色设置
+- 手势管理选项卡：提供手势库的管理界面，可添加、编辑、删除手势
 
 ### 2. ui/console.py
 
@@ -147,6 +149,7 @@ button.set_border_radius(16)             # 修改圆角半径
 - 选项卡切换时的平滑动画过渡效果
 - 选项卡支持图标和文本
 - 选中状态和悬停状态的动画效果
+- 鼠标离开选项卡时的平滑过渡动画效果，避免视觉上的生硬变化
 - 选中选项卡的高亮指示器动画
 - 自动适应内容区域大小
 - 可直接运行文件查看示例效果，便于单独调试
@@ -176,6 +179,75 @@ tab_widget.currentChanged.connect(onTabChanged)
 
 # 添加到界面布局
 layout.addWidget(tab_widget)
+```
+
+### 3.2 ui/components/card.py
+
+**功能说明**：卡片组件，提供精美的、有交互效果的卡片容器，可以容纳其他组件，适合展示结构化信息。
+
+**主要类和方法**：
+- `CardWidget`：卡片组件类，继承自`QWidget`
+  - `__init__(parent, primary_color, hover_color, ...)`：初始化卡片，支持多种自定义参数
+  - `add_widget(widget)`：向卡片内添加组件
+  - `set_selected(selected)`：设置卡片的选中状态
+  - `is_selected()`：获取卡片的选中状态
+  - `set_title(title)`：设置卡片标题
+  - `get_title()`：获取卡片标题
+  - `set_primary_color(color)`：设置卡片主色调
+  - `set_hover_color(color)`：设置卡片悬停色调
+  - `set_selected_color(color)`：设置卡片选中状态的颜色
+  - `set_text_color(color)`：设置卡片文本颜色
+  - `set_border_radius(radius)`：设置卡片边框圆角半径
+
+**特性说明**：
+- 精美的扁平化设计，默认使用淡蓝色系主题
+- 支持鼠标悬停、点击的动画效果
+- 具有选中状态，默认使用更淡的主题蓝色作为选中状态颜色，视觉效果更柔和
+- 动态阴影效果，悬停时阴影增强，增加立体感
+- 适当的内边距设计，确保内容不会覆盖卡片边框
+- 内容随卡片一起动画效果，提供更连贯的交互体验
+- 支持添加标题和内容组件
+- 完全可定制的外观，包括颜色、圆角、阴影等
+- 发射点击信号，便于处理用户交互
+- 可直接运行文件查看示例效果，便于单独调试
+- 适合用于展示列表项、信息卡片、设置面板等场景
+
+**使用方法**：
+```python
+from ui.components.card import CardWidget
+
+# 创建基本卡片
+card = CardWidget(title="卡片标题")
+
+# 添加内容
+content_label = QLabel("这是卡片内容")
+content_label.setAlignment(Qt.AlignCenter)
+card.add_widget(content_label)
+
+# 创建自定义颜色的卡片
+custom_card = CardWidget(
+    title="自定义卡片",
+    primary_color=[230, 230, 250],  # 淡紫色
+    hover_color=[200, 200, 240],    # 悬停颜色
+    selected_color=[85, 170, 225],  # 选中状态颜色（更淡的主题蓝色）
+    text_color=[70, 70, 120],       # 文本颜色
+    border_radius=12,               # 边框圆角
+    min_width=200,                  # 最小宽度
+    min_height=150                  # 最小高度
+)
+
+# 添加到布局
+layout.addWidget(card)
+
+# 设置选中状态
+card.set_selected(True)
+
+# 监听点击事件
+card.clicked.connect(on_card_clicked)
+
+# 动态修改卡片属性
+card.set_title("新标题")
+card.set_primary_color([240, 255, 240])  # 淡绿色
 ```
 
 ### 4. ui/settings/settings_tab.py
@@ -357,19 +429,28 @@ gesture_lib.reset_to_default()
 **主要类和方法**：
 - `GesturesTab`：手势管理选项卡类，继承自`QWidget`
   - `initUI()`：初始化选项卡界面
-  - `update_gesture_list()`：更新手势列表显示
-  - `add_gesture()`：添加新手势
-  - `edit_gesture()`：编辑选中的手势
-  - `delete_gesture()`：删除选中的手势
-  - `reset_gestures()`：重置为默认手势库
-  - `save_gestures()`：保存手势库修改
+  - `createGestureCardsList()`：创建左侧手势卡片列表区域
+  - `createGestureEditor()`：创建右侧手势编辑区域
+  - `updateGestureCards()`：更新手势卡片列表
+  - `onCardClicked()`：处理卡片点击事件
+  - `onGestureCardClicked(name)`：响应手势卡片选中，更新编辑区域
+  - `addNewGesture()`：添加新手势
+  - `saveGesture()`：保存当前编辑的手势
+  - `deleteGesture()`：删除选中的手势
+  - `resetGestures()`：重置为默认手势库
+  - `clearEditor()`：清空编辑区域
+  - `saveGestureLibrary()`：保存手势库到文件
 
 **特性说明**：
-- 使用列表显示所有已定义的手势，包括名称、方向和操作
-- 提供添加、编辑、删除手势的功能
-- 支持重置为默认手势库
-- 即时保存所有修改
-- 使用自定义AnimatedButton组件作为操作按钮，保持统一的视觉风格
+- 采用左右分栏布局，左侧为手势卡片列表，右侧为编辑区域
+- 使用自定义卡片组件（CardWidget）来展示手势，提供直观且美观的用户界面
+- 卡片包含手势名称、方向和动作信息，点击卡片可在右侧编辑
+- 卡片具有选中状态，当前编辑的手势卡片会高亮显示
+- 右侧编辑区域提供完整的手势编辑功能，包括名称、方向、动作类型和值
+- 支持添加、编辑、删除、保存手势操作
+- 可以重置为默认手势库
+- 所有界面按钮使用自定义AnimatedButton组件，保持统一视觉风格
+- 滚动区域支持，当手势数量较多时可滚动浏览
 
 **使用方法**：
 ```python
@@ -558,8 +639,12 @@ python src/main.py
 4. 绘制完成后释放右键，系统会自动识别绘制方向
 5. 如果识别的方向与手势库中的手势匹配，系统会自动执行相应的操作（如快捷键）
 6. 可以在设置选项卡中调整笔尖粗细和颜色，设置实时应用而无需重启绘制功能
-7. 点击"停止绘制"按钮关闭绘制功能
-8. 点击"退出程序"按钮退出应用
+7. 可以在手势管理选项卡中查看、添加、编辑和删除手势：
+   - 左侧卡片列表展示所有可用手势
+   - 点击卡片可在右侧编辑区域修改手势
+   - 可添加新手势、删除现有手势或重置为默认手势库
+8. 点击"停止绘制"按钮关闭绘制功能
+9. 点击"退出程序"按钮退出应用
 
 ## 设置管理
 
@@ -595,7 +680,9 @@ GestroKey实现了完整的手势识别和执行系统：
    - 默认手势库定义在`ui/gestures/default_gestures.json`
    - 如果文件不存在或损坏，系统自动创建包含常用操作的默认手势库
    - 通过手势管理选项卡(`ui/gestures/gestures_tab.py`)提供可视化的手势管理界面
+   - 采用左右分栏布局，左侧使用卡片组件展示手势，右侧为编辑区域
    - 支持对手势库的添加、编辑、删除和重置操作
+   - 卡片式界面提供直观的视觉反馈，突出显示当前选中的手势
 
 4. **支持的手势动作**：
    - 快捷键执行：支持绝大多数单键和组合键操作
@@ -615,6 +702,11 @@ GestroKey使用模块化UI组件系统，所有自定义UI组件都位于`ui/com
   - 特性：扁平化设计、文字动画效果、点击缩放、阴影效果
   - 优点：现代感的UI体验，简单的接口，可单独测试
   - 应用：已在整个应用程序中替代标准按钮，包括主窗口、控制台和设置面板
+
+- `card.py`：精美的卡片容器组件，可容纳其他UI组件
+  - 特性：扁平化设计、悬停和点击动画、选中状态、动态阴影效果
+  - 优点：整洁的信息展示，交互反馈，一致的视觉风格
+  - 应用：用于手势管理选项卡中展示手势信息，替代传统表格视图
 
 - `side_tab.py`：左侧垂直选项卡组件，替代标准QTabWidget
   - 特性：垂直布局、平滑切换动画、选中状态指示、扁平化设计
@@ -637,6 +729,8 @@ from core.drawer import DrawingManager
 from core.logger import get_logger
 from ui.settings.settings import get_settings
 from ui.components.button import AnimatedButton
+from ui.components.card import CardWidget
+from ui.gestures.gestures import get_gesture_library
 
 # 创建日志记录器
 logger = get_logger("MyApp")
@@ -648,12 +742,24 @@ pen_color = settings.get("pen_color")
 logger.info(f"使用笔尖粗细: {pen_width}")
 logger.info(f"使用笔尖颜色: RGB({pen_color[0]},{pen_color[1]},{pen_color[2]})")
 
+# 获取手势库
+gesture_lib = get_gesture_library()
+gestures = gesture_lib.get_all_gestures()
+logger.info(f"已加载 {len(gestures)} 个手势")
+
 # 创建绘制管理器
 drawer = DrawingManager()
 
 # 创建自定义按钮
 start_button = AnimatedButton("开始绘制", primary_color=[41, 128, 185])
 stop_button = AnimatedButton("停止绘制", primary_color=[52, 73, 94])
+
+# 创建手势信息卡片
+gesture_card = CardWidget(title="复制")
+gesture_label = QLabel("方向: 右-下\n动作: Ctrl+C")
+gesture_label.setAlignment(Qt.AlignCenter)
+gesture_card.add_widget(gesture_label)
+gesture_card.clicked.connect(on_card_clicked)
 
 # 连接信号
 start_button.clicked.connect(drawer.start)
