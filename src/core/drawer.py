@@ -209,12 +209,10 @@ class TransparentDrawingOverlay(QWidget):
             
         self.logger.debug("停止绘制，开始淡出")
         
-        # 保存当前线条
+        # 保存当前线条并分析方向
         if self.current_line:
             # 分析笔画方向
             direction_sequence, direction_details = self.stroke_analyzer.analyze_direction(self.current_line)
-            
-            # 获取人类可读描述
             direction_description = self.stroke_analyzer.get_direction_description(direction_sequence)
             
             # 记录本次绘制的点数据和方向
@@ -223,32 +221,16 @@ class TransparentDrawingOverlay(QWidget):
             # 执行与方向匹配的手势动作
             if direction_sequence and direction_sequence not in ["无方向", "无明显方向"]:
                 try:
-                    # 获取手势执行器
-                    self.logger.debug(f"尝试获取手势执行器...")
                     gesture_executor = get_gesture_executor()
-                    self.logger.debug(f"手势执行器获取成功，尝试执行手势: {direction_sequence}")
                     
-                    # 检查手势库是否正确加载
-                    if gesture_executor and hasattr(gesture_executor, 'gesture_library') and gesture_executor.gesture_library:
-                        # 获取手势库中的匹配手势
-                        name, gesture = gesture_executor.gesture_library.get_gesture_by_direction(direction_sequence)
-                        if gesture:
-                            self.logger.info(f"找到匹配的手势: {name}，方向: {direction_sequence}")
-                            
-                            # 执行手势
-                            result = gesture_executor.execute_gesture(direction_sequence)
-                            if result:
-                                self.logger.info(f"成功执行手势动作: {direction_sequence} -> {name if name else '未知手势'}")
-                            else:
-                                self.logger.info(f"手势动作执行失败: {direction_sequence}")
-                        else:
-                            self.logger.info(f"手势库中未找到匹配的手势方向: {direction_sequence}")
-                    else:
-                        self.logger.warning("手势库未正确加载，跳过手势执行")
+                    # 执行手势
+                    result = gesture_executor.execute_gesture(direction_sequence)
+                    if result:
+                        name = gesture_executor.gesture_library.get_gesture_by_direction(direction_sequence)[0]
+                        self.logger.info(f"成功执行手势: {direction_sequence} -> {name if name else '未知手势'}")
                 except Exception as e:
                     self.logger.error(f"执行手势动作时出错: {e}")
-                    import traceback
-                    self.logger.error(f"详细错误: {traceback.format_exc()}")
+                    self.logger.debug(f"详细错误: {traceback.format_exc()}")
             
             # 保存线条数据
             self.lines.append(self.current_line.copy())
@@ -262,17 +244,13 @@ class TransparentDrawingOverlay(QWidget):
         
         # 停止更新计时器，启动淡出计时器
         self.update_timer.stop()
-        
-        # 如果淡出计时器正在运行，先停止它
         if self.fade_timer.isActive():
             self.fade_timer.stop()
-            
-        # 启动淡出计时器
         self.fade_timer.start()
     
     def _log_stroke_data(self, stroke_data, direction_sequence=None, direction_description=None, direction_details=None):
         """记录笔画数据到日志"""
-        if not stroke_data:
+        if not stroke_data or len(stroke_data) < 2:
             return
             
         stroke_id = stroke_data[0][4]  # 获取笔画ID
@@ -281,43 +259,25 @@ class TransparentDrawingOverlay(QWidget):
         end_time = stroke_data[-1][3]
         duration = end_time - start_time
         
-        # 记录基本信息和方向
+        # 构建方向信息
         direction_info = ""
-        if direction_sequence and direction_sequence != "无方向" and direction_sequence != "无明显方向":
-            direction_info = f", 方向序列: {direction_sequence}"
-        if direction_description:
-            direction_info += f", 描述: {direction_description}"
-            
-        self.logger.info(f"笔画 #{stroke_id} 完成: {point_count}个点, 用时:{duration:.2f}秒{direction_info}")
-        
-        # 记录方向详情
-        if direction_details:
-            details_str = ", ".join([f"{d}: {p:.1f}%" for d, p in sorted(direction_details.items(), key=lambda x: x[1], reverse=True)])
-            self.logger.debug(f"笔画 #{stroke_id} 方向详情: {details_str}")
+        if direction_sequence and direction_sequence not in ["无方向", "无明显方向"]:
+            direction_info = f", 方向: {direction_sequence}"
+            if direction_description:
+                direction_info += f" ({direction_description})"
         
         # 计算统计数据
-        if point_count > 1:
-            # 计算总路径长度
-            total_distance = 0
-            for i in range(1, len(stroke_data)):
-                x1, y1 = stroke_data[i-1][0], stroke_data[i-1][1]
-                x2, y2 = stroke_data[i][0], stroke_data[i][1]
-                segment_distance = math.sqrt((x2-x1)**2 + (y2-y1)**2)
-                total_distance += segment_distance
-                
-            # 计算平均速度
-            avg_speed = total_distance / duration if duration > 0 else 0
+        total_distance = 0
+        for i in range(1, len(stroke_data)):
+            x1, y1 = stroke_data[i-1][0], stroke_data[i-1][1]
+            x2, y2 = stroke_data[i][0], stroke_data[i][1]
+            total_distance += math.sqrt((x2-x1)**2 + (y2-y1)**2)
             
-            # 计算平均压力
-            avg_pressure = sum(point[2] for point in stroke_data) / len(stroke_data)
-            
-            # 记录统计数据
-            self.logger.debug(f"笔画 #{stroke_id} 统计: 长度={total_distance:.1f}像素, 平均速度={avg_speed:.1f}像素/秒, 平均压力={avg_pressure:.2f}")
-            
-            # 记录起点和终点
-            start_x, start_y = stroke_data[0][0], stroke_data[0][1]
-            end_x, end_y = stroke_data[-1][0], stroke_data[-1][1]
-            self.logger.debug(f"笔画 #{stroke_id} 轨迹: 起点=({start_x},{start_y}), 终点=({end_x},{end_y})")
+        avg_speed = total_distance / duration if duration > 0 else 0
+        
+        # 记录主要信息
+        self.logger.info(f"笔画 #{stroke_id}: {point_count}点, {duration:.2f}秒{direction_info}")
+        self.logger.debug(f"笔画 #{stroke_id} 统计: 长度={total_distance:.1f}px, 速度={avg_speed:.1f}px/秒")
     
     def fade_path(self):
         """实现路径的淡出效果"""
@@ -580,40 +540,37 @@ class DrawingManager:
             raise
     
     def _calculate_simulated_pressure(self, x, y):
-        """根据鼠标移动速度计算模拟压力值（内部方法）"""
+        """根据鼠标移动速度计算模拟压力值"""
         if not self.last_position:
             return 0.5
             
-        # 计算移动距离和时间
+        # 计算移动速度
         last_x, last_y = self.last_position
         distance = math.sqrt((x - last_x)**2 + (y - last_y)**2)
         current_time = time.time()
-        time_diff = current_time - self.last_pressure_time
+        time_diff = max(0.001, current_time - self.last_pressure_time)
         self.last_pressure_time = current_time
         
-        if time_diff <= 0:
-            return self.simulated_pressure
-            
-        # 计算速度
+        # 计算速度并映射到压力值
         speed = distance / time_diff
         
-        # 速度越快，压力越小（反比关系）
-        # 设置一个速度阈值，当速度超过这个值时，压力接近0
-        max_speed = 2000
-        min_speed = 50
+        # 速度范围和对应的压力值
+        min_speed, max_speed = 50, 2000
+        min_pressure, max_pressure = 0.9, 0.3
         
-        if speed > max_speed:
-            pressure = 0.3
-        elif speed < min_speed:
-            pressure = 0.9
+        # 线性映射: 低速度对应高压力，高速度对应低压力
+        if speed <= min_speed:
+            pressure = max_pressure
+        elif speed >= max_speed:
+            pressure = min_pressure
         else:
-            # 线性映射
-            pressure = 0.9 - 0.6 * ((speed - min_speed) / (max_speed - min_speed))
+            # 线性插值
+            ratio = (speed - min_speed) / (max_speed - min_speed)
+            pressure = max_pressure - ratio * (max_pressure - min_pressure)
         
-        # 平滑压力变化，避免突变
+        # 平滑压力变化
         self.simulated_pressure = self.simulated_pressure * 0.7 + pressure * 0.3
         
-        # 确保在合理范围内
         return max(0.3, min(0.9, self.simulated_pressure))
     
     def get_last_direction(self):

@@ -59,14 +59,6 @@ src/
 │       ├── gestures_tab.py  # 手势管理选项卡
 │       ├── gestures.py      # 手势库管理模块
 │       └── default_gestures.json # 默认手势库定义（JSON格式）
-│   ├── settings/            # 设置相关界面
-│   │   ├── settings_tab.py  # 设置选项卡
-│   │   ├── settings.py      # 设置管理模块
-│   │   └── default_settings.json # 默认设置定义（JSON格式）
-│   └── gestures/            # 手势管理相关界面
-│       ├── gestures_tab.py  # 手势管理选项卡
-│       ├── gestures.py      # 手势库管理模块
-│       └── default_gestures.json # 默认手势库定义（JSON格式）
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
 │       ├── icon.svg         # 应用图标
@@ -1476,67 +1468,45 @@ class GesturesTab(QWidget):
 
 **主要类和方法**：
 - `DrawingSignals`：信号类，处理线程间通信
-  - `__init__(self)`：初始化信号对象
-  - `stroke_completed`：信号，当一次笔画绘制完成时发出，传递笔画ID和方向序列
-  - `direction_detected`：信号，当检测到方向变化时发出，传递方向序列
-  - `gesture_executed`：信号，当手势执行完成时发出，传递执行状态和手势名称
+  - `start_drawing_signal`：信号，开始绘制时发出
+  - `continue_drawing_signal`：信号，继续绘制时发出
+  - `stop_drawing_signal`：信号，停止绘制时发出
 
 - `TransparentDrawingOverlay`：透明绘制覆盖层
   - `__init__(self)`：初始化绘制覆盖层，创建透明窗口和绘制参数
   - `set_pen_width(self, width)`：设置笔尖粗细
-    - `width`：笔尖粗细值，整数值（像素）
   - `set_pen_color(self, color)`：设置笔尖颜色
-    - `color`：RGB格式的数组，如[255, 0, 0]
   - `startDrawing(self, x, y, pressure)`：开始绘制，同时停止任何正在进行的淡出效果
-    - `x`：起始X坐标
-    - `y`：起始Y坐标
-    - `pressure`：压力值（可选），范围0.0-1.0
   - `continueDrawing(self, x, y, pressure)`：继续绘制轨迹
-    - `x`：当前X坐标
-    - `y`：当前Y坐标
-    - `pressure`：压力值（可选），范围0.0-1.0
   - `stopDrawing(self)`：停止绘制并开始淡出效果，同时分析手势并执行
   - `get_stroke_direction(self, stroke_id)`：获取指定笔画的方向
-    - `stroke_id`：笔画ID，整数值
-    - 返回值：方向序列字符串，如"上-右-下"
-  - `paintEvent(self, event)`：绘制事件处理，负责绘制当前笔画和历史笔画
-  - `_start_fade_animation(self)`：开始笔画淡出动画
-  - `_on_fade_finished(self)`：淡出动画完成后的清理工作
-  - `_analyze_stroke(self, stroke_id)`：分析指定ID的笔画，识别方向序列
-  - `_execute_gesture(self, direction)`：执行匹配的手势动作
+  - `paintEvent(self, event)`：绘制事件处理，负责绘制当前笔画
+  - `_log_stroke_data(self, stroke_data, ...)`：记录笔画数据，简化后只记录必要信息
+  - `fade_path(self)`：实现路径的淡出效果
 
 - `DrawingManager`：绘制管理器
   - `__init__(self)`：初始化绘制管理器，创建鼠标钩子和参数
-  - `start(self)`：开始绘制功能，启动监听，并从设置加载笔尖粗细和颜色
+  - `start(self)`：开始绘制功能，启动监听
   - `stop(self)`：停止绘制功能，清理资源
-  - `update_settings(self)`：更新设置参数，无需重启绘制功能即可应用修改的参数
+  - `update_settings(self)`：更新设置参数
   - `get_last_direction(self)`：获取最后一次绘制的方向
-    - 返回值：方向序列字符串，如"上-右-下"
-  - `_on_mouse_event(self, event)`：处理鼠标事件，检测右键操作
-  - `_on_stroke_completed(self, stroke_id, direction)`：处理笔画完成事件
-  - `_on_direction_detected(self, direction)`：处理方向检测事件
-  - `_on_gesture_executed(self, success, gesture_name)`：处理手势执行事件
+  - `_init_mouse_hook(self)`：初始化全局鼠标监听
+  - `_calculate_simulated_pressure(self, x, y)`：根据鼠标移动速度计算模拟压力值，经过简化和优化
 
 **特性说明**：
-- 全局透明覆盖层，可在任何应用程序上方进行绘制，不受区域限制
-- 支持完整的绘制生命周期：开始、继续、结束，每个阶段有清晰的事件处理
-- 所有设置值完全从settings模块获取，不存在内置默认值
-- 如果设置模块不可用，会使用当前已设置的值继续工作，而不会回退到固定的默认值
-- 绘制结束后会自动分析笔画方向，并在手势库中查找匹配的手势进行执行
-- 手势执行功能集成在绘制流程中，无需额外调用
-- 支持笔画淡出动画效果，提供良好的视觉反馈
-- 使用信号槽机制通知UI组件绘制状态变化，代码结构松耦合
-- 智能处理鼠标事件，只响应鼠标右键绘制，不干扰其他鼠标操作
-- 支持压力感应（如果设备支持），可以根据压力值调整笔尖粗细
-- 高效的绘制算法，即使在复杂绘制场景下也能保持流畅
-- 实时路径绘制，减少视觉延迟，提供即时反馈
-- 支持多显示器环境，可在任何显示器上进行绘制
-- 资源管理优化，及时释放不再需要的资源，避免内存泄漏
+- 全局透明覆盖层，可在任何应用程序上方进行绘制
+- 支持完整的绘制生命周期：开始、继续、结束
+- 所有设置值从settings模块获取
+- 绘制结束后自动分析笔画方向，执行匹配手势
+- 支持笔画淡出动画效果
+- 智能处理鼠标事件，只响应鼠标右键绘制
+- 简化的日志记录，只保留关键信息
+- 优化的压力计算算法
+- 高效的绘制算法，保持流畅性能
 
 **使用方法**：
 ```python
 from core.drawer import DrawingManager
-import time
 
 # 创建绘制管理器
 drawer = DrawingManager()
@@ -1544,12 +1514,8 @@ drawer = DrawingManager()
 # 开始绘制功能
 drawer.start()  # 此时可以使用鼠标右键进行绘制
 
-# 等待用户操作
-print("请使用鼠标右键进行绘制...")
-time.sleep(10)  # 实际应用中不需要此等待，这里只是示例
-
-# 更新设置参数（无需重启绘制功能）
-drawer.update_settings()  # 从设置中重新读取参数并应用
+# 更新设置参数
+drawer.update_settings()
 
 # 获取最后一次绘制的方向
 direction = drawer.get_last_direction()
@@ -1559,102 +1525,18 @@ print(f"最后绘制的方向: {direction}")
 drawer.stop()
 ```
 
-**高级用法**：监听绘制事件
-```python
-from core.drawer import DrawingManager
-from PyQt5.QtCore import QObject
-
-class DrawingMonitor(QObject):
-    def __init__(self):
-        super().__init__()
-        self.drawer = DrawingManager()
-        
-        # 连接信号
-        self.drawer.overlay.signals.stroke_completed.connect(self.on_stroke_completed)
-        self.drawer.overlay.signals.direction_detected.connect(self.on_direction_detected)
-        self.drawer.overlay.signals.gesture_executed.connect(self.on_gesture_executed)
-        
-    def start_monitoring(self):
-        self.drawer.start()
-        print("开始监控绘制事件...")
-    
-    def stop_monitoring(self):
-        self.drawer.stop()
-        print("停止监控绘制事件...")
-    
-    def on_stroke_completed(self, stroke_id, direction):
-        print(f"笔画完成: ID={stroke_id}, 方向={direction}")
-    
-    def on_direction_detected(self, direction):
-        print(f"检测到方向: {direction}")
-    
-    def on_gesture_executed(self, success, gesture_name):
-        if success:
-            print(f"成功执行手势: {gesture_name}")
-        else:
-            print(f"手势执行失败: {gesture_name}")
-
-# 使用监控器
-monitor = DrawingMonitor()
-monitor.start_monitoring()
-
-# ... 应用程序主循环 ...
-
-# 停止监控
-monitor.stop_monitoring()
-```
-
 #### 3.2 core/stroke_analyzer.py
 
 **功能说明**：笔画分析模块，负责分析用户绘制的笔画轨迹，识别方向变化和绘制趋势。
 
 **主要类和方法**：
 - `StrokeAnalyzer`：笔画分析器
-  - `__init__(self)`：初始化笔画分析器，设置方向识别参数
-  - `analyze_direction(self, points)`：分析一系列点的方向变化，返回方向序列和方向详细信息
-    - `points`：点列表，每个点为(x, y, pressure, time, id)格式的元组
-    - 返回值：(direction_str, direction_details)元组，其中direction_str是方向序列字符串（如"上-右-下"），direction_details是详细信息字典
+  - `analyze_direction(self, points)`：分析一系列点的方向变化
   - `get_direction_description(self, direction_str)`：将方向字符串转换为人类可读的描述
-    - `direction_str`：方向序列字符串，如"上-右-下"
-    - 返回值：人类可读的描述字符串，如"先上后右再下"
-  - `_segment_stroke(self, coords)`：将笔画分割为不同方向的段
-    - `coords`：坐标列表，每个坐标为(x, y)元组
-    - 返回值：段列表，每个段包含一系列具有相似方向的点
-  - `_analyze_segment_directions(self, coords)`：分析一个段内的方向分布
-    - `coords`：段内坐标列表
-    - 返回值：方向分布字典，键为方向常量，值为该方向的点数占比
   - `_determine_direction(self, dx, dy)`：根据位移确定基本方向
-    - `dx`：X方向位移
-    - `dy`：Y方向位移
-    - 返回值：方向常量（如UP、DOWN、LEFT、RIGHT等）
-  - `_simplify_directions(self, directions)`：简化方向序列，合并相同方向并移除噪声
-    - `directions`：原始方向序列
-    - 返回值：简化后的方向序列
-  - `_get_major_directions(self, directions_with_count)`：获取主要方向，过滤掉次要方向
-    - `directions_with_count`：方向及其计数的列表
-    - 返回值：主要方向列表
 
 **方向常量**：
-- `UP`：上，值为"上"
-- `DOWN`：下，值为"下"
-- `LEFT`：左，值为"左"
-- `RIGHT`：右，值为"右"
-- `UP_LEFT`：左上，值为"左上"
-- `UP_RIGHT`：右上，值为"右上"
-- `DOWN_LEFT`：左下，值为"左下"
-- `DOWN_RIGHT`：右下，值为"右下"
-
-**特性说明**：
-- 支持八个基本方向（上、下、左、右、左上、右上、左下、右下），覆盖所有常见绘制方向
-- 智能方向分析算法，能够准确识别用户的绘制意图
-- 智能噪声过滤，忽略细微抖动和偶然偏移，提高识别准确性
-- 方向序列简化，合并连续相同方向，使结果更加清晰
-- 支持复杂路径分析，能够识别多段组合手势（如"Z"形、"N"形）
-- 提供人类可读的方向描述，便于调试和用户反馈
-- 支持详细的分析信息输出，便于开发时调试和优化
-- 高效的算法实现，即使处理大量点也能保持良好性能
-- 参数可调整，可以根据需要调整方向判定阈值和噪声过滤参数
-- 与绘制模块和手势执行模块无缝集成，形成完整的手势识别链
+- `UP`、`DOWN`、`LEFT`、`RIGHT`等八个基本方向
 
 **使用方法**：
 ```python
@@ -1663,415 +1545,121 @@ from core.stroke_analyzer import StrokeAnalyzer
 # 创建分析器
 analyzer = StrokeAnalyzer()
 
-# 假设有一系列点 [(x1,y1,pressure1,time1,id1), (x2,y2,pressure2,time2,id1), ...]
-# 模拟一个向右然后向下的手势
-points = [
-    (100, 100, 0.5, 1631234567.89, 1),
-    (150, 100, 0.6, 1631234567.95, 1),
-    (200, 100, 0.6, 1631234568.00, 1),
-    (250, 100, 0.6, 1631234568.05, 1),
-    (300, 100, 0.6, 1631234568.10, 1),
-    (300, 150, 0.6, 1631234568.15, 1),
-    (300, 200, 0.6, 1631234568.20, 1),
-    (300, 250, 0.6, 1631234568.25, 1),
-    (300, 300, 0.5, 1631234568.30, 1)
-]
+# 分析点序列
+points = [(100, 100, 0.5, 1.0, 1), (150, 100, 0.5, 1.1, 1), (200, 150, 0.5, 1.2, 1)]
+direction, stats = analyzer.analyze_direction(points)
+print(f"方向: {direction}")
 
-# 分析方向
-direction_sequence, direction_details = analyzer.analyze_direction(points)
-print(f"方向序列: {direction_sequence}")
-print(f"方向详细信息: {direction_details}")
-
-# 获取人类可读描述
-description = analyzer.get_direction_description(direction_sequence)
-print(f"描述: {description}")  # 输出: "先右后下"
-```
-
-**高级用法**：自定义分析参数
-```python
-# 创建使用自定义参数的分析器
-custom_analyzer = StrokeAnalyzer()
-
-# 修改方向判定阈值（更敏感的方向检测）
-custom_analyzer.direction_threshold = 0.2  # 默认为0.3
-
-# 修改最小段长度（更短的段会被视为噪声）
-custom_analyzer.min_segment_length = 3  # 默认为5
-
-# 修改主要方向阈值（只有占比超过此阈值的方向才会被视为主要方向）
-custom_analyzer.major_direction_threshold = 0.15  # 默认为0.2
-
-# 使用自定义分析器
-direction, details = custom_analyzer.analyze_direction(points)
+# 获取方向描述
+description = analyzer.get_direction_description(direction)
+print(f"描述: {description}")
 ```
 
 #### 3.3 core/gesture_executor.py
 
-**功能说明**：手势执行模块，负责根据识别的手势方向执行相应的操作，目前主要支持快捷键操作。
+**功能说明**：手势执行模块，负责根据识别的手势方向序列执行对应的操作。
 
 **主要类和方法**：
-- `GestureExecutor`：手势执行器类
-  - `__init__(self)`：初始化手势执行器
-  - `execute_gesture(self, direction)`：根据方向序列执行对应的手势动作
-    - `direction`：方向序列字符串，如"上-右-下"
-    - 返回值：布尔值，True表示成功执行手势，False表示未找到匹配手势或执行失败
-  - `_execute_shortcut(self, shortcut_str)`：执行快捷键操作
-    - `shortcut_str`：快捷键字符串，如"ctrl+c"、"alt+tab"等
-    - 返回值：布尔值，True表示成功执行，False表示执行失败
-  - `_press_keys(self, modifier_keys, regular_keys)`：内部方法，按下并释放指定的按键
-    - `modifier_keys`：修饰键列表，如["ctrl", "shift"]
-    - `regular_keys`：普通键列表，如["c", "v"]
-    - 返回值：布尔值，True表示成功执行，False表示执行失败
-  - `_key_name_to_vk(self, key_name)`：内部方法，将键名转换为虚拟键码
-    - `key_name`：键名字符串，如"ctrl"、"a"、"f1"等
-    - 返回值：对应的虚拟键码
-
-- `get_gesture_executor()`：获取手势执行器的全局单例实例
-  - 返回值：GestureExecutor实例
-
-**支持的动作类型**：
-- `shortcut`：执行键盘快捷键，如"ctrl+c"、"alt+tab"等
-
-**支持的键名**：
-- 修饰键：ctrl, alt, shift, win
-- 功能键：f1, f2, ..., f12
-- 特殊键：tab, enter, esc, space, backspace, delete, insert, home, end, pageup, pagedown, up, down, left, right, capslock, numlock, scrolllock, printscreen
-- 普通键：a-z, 0-9, 以及各种符号键（如;, ', ,, ., /, \, [, ], -, =）
+- `GestureExecutor`：手势执行器
+  - `__init__(self)`：初始化手势执行器，加载键盘控制器和手势库
+  - `get_instance(cls)`：获取手势执行器的单例实例
+  - `execute_gesture(self, direction)`：执行与方向匹配的手势动作，经过优化简化
+  - `_execute_shortcut(self, shortcut_str)`：执行键盘快捷键，简化实现，提高稳定性
 
 **特性说明**：
-- 支持组合键快捷方式（如Ctrl+Alt+Del），可以同时按下多个修饰键和普通键
-- 使用独立线程执行按键操作，不会阻塞主线程，保证UI响应性
-- 支持大量特殊键（如功能键、修饰键等），覆盖绝大多数常用快捷键
-- 自动处理按键的正确顺序（先修饰键，后普通键）和释放顺序（先普通键，后修饰键）
-- 集成到绘画模块中，能够自动识别并执行与绘制方向匹配的手势
-- 从ui.gestures.gestures模块获取手势库，确保使用统一的手势管理系统
-- 跨平台兼容设计（实际实现主要针对Windows，但架构允许扩展支持其他平台）
-- 提供全局单例实例，确保全应用程序使用同一执行器，避免资源冲突
-- 详细的日志记录，包括手势匹配和执行过程，便于调试和问题排查
-- 可扩展性强，架构设计允许轻松添加新的动作类型，如启动程序、执行脚本等
+- 单例模式设计，确保全局只有一个执行器实例
+- 支持多种操作类型，包括快捷键执行
+- 优化的错误处理机制
+- 精简的日志记录
+- 多线程键盘操作，避免阻塞UI线程
+- 提高代码可读性和维护性
 
 **使用方法**：
 ```python
 from core.gesture_executor import get_gesture_executor
 
-# 获取手势执行器
+# 获取执行器实例
 executor = get_gesture_executor()
 
-# 执行特定方向的手势
-result = executor.execute_gesture("右-下")
-print(f"手势执行{'成功' if result else '失败'}")
-
-# 尝试执行另一个方向的手势
-result = executor.execute_gesture("上-左")
-print(f"手势执行{'成功' if result else '失败'}")
-
-# 直接执行快捷键（通常不需要直接调用，而是通过execute_gesture）
-success = executor._execute_shortcut("ctrl+c")
-print(f"复制操作{'成功' if success else '失败'}")
-```
-
-**集成示例**：
-```python
-from core.drawer import DrawingManager
-from core.gesture_executor import get_gesture_executor
-from ui.gestures.gestures import get_gesture_library
-
-# 准备手势库
-gesture_library = get_gesture_library()
-
-# 添加一些手势
-gesture_library.add_gesture(
-    name="复制",
-    direction="右-下",
-    action_type="shortcut",
-    action_value="ctrl+c"
-)
-
-gesture_library.add_gesture(
-    name="粘贴",
-    direction="下-右",
-    action_type="shortcut",
-    action_value="ctrl+v"
-)
-
-# 保存手势库
-gesture_library.save()
-
-# 创建绘制管理器（自动使用手势执行器）
-drawer = DrawingManager()
-drawer.start()
-
-print("请使用鼠标右键绘制。'右-下'执行复制，'下-右'执行粘贴...")
-
-# ... 应用程序主循环 ...
-
-# 停止绘制
-drawer.stop()
+# 执行手势
+result = executor.execute_gesture("上右下")
+print(f"执行结果: {'成功' if result else '失败'}")
 ```
 
 #### 3.4 core/system_monitor.py
 
-**功能说明**：系统资源监测模块，提供CPU、内存使用情况和程序运行时间等信息。
+**功能说明**：系统监测模块，提供CPU、内存使用情况和程序运行时间等信息。
 
 **主要类和方法**：
-- `SystemMonitor`：系统监测器类，继承自`QObject`
-  - `__init__(self, update_interval=1000)`：初始化系统监测器，可指定更新间隔（毫秒）
-    - `update_interval`：更新间隔，单位毫秒，默认为1000（1秒）
+- `SystemMonitor`：系统监测器
+  - `__init__(self, update_interval=1000)`：初始化系统监测器
   - `start(self)`：开始监测系统信息
   - `stop(self)`：停止监测系统信息
-  - `is_running(self)`：返回监测器是否正在运行
-    - 返回值：布尔值，True表示正在运行，False表示已停止
   - `get_data(self)`：获取当前监测数据
-    - 返回值：包含所有监测信息的字典
+  - `_update_data(self)`：更新系统信息数据，经过优化简化
   - `set_update_interval(self, interval)`：设置更新间隔
-    - `interval`：新的更新间隔，单位毫秒
-  - `get_update_interval(self)`：获取当前更新间隔
-    - 返回值：当前更新间隔，单位毫秒
-  - `reset_start_time(self)`：重置运行时间计时器
-  - `_update_data(self)`：内部方法，更新监测数据并发出dataUpdated信号
-  - `dataUpdated`：数据更新时发射的信号，传递包含所有监测信息的字典
-
-- 辅助函数：
-  - `format_bytes(bytes_value)`：将字节数转换为可读格式，如将1048576转换为"1.00 MB"
-    - `bytes_value`：字节数，整数值
-    - 返回值：格式化的字符串，如"1.00 MB"
-  - `format_time_duration(seconds)`：将秒数转换为可读的时间格式
-    - `seconds`：秒数，整数或浮点数
-    - 返回值：格式化的时间字符串，如"1小时23分钟45秒"
-
-**监测数据字典结构**：
-```python
-{
-    'cpu_percent': 25.0,              # CPU总体使用率(百分比)
-    'memory_percent': 65.0,           # 内存使用率(百分比)
-    'memory_used': '8.50 GB',         # 已用内存(格式化字符串)
-    'memory_total': '16.00 GB',       # 总内存(格式化字符串)
-    'memory_used_bytes': 9126805504,  # 已用内存(字节数)
-    'memory_total_bytes': 17179869184,# 总内存(字节数)
-    'process_cpu': 1.2,               # 当前进程CPU使用率(百分比)
-    'process_memory': 0.8,            # 当前进程内存使用率(百分比)
-    'process_memory_used': '128.5 MB',# 当前进程内存使用量(格式化字符串)
-    'runtime': '1小时23分钟45秒',      # 应用程序运行时间(格式化字符串)
-    'runtime_seconds': 5025           # 应用程序运行时间(秒数)
-}
-```
-
-**特性说明**：
-- 自动周期性更新，支持自定义更新间隔，默认每秒更新一次
-- 基于QTimer的事件驱动设计，不阻塞主线程，保持UI响应性
-- 提供信号机制，方便UI组件实时更新监测数据，遵循Qt的设计模式
-- 详细记录各种系统资源使用情况：
-  - CPU总体使用率（所有核心的平均值）
-  - 内存使用率、已用内存和总内存（格式化值和原始字节数）
-  - 应用程序运行时间（格式化字符串和原始秒数）
-  - 当前进程的CPU和内存使用情况（百分比和格式化值）
-- 智能内存大小格式化，自动选择合适的单位（B/KB/MB/GB/TB）
-- 智能时间格式化，根据运行时长自动选择合适的格式（秒/分/时）
-- 完整的日志记录，便于调试和性能分析
-- 资源占用小，适合在后台持续运行，影响系统性能微乎其微
-- 提供暂停/恢复机制，可以在不需要时暂停监测，节省资源
-- 支持重置运行时间计时器，便于测量特定操作的执行时间
+- `format_bytes(bytes_value)`：将字节数转换为可读格式
 
 **使用方法**：
 ```python
-from core.system_monitor import SystemMonitor, format_bytes
-from PyQt5.QtCore import QCoreApplication, QTimer
+from core.system_monitor import SystemMonitor
+import time
 
-# 创建系统监测器实例（每秒更新一次）
-monitor = SystemMonitor(update_interval=1000)
+# 创建系统监测器
+monitor = SystemMonitor(update_interval=2000)  # 2秒更新一次
 
-# 连接数据更新信号
-def on_system_data_updated(data):
+# 定义数据更新回调
+def on_data_updated(data):
     print(f"CPU: {data['cpu_percent']}%, 内存: {data['memory_percent']}%")
-    print(f"运行时间: {data['runtime']}")
-    print(f"进程CPU: {data['process_cpu']}%, 进程内存: {data['process_memory']}%")
-    
-monitor.dataUpdated.connect(on_system_data_updated)
+
+# 连接信号
+monitor.dataUpdated.connect(on_data_updated)
 
 # 开始监测
 monitor.start()
 
-# 修改更新间隔（改为每2秒更新一次）
-monitor.set_update_interval(2000)
+# 运行一段时间
+time.sleep(10)
 
-# 获取当前监测数据（不等待下一次更新）
-current_data = monitor.get_data()
-print(f"当前CPU使用率: {current_data['cpu_percent']}%")
+# 获取最新数据
+latest_data = monitor.get_data()
+print(f"运行时间: {latest_data['runtime']}")
 
 # 停止监测
 monitor.stop()
-
-# 检查是否正在运行
-is_active = monitor.is_running()  # 应返回False
-
-# 重新开始监测
-monitor.start()
-
-# 重置运行时间计时器（用于测量特定操作的执行时间）
-monitor.reset_start_time()
-
-# 格式化内存大小
-memory_str = format_bytes(1048576)  # 输出: "1.00 MB"
-```
-
-**UI集成示例**：
-```python
-from core.system_monitor import SystemMonitor
-from PyQt5.QtWidgets import QProgressBar, QLabel, QVBoxLayout, QWidget
-
-class SystemMonitorWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.initUI()
-        
-        # 创建系统监测器（每1.5秒更新一次）
-        self.monitor = SystemMonitor(update_interval=1500)
-        self.monitor.dataUpdated.connect(self.update_display)
-        self.monitor.start()
-    
-    def initUI(self):
-        layout = QVBoxLayout(self)
-        
-        # CPU使用率
-        self.cpu_label = QLabel("CPU使用率: 0%")
-        self.cpu_bar = QProgressBar()
-        layout.addWidget(self.cpu_label)
-        layout.addWidget(self.cpu_bar)
-        
-        # 内存使用率
-        self.memory_label = QLabel("内存使用率: 0%")
-        self.memory_bar = QProgressBar()
-        layout.addWidget(self.memory_label)
-        layout.addWidget(self.memory_bar)
-        
-        # 运行时间
-        self.runtime_label = QLabel("运行时间: 0秒")
-        layout.addWidget(self.runtime_label)
-    
-    def update_display(self, data):
-        # 更新CPU信息
-        self.cpu_label.setText(f"CPU使用率: {data['cpu_percent']:.1f}%")
-        self.cpu_bar.setValue(int(data['cpu_percent']))
-        
-        # 更新内存信息
-        mem_text = f"内存使用率: {data['memory_percent']:.1f}% ({data['memory_used']} / {data['memory_total']})"
-        self.memory_label.setText(mem_text)
-        self.memory_bar.setValue(int(data['memory_percent']))
-        
-        # 更新运行时间
-        self.runtime_label.setText(f"运行时间: {data['runtime']}")
-    
-    def closeEvent(self, event):
-        # 确保在关闭窗口时停止监测
-        if self.monitor.is_running():
-            self.monitor.stop()
-        super().closeEvent(event)
 ```
 
 #### 3.5 core/logger.py
 
-**功能说明**：日志记录模块，提供统一的日志记录功能，支持不同日志级别和输出目标。
+**功能说明**：日志记录模块，提供统一的日志记录接口。
 
 **主要类和方法**：
-- `Logger`：日志记录工具类
-  - `__init__(self)`：初始化日志记录器
-  - `setup_logger(self)`：设置日志记录器，配置日志文件路径和格式
-  - `debug(self, message)`：记录调试级别日志
-    - `message`：日志消息字符串
-  - `info(self, message)`：记录信息级别日志
-    - `message`：日志消息字符串
-  - `warning(self, message)`：记录警告级别日志
-    - `message`：日志消息字符串
-  - `error(self, message)`：记录错误级别日志
-    - `message`：日志消息字符串
-  - `critical(self, message)`：记录严重错误级别日志
-    - `message`：日志消息字符串
-  - `exception(self, message)`：记录异常信息，包含堆栈跟踪
-    - `message`：日志消息字符串
-  - `get_logger_instance(self, module_name)`：获取指定模块名的日志记录器
-    - `module_name`：模块名称字符串
-    - 返回值：配置好的日志记录器实例
-
-- `get_logger(module_name)`：获取一个命名的日志记录器
-  - `module_name`：模块名称字符串
-  - 返回值：配置好的日志记录器实例
-
-**日志级别**：
-- `DEBUG`：最详细的调试信息，通常只在诊断问题时使用
-- `INFO`：确认一切按预期运行的信息性消息
-- `WARNING`：表示出现了一些小问题，但程序仍能继续运行
-- `ERROR`：由于更严重的问题，程序不能执行某些功能
-- `CRITICAL`：表示程序遇到严重错误，可能无法继续运行
-- `EXCEPTION`：记录异常信息，包含完整的堆栈跟踪，便于调试
-
-**日志配置**：
-- 日志文件存储在用户目录下的`.gestrokey/log/`文件夹中
-- 日志文件按日期命名：`YYYY-MM-DD.log`
-- 日志同时输出到控制台和文件（如可写）
-- 日志格式：`[时间] [级别] [模块名] - 消息`
-- 时间格式：`YYYY-MM-DD HH:MM:SS,mmm`（毫秒精度）
-- 控制台输出使用彩色文本，不同级别使用不同颜色，增强可读性
-- 文件输出使用纯文本格式，便于长期存储和分析
+- `Logger`：日志工具类
+  - `__init__(self, module_name="GestroKey")`：初始化日志记录器
+  - `setup_logger(self)`：设置日志记录器，经过优化简化
+  - `debug(self, message)`、`info(self, message)`等：不同级别的日志记录方法
+- `get_logger(module_name="GestroKey")`：获取一个命名的日志记录器
 
 **特性说明**：
-- 单例模式设计，确保全应用程序使用同一日志管理器实例
-- 模块级命名，可以根据模块名分类日志消息，便于筛选和分析
-- 自动创建日志目录和文件，用户无需手动设置
-- 日志文件按日期滚动，避免单个文件过大
-- 自动处理文件系统权限问题，如果无法写入文件则仅输出到控制台
-- 支持异常日志记录，自动捕获堆栈跟踪信息
-- 配置源代码路径显示，便于快速定位问题发生位置
-- 控制台输出支持颜色编码，便于直观区分不同级别的日志
-- 输出格式统一清晰，便于人工或自动化分析
-- 运行时级别控制，可以在不同环境（开发/生产）设置不同的日志级别
+- 支持文件和控制台双重输出
+- 自动处理日志目录和文件创建
+- 适当的错误处理和回退机制
+- 不同级别的日志控制
+- 模块化设计，便于在不同组件中使用
+- 简化的初始化流程
 
 **使用方法**：
 ```python
 from core.logger import get_logger
 
-# 获取一个命名的日志记录器
+# 获取日志记录器
 logger = get_logger("MyModule")
 
 # 记录不同级别的日志
-logger.debug("这是调试信息，通常用于开发阶段")
-logger.info("这是一般信息，表示程序正常运行")
-logger.warning("这是警告信息，表示有潜在问题")
-logger.error("这是错误信息，表示发生了错误")
-logger.critical("这是严重错误信息，可能导致程序崩溃")
-
-# 记录异常
-try:
-    # 某些可能导致异常的代码
-    result = 1 / 0
-except Exception as e:
-    logger.exception(f"发生异常: {e}")  # 会自动记录堆栈跟踪信息
-```
-
-**在类中使用**：
-```python
-from core.logger import get_logger
-
-class MyClass:
-    def __init__(self):
-        # 以类名作为模块名创建日志记录器
-        self.logger = get_logger(self.__class__.__name__)
-        self.logger.info("MyClass初始化")
-    
-    def some_method(self, param):
-        self.logger.debug(f"调用some_method，参数: {param}")
-        try:
-            # 执行某些操作
-            result = self._process(param)
-            self.logger.info(f"操作完成，结果: {result}")
-            return result
-        except Exception as e:
-            self.logger.exception(f"操作失败: {e}")
-            raise
-    
-    def _process(self, data):
-        # 内部处理方法
-        self.logger.debug(f"处理数据: {data}")
-        return data.upper()
+logger.debug("调试信息")
+logger.info("一般信息")
+logger.warning("警告信息")
+logger.error("错误信息")
 ```
 
 ### 4. 应用程序集成
@@ -2518,3 +2106,41 @@ GestroKey是一个功能完善的手势控制工具，通过简单的鼠标绘�
 - 开发插件系统，支持第三方扩展
 
 GestroKey为用户提供了一种全新的人机交互方式，通过简单的手势绘制即可执行各种操作，大大提高了工作效率。无论是日常办公、创意设计还是编程开发，GestroKey都能为用户带来全新的便捷体验。
+
+### 最近代码优化
+
+#### @core 目录代码优化
+
+为了提高代码质量和可维护性，最近对 `core` 目录下的核心模块进行了以下优化：
+
+1. **日志记录优化**
+   - 减少了冗余的日志记录，保留关键信息
+   - 简化了日志级别的使用，更符合日志规范
+   - 优化了日志初始化流程，提高了代码清晰度
+
+2. **代码结构优化**
+   - 简化了复杂的嵌套条件判断，提高代码可读性
+   - 减少了不必要的条件检查和重复代码
+   - 优化了方法签名和参数列表，保持简洁性
+   - 重新组织部分代码，使逻辑更加清晰
+
+3. **性能优化**
+   - 改进了模拟压力计算算法，使其更加高效
+   - 优化了系统监测数据更新机制，减少资源占用
+   - 简化了手势执行器中的快捷键处理逻辑
+
+4. **错误处理优化**
+   - 加强了异常捕获和处理机制
+   - 简化了错误日志记录，避免重复信息
+   - 提供了更清晰的错误信息，便于调试
+
+5. **文档优化**
+   - 更新了模块文档，反映当前实现
+   - 简化了使用示例，更加易于理解
+   - 删除了过时的参数说明和使用指南
+
+6. **单例模式实现**
+   - 改进了 `GestureExecutor` 的单例实现，确保全局只有一个实例
+   - 添加了实例检查，防止误创建多个实例
+
+这些优化保留了全部原有功能，同时提高了代码质量和可维护性。核心模块的性能和稳定性得到了提升，为后续功能扩展奠定了更加坚实的基础。

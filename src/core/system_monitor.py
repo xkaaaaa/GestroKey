@@ -79,35 +79,30 @@ class SystemMonitor(QObject):
     def _update_data(self):
         """更新系统信息数据"""
         try:
-            # CPU使用率
+            # 获取CPU和内存数据
             cpu_percent = psutil.cpu_percent(interval=None)
-            
-            # 内存使用情况
             memory = psutil.virtual_memory()
-            memory_percent = memory.percent
-            memory_used = memory.used
-            memory_total = memory.total
             
-            # 程序运行时间
-            runtime = datetime.now() - self._start_time
-            runtime_str = str(runtime).split('.')[0]  # 去除微秒部分
-            
-            # 当前进程的资源使用情况
+            # 获取当前进程资源使用情况
             process_memory = self._process.memory_percent()
             process_cpu = self._process.cpu_percent(interval=None) / psutil.cpu_count()
             
-            # 更新数据
-            self._data = {
+            # 计算运行时间
+            runtime = datetime.now() - self._start_time
+            runtime_str = str(runtime).split('.')[0]  # 去除微秒部分
+            
+            # 更新数据字典
+            self._data.update({
                 "cpu_percent": cpu_percent,
-                "memory_percent": memory_percent,
-                "memory_used": memory_used,
-                "memory_total": memory_total,
+                "memory_percent": memory.percent,
+                "memory_used": memory.used,
+                "memory_total": memory.total,
                 "runtime": runtime_str,
                 "process_memory": process_memory,
                 "process_cpu": process_cpu
-            }
+            })
             
-            # 发射数据更新信号
+            # 发送数据更新信号
             self.dataUpdated.emit(self._data)
             
         except Exception as e:

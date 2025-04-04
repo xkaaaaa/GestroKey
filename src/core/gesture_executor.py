@@ -30,54 +30,44 @@ class GestureExecutor:
     
     def __init__(self):
         """初始化手势执行器"""
+        if GestureExecutor._instance is not None:
+            raise Exception("GestureExecutor已经初始化，请使用get_instance()获取实例")
+            
+        # 初始化日志记录器
         self.logger = get_logger("GestureExecutor")
         
+        # 初始化键盘控制器
         try:
             self.keyboard = Controller()
-            self.logger.info("成功初始化键盘控制器")
-        except Exception as e:
-            self.logger.error(f"初始化键盘控制器失败: {e}")
-            self.logger.error(traceback.format_exc())
-            # 创建一个空的键盘控制器占位，后续会检查
+            self.logger.info("键盘控制器初始化成功")
+        except ImportError as e:
             self.keyboard = None
+            self.logger.error(f"键盘控制器初始化失败: {e}")
             
-        try:
-            self.gesture_library = get_gesture_library()
-            # 获取所有手势
-            gestures = self.gesture_library.get_all_gestures()
-            self.logger.info(f"成功加载手势库，包含 {len(gestures)} 个手势")
-            
-            # 打印所有已加载的手势
-            for name, gesture in gestures.items():
-                self.logger.debug(f"已加载手势: {name}, 方向: {gesture.get('direction', '未知')}, 动作: {gesture.get('action', {}).get('value', '未知')}")
-                
-        except Exception as e:
-            self.logger.error(f"加载手势库失败: {e}")
-            self.logger.error(traceback.format_exc())
-            # 创建空占位
-            self.gesture_library = None
-        
-        # 特殊键映射
+        # 初始化特殊键映射字典
         self.special_keys = {
             'ctrl': Key.ctrl,
             'alt': Key.alt,
             'shift': Key.shift,
-            'win': Key.cmd,  # Windows键
-            'cmd': Key.cmd,  # macOS命令键
+            'win': Key.cmd,
+            'cmd': Key.cmd,
             'tab': Key.tab,
             'esc': Key.esc,
-            'space': Key.space,
+            'escape': Key.esc,
             'enter': Key.enter,
+            'return': Key.enter,
             'backspace': Key.backspace,
             'delete': Key.delete,
-            'home': Key.home,
-            'end': Key.end,
-            'pageup': Key.page_up,
-            'pagedown': Key.page_down,
+            'space': Key.space,
             'up': Key.up,
             'down': Key.down,
             'left': Key.left,
             'right': Key.right,
+            'page_up': Key.page_up,
+            'page_down': Key.page_down,
+            'home': Key.home,
+            'end': Key.end,
+            'insert': Key.insert,
             'f1': Key.f1,
             'f2': Key.f2,
             'f3': Key.f3,
@@ -91,6 +81,27 @@ class GestureExecutor:
             'f11': Key.f11,
             'f12': Key.f12
         }
+        self.logger.debug("特殊键映射字典初始化完成")
+            
+        # 加载手势库
+        try:
+            self.gesture_library = get_gesture_library()
+            self.logger.info("手势库加载成功")
+            
+            # 获取所有手势
+            gestures = self.gesture_library.get_all_gestures()
+            self.logger.info(f"成功加载手势库，包含 {len(gestures)} 个手势")
+            
+            # 打印所有已加载的手势
+            for name, gesture in gestures.items():
+                self.logger.debug(f"已加载手势: {name}, 方向: {gesture.get('direction', '未知')}, 动作: {gesture.get('action', {}).get('value', '未知')}")
+                
+        except ImportError as e:
+            self.gesture_library = None
+            self.logger.error(f"手势库加载失败: {e}")
+            
+        # 设置为单例实例
+        GestureExecutor._instance = self
         
         self.logger.info("手势执行器初始化完成")
     
