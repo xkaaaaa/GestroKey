@@ -5,11 +5,9 @@ import logging
 
 try:
     from core.logger import get_logger
-    from version import DEFAULT_PEN_WIDTH, DEFAULT_PEN_COLOR  # 导入默认设置值
 except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from core.logger import get_logger
-    from version import DEFAULT_PEN_WIDTH, DEFAULT_PEN_COLOR  # 导入默认设置值
 
 class Settings:
     """设置管理器，负责保存和加载用户设置"""
@@ -33,18 +31,18 @@ class Settings:
                 self.logger.info(f"已从 {default_settings_path} 加载默认设置")
                 return settings
             else:
-                # 如果默认设置文件不存在，使用从version.py导入的默认值
+                # 如果默认设置文件不存在，使用内置默认值
                 self.logger.warning(f"默认设置文件 {default_settings_path} 不存在，使用内置默认值")
                 return {
-                    "pen_width": DEFAULT_PEN_WIDTH,
-                    "pen_color": DEFAULT_PEN_COLOR
+                    "pen_width": 3,
+                    "pen_color": [0, 120, 255]
                 }
         except Exception as e:
             self.logger.error(f"加载默认设置失败: {e}，使用内置默认值")
             # 发生异常时也使用内置默认值
             return {
-                "pen_width": DEFAULT_PEN_WIDTH,
-                "pen_color": DEFAULT_PEN_COLOR
+                "pen_width": 3,
+                "pen_color": [0, 120, 255]
             }
         
     def _get_settings_file_path(self):

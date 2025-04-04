@@ -125,49 +125,40 @@ sys.exit(app.exec_())
 
 #### 1.2 version.py
 
-**功能说明**：版本信息模块，存储和管理所有随时间变化的变量，如版本号、构建日期等。
+**功能说明**：版本信息模块，存储和管理版本号、构建日期等应用程序基本信息。
 
 **主要变量**：
-- `VERSION`：版本号，如"1.0.0"
-- `VERSION_NAME`：版本名称，如"初始版本"
-- `BUILD_DATE`：构建日期，格式为"YYYY-MM-DD"
-- `BUILD_NUMBER`：构建编号
+- `VERSION`：版本号，如"2.0.0"
 - `APP_NAME`：应用程序名称，固定为"GestroKey"
 - `APP_DESCRIPTION`：应用程序描述
+- `BUILD_DATE`：构建日期，格式为"YYYY-MM-DD"
 - `AUTHOR`：作者信息
-- `COPYRIGHT`：版权信息
-- `DEFAULT_PEN_WIDTH`：默认笔尖粗细，整数值（像素）
-- `DEFAULT_PEN_COLOR`：默认笔尖颜色，RGB格式的数组，如[0, 120, 255]
+- `LICENSE`：许可证信息
 
 **主要函数**：
-- `get_version_string()`：获取格式化的版本字符串，如"v1.0.0"
-- `get_full_version_string()`：获取完整的版本字符串，包含版本名称和构建信息，如"v1.0.0 (初始版本) - 构建 #123"
-- `get_about_text()`：获取完整的关于信息文本，包含应用名称、版本、作者和版权信息
+- `get_version_string()`：获取格式化的版本字符串，如"GestroKey v2.0.0"
+- `get_full_version_info()`：获取完整的版本信息，返回包含所有版本相关信息的字典
 
 **使用方法**：
 ```python
-from version import VERSION, APP_NAME, get_version_string, get_full_version_string, get_about_text
+from version import VERSION, APP_NAME, get_version_string, get_full_version_info
 
 # 获取版本号
-current_version = VERSION  # 如："1.0.0"
+current_version = VERSION  # 如："2.0.0"
 
 # 获取应用名称
 app_name = APP_NAME  # 返回："GestroKey"
 
 # 获取格式化的版本字符串
-version_string = get_version_string()  # 返回："v1.0.0"
+version_string = get_version_string()  # 返回："GestroKey v2.0.0"
 
-# 获取完整的版本字符串
-full_version = get_full_version_string()  # 返回："v1.0.0 (初始版本) - 构建 #123"
-
-# 获取关于信息文本
-about_text = get_about_text()  # 返回完整的关于信息文本
+# 获取完整的版本信息
+version_info = get_full_version_info()  # 返回包含所有版本信息的字典
 ```
 
 **版本管理说明**：
 - 更新应用程序版本时，只需修改`VERSION`和相关变量
-- 构建编号`BUILD_NUMBER`在每次发布前应递增
-- 默认设置（如笔尖粗细和颜色）也定义在此模块中，便于版本间的跟踪和变更
+- 构建日期`BUILD_DATE`自动设置为当前日期
 
 ### 2. 用户界面模块 (UI)
 

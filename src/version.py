@@ -14,10 +14,6 @@ BUILD_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 AUTHOR = "xkaaaaa"
 LICENSE = "GPL-3.0"
 
-# 其他可能随时间变化的变量
-DEFAULT_PEN_WIDTH = 3
-DEFAULT_PEN_COLOR = [0, 120, 255]  # RGB格式
-
 def get_version_string():
     """
     获取格式化的版本字符串
