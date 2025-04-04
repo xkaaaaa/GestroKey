@@ -1,38 +1,49 @@
 """
-GestroKey版本信息模块
-此模块存储所有随时间变化的变量，如版本号、构建日期等
+版本信息模块
+
+此模块提供GestroKey应用程序的版本信息和应用名称，
+集中管理版本号和应用相关信息。
 """
 import datetime
 
 # 版本信息
 VERSION = "2.0.0"
-VERSION_NAME = "第二个版本"
-BUILD_DATE = "6666-06-06"  # 格式：YYYY-MM-DD
-BUILD_NUMBER = 1
-
-# 应用信息
 APP_NAME = "GestroKey"
 APP_DESCRIPTION = "一款手势控制工具"
+BUILD_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 AUTHOR = "xkaaaaa"
-COPYRIGHT = f"© {datetime.datetime.now().year} {AUTHOR}"
+LICENSE = "GPL-3.0"
 
 # 其他可能随时间变化的变量
 DEFAULT_PEN_WIDTH = 3
 DEFAULT_PEN_COLOR = [0, 120, 255]  # RGB格式
 
 def get_version_string():
-    """获取格式化的版本字符串"""
-    return f"v{VERSION}"
+    """
+    获取格式化的版本字符串
+    
+    返回:
+        str: 格式化的版本信息，包含版本号和应用名称
+    """
+    return f"{APP_NAME} v{VERSION}"
 
-def get_full_version_string():
-    """获取完整的版本字符串，包含版本名称和构建信息"""
-    return f"v{VERSION} ({VERSION_NAME}) - 构建 #{BUILD_NUMBER}"
+def get_full_version_info():
+    """
+    获取完整的版本信息
+    
+    返回:
+        dict: 包含版本号、应用名称、构建日期等信息的字典
+    """
+    return {
+        "version": VERSION,
+        "app_name": APP_NAME,
+        "description": APP_DESCRIPTION,
+        "build_date": BUILD_DATE,
+        "author": AUTHOR,
+        "license": LICENSE
+    }
 
-def get_about_text():
-    """获取关于信息文本"""
-    return f"""{APP_NAME} {get_version_string()}
-{APP_DESCRIPTION}
-{COPYRIGHT}
-构建日期: {BUILD_DATE}
-构建编号: {BUILD_NUMBER}
-""" 
+# 测试代码
+if __name__ == "__main__":
+    print(get_version_string())
+    print(get_full_version_info())

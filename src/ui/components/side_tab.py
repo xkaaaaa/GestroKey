@@ -431,9 +431,14 @@ if __name__ == "__main__":
     tab2_layout = QVBoxLayout(tab2)
     tab2_layout.addWidget(QLabel("设置选项卡内容"))
     
-    # 创建图标（使用系统图标示例）
-    console_icon = QIcon.fromTheme("utilities-terminal", QIcon())
-    settings_icon = QIcon.fromTheme("preferences-system", QIcon())
+    # 创建图标（使用本地图标文件）
+    icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/images')
+    console_icon_path = os.path.join(icons_dir, 'console.svg')
+    settings_icon_path = os.path.join(icons_dir, 'settings.svg')
+
+    # 如果图标文件存在则使用，否则使用空图标
+    console_icon = QIcon(console_icon_path) if os.path.exists(console_icon_path) else QIcon()
+    settings_icon = QIcon(settings_icon_path) if os.path.exists(settings_icon_path) else QIcon()
     
     # 添加选项卡
     tab_widget.addTab(tab1, "控制台", console_icon)

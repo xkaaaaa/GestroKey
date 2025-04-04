@@ -3,6 +3,7 @@ import os
 from PyQt5.QtWidgets import QApplication, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, pyqtProperty, QPoint, QRectF, QSequentialAnimationGroup, QParallelAnimationGroup
 from PyQt5.QtGui import QColor, QPainter, QFont, QPixmap, QIcon, QPainterPath, QBrush, QPen, QFontMetrics, QTransform
+from PyQt5.QtWidgets import QStyle
 
 try:
     from core.logger import get_logger
@@ -468,7 +469,7 @@ if __name__ == "__main__":
         # 浅蓝色按钮，带深色文本
         {"text": "浅蓝色按钮", "primary_color": [133, 193, 233], "hover_color": [169, 204, 227], "text_color": [33, 37, 41]},
         # 带图标的按钮
-        {"text": "带图标的按钮", "primary_color": [41, 128, 185], "icon": QIcon.fromTheme("document-open")},
+        {"text": "带图标的按钮", "primary_color": [41, 128, 185], "icon": QIcon()},
         # 深色按钮
         {"text": "深色按钮", "primary_color": [52, 73, 94], "hover_color": [75, 101, 132]},
         # 大圆角按钮
@@ -482,7 +483,8 @@ if __name__ == "__main__":
         button = AnimatedButton(**button_config)
         # 如果没有提供图标且环境中有图标主题，使用一个默认图标
         if "icon" not in button_config and i % 2 == 0:  # 偶数索引的按钮添加图标
-            button.setIcon(QIcon.fromTheme("dialog-ok"))
+            # 使用内置的QStyle标准图标替代主题图标
+            button.setIcon(button.style().standardIcon(QStyle.SP_DialogOkButton))
             button.setIconSize(QSize(20, 20))
         
         # 添加到网格，每行2个按钮

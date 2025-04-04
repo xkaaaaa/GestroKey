@@ -95,9 +95,16 @@ class GestroKeyApp(QMainWindow):
         self.tab_widget = SideTabWidget()
         
         # 创建选项卡图标
-        console_icon = QIcon.fromTheme("utilities-terminal", QIcon())  # 使用系统图标或默认的空图标
-        settings_icon = QIcon.fromTheme("preferences-system", QIcon())
-        gestures_icon = QIcon.fromTheme("input-mouse", QIcon())
+        # 尝试使用存在的图标文件，而不是依赖系统主题
+        icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images')
+        console_icon_path = os.path.join(icons_dir, 'console.svg')
+        settings_icon_path = os.path.join(icons_dir, 'settings.svg')
+        gestures_icon_path = os.path.join(icons_dir, 'gestures.svg')
+
+        # 如果图标文件存在则使用，否则使用空图标
+        console_icon = QIcon(console_icon_path) if os.path.exists(console_icon_path) else QIcon()
+        settings_icon = QIcon(settings_icon_path) if os.path.exists(settings_icon_path) else QIcon()
+        gestures_icon = QIcon(gestures_icon_path) if os.path.exists(gestures_icon_path) else QIcon()
         
         # 添加选项卡到左侧选项卡组件
         self.logger.debug("添加选项卡到左侧选项卡组件")

@@ -27,7 +27,10 @@ src/
 │       └── default_gestures.json # 默认手势库定义（JSON格式）
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
-│       └── icon.svg         # 应用图标
+│       ├── icon.svg         # 应用图标
+│       ├── console.svg      # 控制台选项卡图标
+│       ├── settings.svg     # 设置选项卡图标
+│       └── gestures.svg     # 手势管理选项卡图标
 ├── version.py               # 版本信息模块
 └── main.py                  # 主程序入口
 ```
@@ -890,4 +893,36 @@ try:
     
 except Exception as e:
     logger.exception(f"应用运行时发生错误: {e}")
-``` 
+```
+
+### 5. assets/images 目录
+
+**功能说明**：存放应用程序使用的图像资源，包括图标和SVG矢量图形。
+
+**包含文件**：
+- `icon.svg`：应用主图标，用于窗口标题栏和任务栏
+- `console.svg`：控制台选项卡图标
+- `settings.svg`：设置选项卡图标
+- `gestures.svg`：手势管理选项卡图标
+
+**注意事项**：
+- 所有SVG文件都经过优化，移除了空的image标签和不必要的元素，避免Qt SVG渲染器产生"Image filename is empty"警告
+- 选项卡图标使用本地SVG文件而非系统主题图标，确保在不同操作系统上一致显示
+- 图标推荐使用SVG格式，以获得更好的缩放效果和显示质量
+
+**如何使用**：
+```python
+# 加载应用图标
+icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images', 'icon.svg')
+if os.path.exists(icon_path):
+    app_icon = QIcon(icon_path)
+    self.setWindowIcon(app_icon)
+    
+# 加载选项卡图标
+icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images')
+console_icon_path = os.path.join(icons_dir, 'console.svg')
+console_icon = QIcon(console_icon_path) if os.path.exists(console_icon_path) else QIcon()
+```
+
+**SVG问题排查**：
+如果遇到SVG渲染警告"QSvgHandler: Image filename is empty"，请检查SVG文件中是否包含空的image标签或引用了不存在的外部资源，移除这些元素可以解决警告问题。 
