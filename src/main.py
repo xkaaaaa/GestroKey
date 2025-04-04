@@ -7,6 +7,7 @@ from PyQt5.QtGui import QIcon
 
 from core.drawer import DrawingManager
 from core.logger import get_logger
+from version import get_version_string, APP_NAME  # 导入版本信息
 
 # 导入选项卡模块
 try:
@@ -59,7 +60,7 @@ class GestroKeyApp(QMainWindow):
     def initUI(self):
         """初始化用户界面"""
         # 设置窗口属性
-        self.setWindowTitle('GestroKey')
+        self.setWindowTitle(APP_NAME)
         self.setGeometry(300, 300, 750, 550)  # 调整窗口大小以适应左侧选项卡
         
         # 设置应用图标
@@ -123,7 +124,7 @@ class GestroKeyApp(QMainWindow):
         self.exit_button.setFixedSize(120, 36)
         self.exit_button.clicked.connect(self.close)
         
-        self.version_label = QLabel("v1.0.0")
+        self.version_label = QLabel(get_version_string())
         self.version_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         status_layout.addWidget(self.exit_button)

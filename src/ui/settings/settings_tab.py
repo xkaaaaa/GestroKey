@@ -10,11 +10,13 @@ try:
     from core.logger import get_logger
     from ui.settings.settings import get_settings
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
+    from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append('../../')
     from core.logger import get_logger
     from ui.settings.settings import get_settings
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
+    from version import APP_NAME  # 导入应用名称
 
 class SettingsTab(QWidget):
     """设置选项卡，提供应用程序设置管理功能"""
@@ -34,7 +36,7 @@ class SettingsTab(QWidget):
         main_layout.setAlignment(Qt.AlignTop)
         
         # 标题标签
-        title_label = QLabel("GestroKey 设置")
+        title_label = QLabel(f"{APP_NAME} 设置")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
         title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)

@@ -25,6 +25,10 @@ src/
 │       ├── gestures_tab.py  # 手势管理选项卡
 │       ├── gestures.py      # 手势库管理模块
 │       └── default_gestures.json # 默认手势库定义（JSON格式）
+├── assets/                  # 资源文件目录
+│   └── images/              # 图像资源
+│       └── icon.svg         # 应用图标
+├── version.py               # 版本信息模块
 └── main.py                  # 主程序入口
 ```
 
@@ -50,7 +54,42 @@ python src/main.py
 - 设置选项卡：提供应用程序设置的配置，包括笔尖粗细和笔尖颜色设置
 - 手势管理选项卡：提供手势库的管理界面，可添加、编辑、删除手势
 
-### 2. ui/console.py
+### 2. version.py
+
+**功能说明**：版本信息模块，存储和管理所有随时间变化的变量，如版本号、构建日期等。
+
+**主要变量**：
+- `VERSION`：版本号，如"1.0.0"
+- `VERSION_NAME`：版本名称，如"初始版本"
+- `BUILD_DATE`：构建日期，格式为"YYYY-MM-DD"
+- `BUILD_NUMBER`：构建编号
+- `APP_NAME`：应用程序名称
+- `APP_DESCRIPTION`：应用程序描述
+- `AUTHOR`：作者信息
+- `COPYRIGHT`：版权信息
+- `DEFAULT_PEN_WIDTH`：默认笔尖粗细
+- `DEFAULT_PEN_COLOR`：默认笔尖颜色，RGB格式
+
+**主要函数**：
+- `get_version_string()`：获取格式化的版本字符串，如"v1.0.0"
+- `get_full_version_string()`：获取完整的版本字符串，包含版本名称和构建信息
+- `get_about_text()`：获取关于信息文本
+
+**使用方法**：
+```python
+from version import VERSION, APP_NAME, get_version_string
+
+# 获取版本号
+current_version = VERSION  # 如："1.0.0"
+
+# 获取应用名称
+app_name = APP_NAME  # 如："GestroKey"
+
+# 获取格式化的版本字符串
+version_string = get_version_string()  # 如："v1.0.0"
+```
+
+### 3. ui/console.py
 
 **功能说明**：控制台选项卡模块，实现绘制功能的控制界面。
 
@@ -71,7 +110,7 @@ console = ConsoleTab()
 # ...
 ```
 
-### 3. ui/components/button.py
+### 4. ui/components/button.py
 
 **功能说明**：自定义动画按钮组件，提供美观的、带有动画效果的按钮，可以轻松集成到任何界面。
 

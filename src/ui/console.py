@@ -1,16 +1,20 @@
+import os
 import sys
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QCursor
 
 try:
     from core.logger import get_logger
     from core.drawer import DrawingManager
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
+    from version import APP_NAME  # 导入应用名称
 except ImportError:
-    sys.path.append('../')
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from core.logger import get_logger
     from core.drawer import DrawingManager
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
+    from version import APP_NAME  # 导入应用名称
 
 class ConsoleTab(QWidget):
     """控制台选项卡，提供基本的绘制控制功能"""
@@ -33,7 +37,7 @@ class ConsoleTab(QWidget):
         layout.setAlignment(Qt.AlignCenter)
         
         # 标题标签
-        title_label = QLabel("GestroKey 控制台")
+        title_label = QLabel(f"{APP_NAME} 控制台")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
         title_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(title_label)
