@@ -1,7 +1,7 @@
 import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
-                            QLabel, QMainWindow, QHBoxLayout, QMessageBox)
+                            QLabel, QMainWindow, QHBoxLayout, QMessageBox, QSizePolicy)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 
@@ -61,7 +61,8 @@ class GestroKeyApp(QMainWindow):
         """初始化用户界面"""
         # 设置窗口属性
         self.setWindowTitle(APP_NAME)
-        self.setGeometry(300, 300, 750, 550)  # 调整窗口大小以适应左侧选项卡
+        self.setGeometry(300, 300, 850, 650)  # 增大默认窗口大小以适应更丰富的内容
+        self.setMinimumSize(640, 480)  # 设置最小窗口大小，确保内容可见
         
         # 设置应用图标
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images', 'icon.svg')
@@ -79,6 +80,7 @@ class GestroKeyApp(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)  # 去除边距以获得更好的视觉效果
+        main_layout.setSpacing(0)  # 减少布局间距
         
         # 创建选项卡内容
         self.logger.debug("创建控制台选项卡")
@@ -93,6 +95,7 @@ class GestroKeyApp(QMainWindow):
         # 创建左侧选项卡小部件
         self.logger.debug("创建左侧选项卡组件")
         self.tab_widget = SideTabWidget()
+        self.tab_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         # 创建选项卡图标
         # 尝试使用存在的图标文件，而不是依赖系统主题
@@ -126,25 +129,31 @@ class GestroKeyApp(QMainWindow):
         
         # 将选项卡添加到主布局
         self.logger.debug("将选项卡添加到主布局")
-        main_layout.addWidget(self.tab_widget)
+        main_layout.addWidget(self.tab_widget, 1)  # 设置1的拉伸系数，让选项卡占据大部分空间
         
         # 添加底部状态栏
-        status_layout = QHBoxLayout()
+        status_widget = QWidget()
+        status_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        status_layout = QHBoxLayout(status_widget)
         status_layout.setContentsMargins(10, 5, 10, 5)  # 设置适当的边距
         
         # 使用自定义动画按钮替换标准按钮
         self.exit_button = AnimatedButton("退出程序", primary_color=[220, 53, 69])  # 红色按钮
-        self.exit_button.setFixedSize(120, 36)
+        self.exit_button.setMinimumSize(120, 36)  # 设置最小尺寸，而不是固定尺寸
+        self.exit_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.exit_button.clicked.connect(self.close)
         
         self.version_label = QLabel(get_version_string())
         self.version_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.version_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
         status_layout.addWidget(self.exit_button)
         status_layout.addStretch(1)
         status_layout.addWidget(self.version_label)
         
-        main_layout.addLayout(status_layout)
+        # 设置状态栏布局
+        status_widget.setLayout(status_layout)
+        main_layout.addWidget(status_widget)
         
         # 显示窗口
         self.show()
@@ -170,6 +179,13 @@ class GestroKeyApp(QMainWindow):
         """选项卡切换事件处理"""
         tab_name = "控制台" if index == 0 else "设置" if index == 1 else "手势管理" if index == 2 else f"未知({index})"
         self.logger.debug(f"切换到选项卡: {index} ({tab_name})")
+    
+    def resizeEvent(self, event):
+        """窗口尺寸变化事件处理"""
+        super().resizeEvent(event)
+        self.logger.debug(f"主窗口大小已调整: {self.width()}x{self.height()}")
+        
+        # 可以在这里添加特定尺寸变化的处理逻辑
     
     def closeEvent(self, event):
         """关闭窗口事件处理"""
@@ -248,33 +264,15 @@ class GestroKeyApp(QMainWindow):
                 self.logger.info("用户取消关闭")
                 event.ignore()
                 return
-        else:
-            # 没有更改，直接关闭
-            self.logger.info("没有未保存的更改，程序直接关闭")
-            event.accept()
 
 
 if __name__ == "__main__":
-    try:
-        app = QApplication(sys.argv)
-        app.setStyle('Fusion')  # 使用Fusion样式，在所有平台上看起来一致
-        
-        # 在创建主窗口前设置应用程序图标
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images', 'icon.svg')
-        if os.path.exists(icon_path):
-            app_icon = QIcon(icon_path)
-            app.setWindowIcon(app_icon)
-        
-        main_window = GestroKeyApp()
-        sys.exit(app.exec_())
-    except Exception as e:
-        error_logger = get_logger("MainError")
-        error_logger.exception(f"主程序发生未捕获的异常: {e}")
-        # 显示错误消息框
-        from PyQt5.QtWidgets import QMessageBox
-        error_box = QMessageBox()
-        error_box.setIcon(QMessageBox.Critical)
-        error_box.setWindowTitle("错误")
-        error_box.setText("程序启动失败")
-        error_box.setDetailedText(f"错误详情: {str(e)}")
-        error_box.exec_() 
+    # 设置高DPI缩放
+    if hasattr(Qt, 'AA_EnableHighDpiScaling'):
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    
+    app = QApplication(sys.argv)
+    window = GestroKeyApp()
+    sys.exit(app.exec_()) 

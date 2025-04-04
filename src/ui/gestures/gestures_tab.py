@@ -2,9 +2,9 @@ import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QLineEdit, QComboBox,
-                            QScrollArea, QSizePolicy,
+                            QScrollArea, QSizePolicy, QSpacerItem,
                             QGroupBox, QMessageBox, QPushButton,
-                            QFrame)
+                            QFrame, QSplitter)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
@@ -43,6 +43,9 @@ class GestureContentWidget(QWidget):
         self.layout.addWidget(self.action_label)
         
         self.setLayout(self.layout)
+        
+        # 设置大小策略，允许水平拉伸
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
     
     def updateContent(self, direction="", action_type="", action_value=""):
         """更新内容"""
@@ -83,12 +86,29 @@ class GesturesTab(QWidget):
         """初始化用户界面"""
         # 创建主布局
         main_layout = QHBoxLayout(self)  # 使用水平布局，左侧卡片列表，右侧编辑区域
+        main_layout.setContentsMargins(5, 5, 5, 5)  # 减小边距，使用更多空间
+        
+        # 创建可调整的分割器
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setChildrenCollapsible(False)  # 防止某个部分被完全折叠
         
         # 创建左侧手势卡片列表区域
-        self.createGestureCardsList(main_layout)
+        left_widget = QWidget()
+        self.createGestureCardsList(left_widget)
         
         # 创建右侧手势编辑区域
-        self.createGestureEditor(main_layout)
+        right_widget = QWidget()
+        self.createGestureEditor(right_widget)
+        
+        # 添加到分割器
+        splitter.addWidget(left_widget)
+        splitter.addWidget(right_widget)
+        
+        # 设置初始分割比例
+        splitter.setSizes([int(self.width() * 0.3), int(self.width() * 0.7)])
+        
+        # 添加分割器到主布局
+        main_layout.addWidget(splitter)
         
         # 设置布局
         self.setLayout(main_layout)
@@ -101,24 +121,31 @@ class GesturesTab(QWidget):
         
         # 更新手势列表
         self.updateGestureCards()
+        
+        # 启用响应式设计
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.logger.debug("手势管理选项卡启用了响应式设计")
     
-    def createGestureCardsList(self, parent_layout):
+    def createGestureCardsList(self, parent_widget):
         """创建左侧手势卡片列表区域"""
-        # 创建左侧区域容器
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
+        # 创建左侧布局
+        left_layout = QVBoxLayout(parent_widget)
+        left_layout.setContentsMargins(0, 0, 5, 0)  # 减小内部边距
         
         # 标题标签
         title_label = QLabel("手势库")
         title_label.setStyleSheet("font-size: 16pt; font-weight: bold; margin-bottom: 10px;")
         title_label.setAlignment(Qt.AlignCenter)
+        title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         left_layout.addWidget(title_label)
         
         # 创建滚动区域，放置卡片
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QFrame.NoFrame)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # 改为需要时才显示滚动条
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         # 创建卡片容器
         self.cards_container = QWidget()
@@ -128,17 +155,22 @@ class GesturesTab(QWidget):
         self.cards_layout.setSpacing(10)
         
         scroll_area.setWidget(self.cards_container)
-        left_layout.addWidget(scroll_area)
+        left_layout.addWidget(scroll_area, 1)  # 使用比例系数1让它可以拉伸
         
         # 添加操作按钮
         buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 5, 0, 5)
         
         # 添加新手势按钮
         self.add_button = AnimatedButton("添加新手势", primary_color=[46, 204, 113])
+        self.add_button.setMinimumSize(100, 36)  # 设置最小尺寸而不是固定尺寸
+        self.add_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.add_button.clicked.connect(self.addNewGesture)
         
         # 重置按钮
         self.reset_button = AnimatedButton("重置为默认", primary_color=[108, 117, 125])
+        self.reset_button.setMinimumSize(100, 36)  # 设置最小尺寸而不是固定尺寸
+        self.reset_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.reset_button.clicked.connect(self.resetGestures)
         
         buttons_layout.addWidget(self.add_button)
@@ -148,47 +180,62 @@ class GesturesTab(QWidget):
         
         # 添加保存更改按钮
         save_layout = QHBoxLayout()
+        save_layout.setContentsMargins(0, 5, 0, 0)
+        
         self.save_button = AnimatedButton("保存更改", primary_color=[52, 152, 219])
+        self.save_button.setMinimumSize(100, 50)  # 设置最小尺寸而不是固定尺寸
+        self.save_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.save_button.clicked.connect(self.saveGestureLibrary)
-        self.save_button.setMinimumHeight(50)
+        
         save_layout.addWidget(self.save_button)
         
         left_layout.addLayout(save_layout)
         
-        # 设置左侧容器的固定宽度
-        left_container.setFixedWidth(300)
-        left_container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        
-        # 添加到主布局
-        parent_layout.addWidget(left_container)
-        
-        # 添加垂直分割线
-        line = QFrame()
-        line.setFrameShape(QFrame.VLine)
-        line.setFrameShadow(QFrame.Sunken)
-        parent_layout.addWidget(line)
+        # 设置布局
+        parent_widget.setLayout(left_layout)
+        parent_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)  # 允许水平方向调整
     
-    def createGestureEditor(self, parent_layout):
+    def createGestureEditor(self, parent_widget):
         """创建右侧手势编辑区域"""
-        # 创建右侧区域容器
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
+        # 创建右侧布局
+        right_layout = QVBoxLayout(parent_widget)
+        right_layout.setContentsMargins(5, 0, 0, 0)  # 减小内部边距
         
         # 标题标签
         title_label = QLabel("编辑手势")
         title_label.setStyleSheet("font-size: 16pt; font-weight: bold; margin-bottom: 10px;")
         title_label.setAlignment(Qt.AlignCenter)
+        title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         right_layout.addWidget(title_label)
+        
+        # 创建滚动区域，以便在窗口较小时可以滚动查看表单
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # 创建表单内容部件
+        form_content = QWidget()
+        form_content_layout = QVBoxLayout(form_content)
+        form_content_layout.setContentsMargins(10, 10, 10, 10)
         
         # 编辑表单
         form_group = QGroupBox("手势详情")
+        form_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         form_layout = QVBoxLayout()
+        form_layout.setSpacing(15)  # 增加表单元素之间的间距
         
         # 名称输入
         name_layout = QHBoxLayout()
         name_label = QLabel("名称:")
         name_label.setMinimumWidth(80)
+        name_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        
         self.name_input = QLineEdit()
+        self.name_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
         name_layout.addWidget(name_label)
         name_layout.addWidget(self.name_input)
         form_layout.addLayout(name_layout)
@@ -197,8 +244,12 @@ class GesturesTab(QWidget):
         direction_layout = QHBoxLayout()
         direction_label = QLabel("方向:")
         direction_label.setMinimumWidth(80)
+        direction_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        
         self.direction_combo = QComboBox()
         self.direction_combo.addItems(self.DIRECTIONS)
+        self.direction_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
         direction_layout.addWidget(direction_label)
         direction_layout.addWidget(self.direction_combo)
         form_layout.addLayout(direction_layout)
@@ -207,8 +258,12 @@ class GesturesTab(QWidget):
         action_type_layout = QHBoxLayout()
         action_type_label = QLabel("动作类型:")
         action_type_label.setMinimumWidth(80)
+        action_type_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        
         self.action_type_combo = QComboBox()
         self.action_type_combo.addItems(self.ACTION_TYPES)
+        self.action_type_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
         action_type_layout.addWidget(action_type_label)
         action_type_layout.addWidget(self.action_type_combo)
         form_layout.addLayout(action_type_layout)
@@ -217,36 +272,61 @@ class GesturesTab(QWidget):
         action_value_layout = QHBoxLayout()
         action_value_label = QLabel("动作值:")
         action_value_label.setMinimumWidth(80)
+        action_value_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        
         self.action_value_input = QLineEdit()
         self.action_value_input.setPlaceholderText("例如: ctrl+c")
+        self.action_value_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
         action_value_layout.addWidget(action_value_label)
         action_value_layout.addWidget(self.action_value_input)
         form_layout.addLayout(action_value_layout)
         
-        form_group.setLayout(form_layout)
-        right_layout.addWidget(form_group)
-        
-        # 操作按钮
-        buttons_layout = QHBoxLayout()
-        
-        # 删除按钮
+        # 先定义按钮
         self.delete_button = AnimatedButton("删除手势", primary_color=[231, 76, 60])
+        self.delete_button.setMinimumSize(120, 36)
+        self.delete_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self.delete_button.clicked.connect(self.deleteGesture)
-        
-        # 清空按钮
+
         self.clear_button = AnimatedButton("清空表单", primary_color=[149, 165, 166])
+        self.clear_button.setMinimumSize(120, 36)
+        self.clear_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self.clear_button.clicked.connect(self.clearEditor)
-        
+
+        # 添加按钮到布局
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 10, 0, 0)
         buttons_layout.addWidget(self.clear_button)
+        buttons_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         buttons_layout.addWidget(self.delete_button)
+
+        # 设置表单布局
+        form_group.setLayout(form_layout)
+        form_content_layout.addWidget(form_group)
+
+        # 添加按钮布局到内容布局
+        form_content_layout.addLayout(buttons_layout)
         
-        right_layout.addLayout(buttons_layout)
+        # 添加底部空白区域，确保内容在滚动区域中有足够的空间
+        form_content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
         
-        # 添加弹性空间
-        right_layout.addStretch()
+        # 设置表单内容
+        form_content.setLayout(form_content_layout)
         
-        # 添加到主布局
-        parent_layout.addWidget(right_container, 1)  # 设置右侧区域占据更多空间
+        # 添加到滚动区域
+        scroll_area.setWidget(form_content)
+        
+        # 添加到右侧布局
+        right_layout.addWidget(scroll_area)
+        
+        # 设置布局
+        parent_widget.setLayout(right_layout)
+        parent_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    
+    def resizeEvent(self, event):
+        """窗口尺寸变化事件处理，用于调整UI布局"""
+        super().resizeEvent(event)
+        self.logger.debug(f"手势管理选项卡大小已调整: {self.width()}x{self.height()}")
     
     def updateGestureCards(self, maintain_selected=True):
         """更新手势卡片列表

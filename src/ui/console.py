@@ -1,6 +1,6 @@
 import os
 import sys
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QSizePolicy, QSpacerItem
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QCursor
 
@@ -36,40 +36,63 @@ class ConsoleTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignCenter)
         
+        # 顶部空白间距，增加灵活性
+        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        
         # 标题标签
         title_label = QLabel(f"{APP_NAME} 控制台")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
         title_label.setAlignment(Qt.AlignCenter)
+        title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout.addWidget(title_label)
         
         # 状态标签
         self.status_label = QLabel("准备就绪")
         self.status_label.setStyleSheet("font-size: 10pt; margin-bottom: 20px;")
         self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout.addWidget(self.status_label)
         
         # 使用自定义动画按钮替换标准按钮
         # 开始绘制按钮 - 使用主题蓝色
         self.start_button = AnimatedButton("开始绘制", primary_color=[41, 128, 185])
-        self.start_button.setFixedSize(150, 40)
+        self.start_button.setMinimumSize(150, 40)  # 使用最小尺寸而不是固定尺寸
+        self.start_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self.start_button.clicked.connect(self.start_drawing)
-        layout.addWidget(self.start_button)
+        layout.addWidget(self.start_button, 0, Qt.AlignCenter)  # 居中对齐
         
         # 停止绘制按钮（初始禁用） - 使用红色
         self.stop_button = AnimatedButton("停止绘制", primary_color=[220, 53, 69])
-        self.stop_button.setFixedSize(150, 40)
+        self.stop_button.setMinimumSize(150, 40)  # 使用最小尺寸而不是固定尺寸
+        self.stop_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self.stop_button.clicked.connect(self.stop_drawing)
         self.stop_button.setEnabled(False)
-        layout.addWidget(self.stop_button)
+        layout.addWidget(self.stop_button, 0, Qt.AlignCenter)  # 居中对齐
         
         # 方向信息标签
         self.direction_label = QLabel("最后一次绘制方向: -")
         self.direction_label.setStyleSheet("font-size: 10pt; margin-top: 20px;")
         self.direction_label.setAlignment(Qt.AlignCenter)
+        self.direction_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout.addWidget(self.direction_label)
         
-        # 设置布局
+        # 底部空白间距，增加灵活性
+        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        
+        # 设置布局和大小策略
         self.setLayout(layout)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # 设置尺寸变化事件处理
+        self.logger.debug("已启用自适应布局")
+    
+    def resizeEvent(self, event):
+        """窗口尺寸变化事件处理，用于调整UI布局"""
+        # 调用父类方法
+        super().resizeEvent(event)
+        
+        # 可以在这里添加特定的尺寸调整逻辑
+        self.logger.debug(f"控制台选项卡大小已调整: {self.width()}x{self.height()}")
     
     def start_drawing(self):
         """开始绘制功能"""

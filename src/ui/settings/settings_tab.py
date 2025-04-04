@@ -2,7 +2,8 @@ import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QSpinBox, QFileDialog, 
-                            QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton, QMessageBox)
+                            QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton, QMessageBox,
+                            QSizePolicy, QSpacerItem, QScrollArea)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 
@@ -35,23 +36,44 @@ class SettingsTab(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignTop)
         
+        # 创建滚动区域，以便在窗口较小时可以滚动查看所有设置
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        # 创建内容部件
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        
         # 标题标签
         title_label = QLabel(f"{APP_NAME} 设置")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
         title_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(title_label)
+        title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        content_layout.addWidget(title_label)
+        
+        # 添加顶部间距
+        content_layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
         
         # 绘制设置组
         drawing_group = QGroupBox("绘制设置")
+        drawing_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         drawing_layout = QVBoxLayout()
         
         # 笔尖粗细设置
         pen_layout = QHBoxLayout()
         pen_label = QLabel("笔尖粗细:")
+        pen_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        
         self.pen_width_spinner = QSpinBox()
         self.pen_width_spinner.setRange(1, 20)
         self.pen_width_spinner.setValue(self.settings.get("pen_width"))
         self.pen_width_spinner.valueChanged.connect(self.pen_width_changed)
+        self.pen_width_spinner.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         
         pen_layout.addWidget(pen_label)
         pen_layout.addWidget(self.pen_width_spinner)
@@ -61,11 +83,13 @@ class SettingsTab(QWidget):
         # 笔尖颜色设置
         color_layout = QHBoxLayout()
         color_label = QLabel("笔尖颜色:")
+        color_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         
         # 使用原生QPushButton而不是AnimatedButton作为颜色选择按钮
         current_color = self.settings.get("pen_color")
         self.color_button = QPushButton("")
-        self.color_button.setFixedSize(50, 25)  # 设置按钮大小
+        self.color_button.setMinimumSize(50, 25)  # 设置最小按钮大小，而不是固定大小
+        self.color_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.color_button.setCursor(Qt.PointingHandCursor)  # 设置光标为手型
         self.update_color_button(current_color)
         
@@ -79,10 +103,13 @@ class SettingsTab(QWidget):
         # 绘制预览框
         preview_layout = QHBoxLayout()
         preview_label = QLabel("笔尖预览:")
+        preview_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        
         self.preview_widget = PenPreviewWidget(
             self.settings.get("pen_width"), 
             self.settings.get("pen_color")
         )
+        self.preview_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         
         preview_layout.addWidget(preview_label)
         preview_layout.addWidget(self.preview_widget)
@@ -90,26 +117,55 @@ class SettingsTab(QWidget):
         drawing_layout.addLayout(preview_layout)
         
         drawing_group.setLayout(drawing_layout)
-        main_layout.addWidget(drawing_group)
+        content_layout.addWidget(drawing_group)
+        
+        # 添加中间间距
+        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
         
         # 重置和保存按钮
         buttons_layout = QHBoxLayout()
         
         # 使用自定义动画按钮替换标准按钮
         reset_button = AnimatedButton("重置为默认设置", primary_color=[108, 117, 125])  # 灰色
+        reset_button.setMinimumSize(140, 36)  # 设置最小大小而不是固定大小
+        reset_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         reset_button.clicked.connect(self.reset_settings)
         
         save_button = AnimatedButton("保存设置", primary_color=[41, 128, 185])  # 蓝色
+        save_button.setMinimumSize(120, 36)  # 设置最小大小而不是固定大小
+        save_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         save_button.clicked.connect(self.save_settings)
         
         buttons_layout.addWidget(reset_button)
+        buttons_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         buttons_layout.addWidget(save_button)
         
-        main_layout.addLayout(buttons_layout)
-        main_layout.addStretch()
+        content_layout.addLayout(buttons_layout)
         
-        # 设置布局
+        # 底部弹性空间
+        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        
+        # 设置内容部件
+        content_widget.setLayout(content_layout)
+        scroll_area.setWidget(content_widget)
+        
+        # 将滚动区域添加到主布局
+        main_layout.addWidget(scroll_area)
+        
+        # 设置布局和大小策略
         self.setLayout(main_layout)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # 记录自适应布局启用
+        self.logger.debug("设置选项卡自适应布局已启用")
+    
+    def resizeEvent(self, event):
+        """窗口尺寸变化事件处理，用于调整UI布局"""
+        # 调用父类方法
+        super().resizeEvent(event)
+        
+        # 记录窗口大小变化
+        self.logger.debug(f"设置选项卡大小已调整: {self.width()}x{self.height()}")
     
     def update_color_button(self, color):
         """更新颜色按钮的背景色"""
