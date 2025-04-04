@@ -489,6 +489,19 @@ class AnimatedButton(QPushButton):
     def set_primary_color(self, color):
         """设置按钮主色调"""
         self._primary_color = self._parse_color(color)
+        
+        # 如果没有明确设置过hover_color，则自动更新悬停色调
+        # 基于新的主色调重新计算悬停色，与初始化时的计算逻辑保持一致
+        primary_r = self._primary_color.red()
+        primary_g = self._primary_color.green()
+        primary_b = self._primary_color.blue()
+        
+        hover_r = min(255, int(primary_r * 1.2))
+        hover_g = min(255, int(primary_g * 1.2))
+        hover_b = min(255, int(primary_b * 1.2))
+        
+        self._hover_color = QColor(hover_r, hover_g, hover_b)
+        
         self.update()
     
     def set_hover_color(self, color):

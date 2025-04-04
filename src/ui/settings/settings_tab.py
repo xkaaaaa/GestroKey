@@ -52,7 +52,7 @@ class SettingsTab(QWidget):
         content_layout.setContentsMargins(10, 10, 10, 10)
         
         # 标题标签
-        title_label = QLabel(f"{APP_NAME} 设置")
+        title_label = QLabel("设置")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)

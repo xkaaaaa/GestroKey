@@ -34,13 +34,13 @@ class ConsoleTab(QWidget):
         """初始化用户界面"""
         # 创建布局
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setAlignment(Qt.AlignTop)  # 改为顶部对齐，与其他选项卡一致
         
         # 顶部空白间距，增加灵活性
-        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
         
-        # 标题标签
-        title_label = QLabel(f"{APP_NAME} 控制台")
+        # 标题标签 - 去掉APP_NAME前缀
+        title_label = QLabel("控制台")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -53,21 +53,12 @@ class ConsoleTab(QWidget):
         self.status_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout.addWidget(self.status_label)
         
-        # 使用自定义动画按钮替换标准按钮
-        # 开始绘制按钮 - 使用主题蓝色
-        self.start_button = AnimatedButton("开始绘制", primary_color=[41, 128, 185])
-        self.start_button.setMinimumSize(150, 40)  # 使用最小尺寸而不是固定尺寸
-        self.start_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        self.start_button.clicked.connect(self.start_drawing)
-        layout.addWidget(self.start_button, 0, Qt.AlignCenter)  # 居中对齐
-        
-        # 停止绘制按钮（初始禁用） - 使用红色
-        self.stop_button = AnimatedButton("停止绘制", primary_color=[220, 53, 69])
-        self.stop_button.setMinimumSize(150, 40)  # 使用最小尺寸而不是固定尺寸
-        self.stop_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        self.stop_button.clicked.connect(self.stop_drawing)
-        self.stop_button.setEnabled(False)
-        layout.addWidget(self.stop_button, 0, Qt.AlignCenter)  # 居中对齐
+        # 使用单个按钮，根据状态切换文本和颜色
+        self.action_button = AnimatedButton("开始绘制", primary_color=[41, 128, 185])  # 初始为蓝色"开始绘制"按钮
+        self.action_button.setMinimumSize(150, 40)
+        self.action_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.action_button.clicked.connect(self.toggle_drawing)
+        layout.addWidget(self.action_button, 0, Qt.AlignCenter)
         
         # 方向信息标签
         self.direction_label = QLabel("最后一次绘制方向: -")
@@ -75,6 +66,13 @@ class ConsoleTab(QWidget):
         self.direction_label.setAlignment(Qt.AlignCenter)
         self.direction_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout.addWidget(self.direction_label)
+        
+        # 添加说明文本
+        info_label = QLabel("使用鼠标右键绘制手势，系统将自动识别并执行对应操作")
+        info_label.setStyleSheet("font-size: 10pt; color: #666; margin-top: 15px;")
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        layout.addWidget(info_label)
         
         # 底部空白间距，增加灵活性
         layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
@@ -94,6 +92,13 @@ class ConsoleTab(QWidget):
         # 可以在这里添加特定的尺寸调整逻辑
         self.logger.debug(f"控制台选项卡大小已调整: {self.width()}x{self.height()}")
     
+    def toggle_drawing(self):
+        """切换绘制状态"""
+        if self.is_drawing_active:
+            self.stop_drawing()
+        else:
+            self.start_drawing()
+    
     def start_drawing(self):
         """开始绘制功能"""
         try:
@@ -108,8 +113,9 @@ class ConsoleTab(QWidget):
             
             if success:
                 self.status_label.setText("绘制中 - 使用鼠标右键进行绘制")
-                self.start_button.setEnabled(False)
-                self.stop_button.setEnabled(True)
+                # 切换按钮为"停止绘制"，并改为红色
+                self.action_button.setText("停止绘制")
+                self.action_button.set_primary_color([220, 53, 69])  # 红色
                 self.is_drawing_active = True
                 self.logger.debug("绘制功能已启动")
                 # 清空方向信息
@@ -134,8 +140,9 @@ class ConsoleTab(QWidget):
                 
                 if success:
                     self.status_label.setText("准备就绪")
-                    self.start_button.setEnabled(True)
-                    self.stop_button.setEnabled(False)
+                    # 切换按钮为"开始绘制"，并改为蓝色
+                    self.action_button.setText("开始绘制")
+                    self.action_button.set_primary_color([41, 128, 185])  # 蓝色
                     self.is_drawing_active = False
                     self.logger.debug("绘制功能已停止")
                 
