@@ -178,16 +178,21 @@ button.set_border_radius(16)             # 修改圆角半径
   - `setText(text)`：设置选项卡文本
   - `setIcon(icon)`：设置选项卡图标
 - `SideTabWidget`：左侧选项卡容器类
-  - `addTab(widget, text, icon=None)`：添加新的选项卡
+  - `addTab(widget, text, icon=None, position=POSITION_TOP)`：添加新的选项卡，支持指定位置
   - `setCurrentIndex(index)`：设置当前选项卡，触发动画切换
   - `currentIndex()`：获取当前选项卡索引
   - `widget(index)`：获取指定索引的内容窗口
   - `setTabText(index, text)`：设置指定索引的选项卡文本
   - `setTabIcon(index, icon)`：设置指定索引的选项卡图标
+  - `setTabPosition(index, position)`：更改已有选项卡的位置
+  - `tabPosition(index)`：获取选项卡的位置
 
 **特性说明**：
 - 精美的扁平化设计，与应用主题风格一致
 - 垂直布局的选项卡位于窗口左侧
+- 选项卡支持两种位置定位：顶部(POSITION_TOP)和底部(POSITION_BOTTOM)
+- 支持将重要和常用选项卡（如控制台）放在顶部，将设置等辅助功能放在底部，优化用户体验
+- 可灵活调整选项卡位置，无需改变选项卡的添加顺序
 - 选项卡切换时的平滑动画过渡效果
 - 选项卡支持图标和文本
 - 选中状态和悬停状态的动画效果
@@ -204,20 +209,29 @@ from ui.components.side_tab import SideTabWidget
 # 创建左侧选项卡组件
 tab_widget = SideTabWidget()
 
-# 添加带图标的选项卡
+# 添加带图标的选项卡（放在顶部）
 console_tab = QWidget()  # 或任何QWidget子类
-console_icon = QIcon("path/to/icon.png")  # 也可使用QIcon.fromTheme获取系统图标
-tab_widget.addTab(console_tab, "控制台", console_icon)
+console_icon = QIcon("path/to/icon.png")
+tab_widget.addTab(console_tab, "控制台", console_icon, tab_widget.POSITION_TOP)
 
-# 添加不带图标的选项卡
+# 添加手势管理选项卡（也放在顶部）
+gestures_tab = QWidget()
+gestures_icon = QIcon("path/to/gestures_icon.png")
+tab_widget.addTab(gestures_tab, "手势管理", gestures_icon, tab_widget.POSITION_TOP)
+
+# 将设置选项卡放在底部
 settings_tab = QWidget()
-tab_widget.addTab(settings_tab, "设置")
+settings_icon = QIcon("path/to/settings_icon.png")
+tab_widget.addTab(settings_tab, "设置", settings_icon, tab_widget.POSITION_BOTTOM)
 
 # 切换到指定选项卡
-tab_widget.setCurrentIndex(1)  # 切换到第二个选项卡（索引从0开始）
+tab_widget.setCurrentIndex(0)  # 切换到控制台选项卡
 
 # 监听选项卡切换事件
 tab_widget.currentChanged.connect(onTabChanged)
+
+# 动态更改选项卡位置
+tab_widget.setTabPosition(1, tab_widget.POSITION_BOTTOM)  # 将手势管理选项卡移到底部
 
 # 添加到界面布局
 layout.addWidget(tab_widget)

@@ -108,10 +108,16 @@ class GestroKeyApp(QMainWindow):
         
         # 添加选项卡到左侧选项卡组件
         self.logger.debug("添加选项卡到左侧选项卡组件")
-        console_index = self.tab_widget.addTab(self.console_tab, "控制台", console_icon)
-        settings_index = self.tab_widget.addTab(self.settings_tab, "设置", settings_icon)
-        gestures_index = self.tab_widget.addTab(self.gestures_tab, "手势管理", gestures_icon)
-        
+        # 控制台选项卡放在顶部
+        console_index = self.tab_widget.addTab(self.console_tab, "控制台", console_icon, 
+                                             self.tab_widget.POSITION_TOP)
+        # 手势管理选项卡也放在顶部
+        gestures_index = self.tab_widget.addTab(self.gestures_tab, "手势管理", gestures_icon, 
+                                              self.tab_widget.POSITION_TOP)
+        # 设置选项卡放在底部
+        settings_index = self.tab_widget.addTab(self.settings_tab, "设置", settings_icon, 
+                                              self.tab_widget.POSITION_BOTTOM)
+
         # 记录初始添加的选项卡索引
         self.logger.debug(f"控制台索引: {console_index}, 设置索引: {settings_index}, 手势索引: {gestures_index}")
         
