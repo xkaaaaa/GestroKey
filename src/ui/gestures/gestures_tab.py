@@ -20,6 +20,41 @@ except ImportError:
     from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
 
+class GestureContentWidget(QWidget):
+    """自定义的手势内容显示组件，专门用于解决刷新问题"""
+    
+    def __init__(self, direction="", action_type="", action_value="", parent=None):
+        super().__init__(parent)
+        self.setObjectName("GestureContentWidget")
+        
+        # 创建布局
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(5, 5, 5, 5)
+        self.layout.setSpacing(5)
+        
+        # 方向标签
+        self.direction_label = QLabel(f"方向: {direction}")
+        self.direction_label.setWordWrap(True)
+        self.layout.addWidget(self.direction_label)
+        
+        # 动作标签
+        self.action_label = QLabel(f"动作: {action_type} - {action_value}")
+        self.action_label.setWordWrap(True)
+        self.layout.addWidget(self.action_label)
+        
+        self.setLayout(self.layout)
+    
+    def updateContent(self, direction="", action_type="", action_value=""):
+        """更新内容"""
+        self.direction_label.setText(f"方向: {direction}")
+        self.action_label.setText(f"动作: {action_type} - {action_value}")
+        
+        # 强制刷新
+        self.direction_label.repaint()
+        self.action_label.repaint()
+        self.repaint()
+        return True
+
 class GesturesTab(QWidget):
     """手势管理选项卡，提供手势库管理功能"""
     
@@ -57,6 +92,12 @@ class GesturesTab(QWidget):
         
         # 设置布局
         self.setLayout(main_layout)
+        
+        # 连接实时更新信号
+        self.name_input.textChanged.connect(self.name_input_textChanged)
+        self.direction_combo.currentIndexChanged.connect(self.direction_combo_changed)
+        self.action_type_combo.currentIndexChanged.connect(self.action_type_combo_changed)
+        self.action_value_input.textChanged.connect(self.action_value_input_textChanged)
         
         # 更新手势列表
         self.updateGestureCards()
@@ -104,6 +145,15 @@ class GesturesTab(QWidget):
         buttons_layout.addWidget(self.reset_button)
         
         left_layout.addLayout(buttons_layout)
+        
+        # 添加保存更改按钮
+        save_layout = QHBoxLayout()
+        self.save_button = AnimatedButton("保存更改", primary_color=[52, 152, 219])
+        self.save_button.clicked.connect(self.saveGestureLibrary)
+        self.save_button.setMinimumHeight(50)
+        save_layout.addWidget(self.save_button)
+        
+        left_layout.addLayout(save_layout)
         
         # 设置左侧容器的固定宽度
         left_container.setFixedWidth(300)
@@ -179,10 +229,6 @@ class GesturesTab(QWidget):
         # 操作按钮
         buttons_layout = QHBoxLayout()
         
-        # 保存按钮
-        self.save_gesture_button = AnimatedButton("保存更改", primary_color=[41, 128, 185])
-        self.save_gesture_button.clicked.connect(self.saveGesture)
-        
         # 删除按钮
         self.delete_button = AnimatedButton("删除手势", primary_color=[231, 76, 60])
         self.delete_button.clicked.connect(self.deleteGesture)
@@ -193,18 +239,8 @@ class GesturesTab(QWidget):
         
         buttons_layout.addWidget(self.clear_button)
         buttons_layout.addWidget(self.delete_button)
-        buttons_layout.addWidget(self.save_gesture_button)
         
         right_layout.addLayout(buttons_layout)
-        
-        # 保存所有更改按钮
-        save_all_layout = QHBoxLayout()
-        self.save_all_button = AnimatedButton("保存所有更改", primary_color=[52, 152, 219])
-        self.save_all_button.clicked.connect(self.saveGestureLibrary)
-        self.save_all_button.setMinimumHeight(50)
-        save_all_layout.addWidget(self.save_all_button)
-        
-        right_layout.addLayout(save_all_layout)
         
         # 添加弹性空间
         right_layout.addStretch()
@@ -225,172 +261,342 @@ class GesturesTab(QWidget):
                 self.onGestureCardClicked(name)
                 break
     
-    def updateGestureCards(self):
-        """更新手势卡片列表"""
-        # 清空现有卡片
-        while self.cards_layout.count():
-            item = self.cards_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+    def updateGestureCards(self, maintain_selected=True):
+        """更新手势卡片列表
         
-        self.gesture_cards = {}  # 重置卡片引用字典
+        Args:
+            maintain_selected: 是否保持当前选中的卡片
+        """
+        self.logger.debug("更新手势卡片列表")
+        current_gesture_name = None
+        current_gesture_id = None
         
-        # 获取所有手势
-        all_gestures = self.gestures.get_all_gestures()
-        if not all_gestures:
-            # 如果没有手势，显示一个提示卡片
-            empty_card = CardWidget(title="没有手势")
-            empty_label = QLabel("点击「添加新手势」按钮\n创建第一个手势")
-            empty_label.setAlignment(Qt.AlignCenter)
-            empty_card.add_widget(empty_label)
-            self.cards_layout.addWidget(empty_card)
-            return
+        # 记录当前选择的卡片
+        if self.current_selected_card and maintain_selected:
+            current_gesture_name, current_gesture_id = self.current_selected_card
         
-        # 添加手势卡片
-        for name, gesture in all_gestures.items():
-            # 创建卡片
-            card = CardWidget(title=name)
+        # 清除当前手势卡片
+        self.clearGestureCards()
+        
+        try:
+            # 按ID排序获取所有手势
+            gestures = self.gestures.get_all_gestures_sorted()
             
-            # 创建卡片内容
-            content_layout = QVBoxLayout()
-            content_layout.setContentsMargins(5, 5, 5, 5)  # 添加内边距
-            
-            # 添加方向信息
-            direction_layout = QHBoxLayout()
-            direction_label = QLabel("方向:")
-            direction_label.setStyleSheet("font-weight: bold;")
-            direction_value = QLabel(gesture.get("direction", ""))
-            direction_layout.addWidget(direction_label)
-            direction_layout.addWidget(direction_value)
-            content_layout.addLayout(direction_layout)
-            
-            # 添加动作信息
-            action = gesture.get("action", {})
-            action_layout = QHBoxLayout()
-            action_label = QLabel("动作:")
-            action_label.setStyleSheet("font-weight: bold;")
-            action_value = QLabel(f"{action.get('type', '')}: {action.get('value', '')}")
-            action_layout.addWidget(action_label)
-            action_layout.addWidget(action_value)
-            content_layout.addLayout(action_layout)
-            
-            # 创建内容容器
-            content_widget = QWidget()
-            content_widget.setLayout(content_layout)
-            card.add_widget(content_widget)
-            
-            # 连接点击事件 - 使用通用的处理器
-            card.clicked.connect(self.onCardClicked)
-            
-            # 添加到布局
-            self.cards_layout.addWidget(card)
-            
-            # 存储卡片引用
-            self.gesture_cards[name] = card
+            # 添加所有手势卡片
+            for i, (name, gesture) in enumerate(gestures.items()):
+                gesture_id = gesture.get("id")
+                direction = gesture.get("direction", "")
+                action_type = gesture.get("action", {}).get("type", "")
+                action_value = gesture.get("action", {}).get("value", "")
+                
+                # 添加手势卡片
+                card = self.addGestureCard(name, gesture_id, direction, action_type, action_value)
+                
+                # 如果是之前选中的手势，重新选中
+                if maintain_selected and current_gesture_id is not None and gesture_id == current_gesture_id:
+                    self.current_selected_card = (name, gesture_id)
+                    self.highlightCard(card)
+                    
+                    # 更新表单内容
+                    self.name_input.setText(name)
+                    self.direction_combo.setCurrentText(direction)
+                    self.action_type_combo.setCurrentText(action_type)
+                    self.action_value_input.setText(action_value)
+        except Exception as e:
+            self.logger.error(f"更新手势卡片失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
     
-    def onGestureCardClicked(self, name):
-        """当点击手势卡片时，更新编辑区域并更新卡片选中状态"""
-        # 先清除所有卡片的选中状态
-        for card_name, card in self.gesture_cards.items():
-            if card_name != name:
-                card.set_selected(False)
+    def onGestureCardClicked(self, card):
+        """处理手势卡片点击事件"""
+        self.logger.debug("手势卡片被点击")
         
-        # 设置当前卡片为选中状态
-        current_card = self.gesture_cards.get(name)
-        if current_card:
-            current_card.set_selected(True)
-            self.current_selected_card = name
+        # 获取卡片的名称和ID
+        name = card.property("name") if card.property("name") else card.get_title()
+        gesture_id = card.property("id") if card.property("id") is not None else card.gesture_id
         
-        # 获取手势详情
-        gesture = self.gestures.get_gesture(name)
-        if not gesture:
+        # 确保ID是整数
+        if isinstance(gesture_id, str):
+            try:
+                gesture_id = int(gesture_id)
+            except (ValueError, TypeError):
+                pass
+        
+        # 检查是否点击了当前已选中的卡片
+        if self.current_selected_card and self.current_selected_card[0] == name and self.current_selected_card[1] == gesture_id:
+            # 如果点击的是已选中的卡片，取消选中
+            self.logger.debug(f"取消选中卡片: {name}, ID: {gesture_id}")
+            card.set_selected(False)
+            self.current_selected_card = None
+            self.clearEditor()
+            self.delete_button.setEnabled(False)
             return
+            
+        # 高亮选中的卡片
+        self.highlightCard(card)
         
-        # 更新编辑区域
-        self.name_input.setText(name)
+        # 设置当前选中的卡片
+        self.current_selected_card = (name, gesture_id)
+        self.logger.debug(f"当前选中卡片: {name}, ID: {gesture_id}")
         
-        # 查找并设置方向下拉框
-        direction = gesture.get("direction", "")
-        direction_index = self.direction_combo.findText(direction)
-        if direction_index != -1:
-            self.direction_combo.setCurrentIndex(direction_index)
+        # 获取手势信息
+        gesture = self.gestures.get_gesture(name)
+        if gesture:
+            # 更新表单内容
+            self.name_input.setText(name)
+            self.direction_combo.setCurrentText(gesture.get("direction", ""))
+            action_type = gesture.get("action", {}).get("type", "")
+            action_value = gesture.get("action", {}).get("value", "")
+            self.action_type_combo.setCurrentText(action_type)
+            self.action_value_input.setText(action_value)
+            
+            # 这里不要设置was_selected=True，因为我们期望表单变化时自动更新
+            self.is_form_ready = True
         
-        # 查找并设置动作类型下拉框
-        action = gesture.get("action", {})
-        action_type = action.get("type", "")
-        action_type_index = self.action_type_combo.findText(action_type)
-        if action_type_index != -1:
-            self.action_type_combo.setCurrentIndex(action_type_index)
-        
-        # 设置动作值
-        action_value = action.get("value", "")
-        self.action_value_input.setText(action_value)
+        # 更新删除按钮状态
+        self.delete_button.setEnabled(True)
     
     def addNewGesture(self):
         """添加新手势"""
-        # 清空编辑区域
-        self.clearEditor()
+        self.logger.debug("添加新手势")
+        was_selected = self.current_selected_card is not None
         
-        # 清除所有卡片的选中状态
-        for card_name, card in self.gesture_cards.items():
-            card.set_selected(False)
-        
-        self.current_selected_card = None
+        try:
+            # 获取表单数据
+            name = self.name_input.text().strip()
+            direction = self.direction_combo.currentText()
+            action_type = self.action_type_combo.currentText()
+            action_value = self.action_value_input.text().strip()
+            
+            # 验证数据
+            if not name:
+                self.logger.warning("手势名称不能为空")
+                return
+                
+            if not action_value:
+                self.logger.warning("动作值不能为空")
+                return
+                
+            # 检查名称是否已存在
+            if name in self.gestures.list_gestures():
+                self.logger.warning(f"手势名称已存在: {name}")
+                return
+                
+            # 获取下一个可用ID
+            next_id = self.gestures._get_next_id()
+            
+            # 添加新手势
+            success = self.gestures.add_gesture(
+                name, 
+                direction, 
+                action_type, 
+                action_value,
+                gesture_id=next_id
+            )
+            
+            if success:
+                self.logger.info(f"成功添加新手势: {name}, ID: {next_id}")
+                
+                # 更新手势卡片列表，不保持选择状态
+                self.updateGestureCards(maintain_selected=False)
+                
+                # 选中新添加的手势卡片
+                for i in range(self.cards_layout.count()):
+                    card = self.cards_layout.itemAt(i).widget()
+                    if card and card.property("name") == name:
+                        self.onGestureCardClicked(card)
+                        break
+                
+                # 保存手势库
+                self.gestures.save()
+            else:
+                self.logger.warning(f"添加手势时没有变化: {name}")
+        except Exception as e:
+            self.logger.error(f"添加新手势失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
     
     def clearEditor(self):
         """清空编辑区域"""
+        # 暂时断开信号连接，避免触发onFormChanged
+        self.name_input.blockSignals(True)
+        self.direction_combo.blockSignals(True)
+        self.action_type_combo.blockSignals(True)
+        self.action_value_input.blockSignals(True)
+        
         self.name_input.clear()
         self.direction_combo.setCurrentIndex(0)
         self.action_type_combo.setCurrentIndex(0)
         self.action_value_input.clear()
         
+        # 恢复信号连接
+        self.name_input.blockSignals(False)
+        self.direction_combo.blockSignals(False)
+        self.action_type_combo.blockSignals(False)
+        self.action_value_input.blockSignals(False)
+        
         # 清除当前选中状态
-        if self.current_selected_card and self.current_selected_card in self.gesture_cards:
-            self.gesture_cards[self.current_selected_card].set_selected(False)
+        if self.current_selected_card:
+            name, gesture_id = self.current_selected_card
+            if name in self.gesture_cards:
+                self.gesture_cards[name].set_selected(False)
+        
+        # 重置当前选中的卡片
         self.current_selected_card = None
     
-    def saveGesture(self):
-        """保存当前编辑的手势"""
-        # 获取输入
+    def updateCardContent(self, name, gesture):
+        """直接更新卡片内容，不重新创建卡片"""
+        if name not in self.gesture_cards:
+            return False
+            
+        try:
+            card = self.gesture_cards[name]
+            
+            # 查找自定义内容组件
+            content_widget = card.findChild(GestureContentWidget)
+            if not content_widget:
+                return False
+            
+            # 获取最新的数据
+            direction = gesture.get('direction', '未知')
+            action = gesture.get("action", {})
+            action_type = action.get("type", "未知")
+            action_value = action.get("value", "")
+            
+            # 使用自定义组件的更新方法
+            success = content_widget.updateContent(direction, action_type, action_value)
+            
+            # 记录成功或失败
+            if success:
+                self.logger.debug(f"直接更新卡片内容成功: {name} - 方向: '{direction}', 动作: '{action_type} - {action_value}'")
+            else:
+                self.logger.debug(f"直接更新卡片内容失败: {name}")
+            
+            return success
+        except Exception as e:
+            self.logger.error(f"更新卡片内容失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return False
+            
+    def onFormChanged(self):
+        """表单内容变化时自动应用更改"""
+        # 获取表单数据
         name = self.name_input.text().strip()
         direction = self.direction_combo.currentText()
         action_type = self.action_type_combo.currentText()
         action_value = self.action_value_input.text().strip()
         
-        # 验证输入
-        if not name:
-            QMessageBox.warning(self, "输入错误", "手势名称不能为空")
+        # 表单数据不完整，不处理
+        if not name or not action_value:
             return
             
-        if not action_value:
-            QMessageBox.warning(self, "输入错误", "动作值不能为空")
+        # 如果没有选中任何手势，不进行自动应用和UI更新
+        # 用户需要点击"添加新手势"按钮来创建新手势
+        if not self.current_selected_card:
             return
+            
+        # 获取当前选中手势的名称和ID
+        current_name, current_id = self.current_selected_card
         
-        # 检查是否是新增还是更新
-        is_new = self.current_selected_card is None or self.current_selected_card != name
+        # 检查是否修改了名称
+        is_rename = current_name != name
         
-        # 如果是新增，并且手势名称已存在，则提示错误
-        if is_new and name in self.gestures.get_all_gestures():
-            QMessageBox.warning(self, "输入错误", f"手势名称 '{name}' 已存在")
-            return
-        
-        # 保存手势
-        self.gestures.add_gesture(name, direction, action_type, action_value)
-        
-        # 如果是修改了手势名称，则需要删除旧的手势
-        if self.current_selected_card and self.current_selected_card != name:
-            self.gestures.remove_gesture(self.current_selected_card)
-        
-        # 更新手势卡片列表
-        self.updateGestureCards()
-        
-        # 设置新保存的手势为选中状态
-        if name in self.gesture_cards:
-            self.onGestureCardClicked(name)
-        
-        self.logger.debug(f"保存手势: {name}")
-        QMessageBox.information(self, "保存成功", f"手势 '{name}' 已保存")
+        try:
+            if is_rename:
+                # 检查新名称是否已存在
+                if name in self.gestures.list_gestures():
+                    # 名称已存在，不自动保存，用户需要修改名称
+                    return
+                    
+                # 执行重命名操作
+                success = self.gestures.update_gesture_name(current_name, name)
+                if not success:
+                    self.logger.warning(f"重命名手势失败: {current_name} -> {name}")
+                    return
+                    
+                # 更新当前选中的手势名称
+                self.current_selected_card = (name, current_id)
+                self.logger.debug(f"手势已重命名: {current_name} -> {name}")
+                
+                # 重命名情况下需要更新整个列表（使用updateGestureCards方法）
+                self.gestures.add_gesture(name, direction, action_type, action_value, current_id)
+                self.updateGestureCards(maintain_selected=True)
+            else:
+                # 获取当前手势的ID（如果存在）
+                gesture_id = current_id
+                current_gesture = self.gestures.get_gesture(current_name)
+                if not current_gesture:
+                    # 如果手势不存在，不进行更新
+                    return
+                
+                # 记录更新前的卡片内容（调试用）
+                self.logger.debug(f"更新前卡片内容:")
+                self.dumpCardContents(current_name)
+                
+                # 添加或更新手势 - 这会标记有未保存更改
+                result = self.gestures.add_gesture(name, direction, action_type, action_value, gesture_id)
+                self.logger.debug(f"添加/更新手势结果: {result}, 手势名称: {name}, 方向: {direction}")
+                
+                # 只有在编辑现有手势时才更新UI
+                if name in self.gesture_cards:
+                    # 创建临时手势数据结构用于更新
+                    temp_gesture = {
+                        "id": gesture_id,
+                        "direction": direction,
+                        "action": {
+                            "type": action_type,
+                            "value": action_value
+                        }
+                    }
+                    
+                    # 直接尝试更新卡片内容，无需重新获取手势数据
+                    updated = self.updateCardContent(name, temp_gesture)
+                    self.logger.debug(f"卡片内容更新结果: {updated}")
+                    
+                    # 如果直接更新失败，使用完整的刷新方法
+                    if not updated:
+                        self.logger.debug(f"直接更新失败，尝试完整刷新")
+                        self.updateGestureCards(maintain_selected=True)
+                    
+                    # 记录更新后的卡片内容（调试用）
+                    self.logger.debug(f"更新后卡片内容:")
+                    self.dumpCardContents(name)
+                
+                self.logger.debug(f"手势已修改: {name}")
+        except Exception as e:
+            self.logger.error(f"自动应用手势修改失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
     
+    def onDeleteGestureConfirmed(self):
+        """确认删除手势"""
+        if not self.current_selected_card:
+            return
+            
+        name, gesture_id = self.current_selected_card
+        
+        # 删除手势并重新排序ID
+        if self.gestures.remove_gesture(name):
+            # 保存手势库
+            self.gestures.save()
+            
+            # 清除表单
+            self.clearEditor()
+            
+            # 重置当前选中的卡片
+            self.current_selected_card = None
+            
+            # 更新手势卡片列表
+            self.updateGestureCards(maintain_selected=False)
+            
+            # 禁用删除按钮
+            self.delete_button.setEnabled(False)
+            
+            self.logger.info(f"成功删除手势: {name}, ID: {gesture_id}")
+        else:
+            self.logger.warning(f"删除手势失败: {name}")
+            
     def deleteGesture(self):
         """删除当前编辑的手势"""
         # 如果没有选中的手势，则返回
@@ -398,23 +604,16 @@ class GesturesTab(QWidget):
             QMessageBox.warning(self, "删除错误", "请先选择要删除的手势")
             return
         
+        name, gesture_id = self.current_selected_card
+        
         # 确认删除
         reply = QMessageBox.question(self, "确认删除", 
-                                    f"确定要删除手势 '{self.current_selected_card}' 吗?",
+                                    f"确定要删除手势 '{name}' 吗?",
                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         
         if reply == QMessageBox.Yes:
-            # 删除手势
-            self.gestures.remove_gesture(self.current_selected_card)
-            
-            # 更新列表
-            self.updateGestureCards()
-            
-            # 清空编辑区域
-            self.clearEditor()
-            
-            self.logger.debug(f"删除手势: {self.current_selected_card}")
-            QMessageBox.information(self, "删除成功", "手势已删除")
+            self.onDeleteGestureConfirmed()
+            QMessageBox.information(self, "删除成功", f"手势 '{name}' 已删除")
     
     def resetGestures(self):
         """重置为默认手势库"""
@@ -432,17 +631,132 @@ class GesturesTab(QWidget):
             # 清空编辑区域
             self.clearEditor()
             
-            self.logger.debug("重置为默认手势库")
-            QMessageBox.information(self, "重置成功", "已重置为默认手势库")
+            self.logger.info("重置为默认手势库")
+            QMessageBox.information(self, "重置成功", "已重置为默认手势库，记得点击「保存更改」按钮保存更改。")
     
     def saveGestureLibrary(self):
-        """保存手势库到文件"""
-        # 保存手势库
-        self.gestures.save()
-        
-        self.logger.debug("保存手势库到文件")
-        QMessageBox.information(self, "保存成功", "手势库已保存到文件")
+        """保存手势库"""
+        try:
+            # 保存手势库
+            success = self.gestures.save()
+            
+            if success:
+                self.logger.info("手势库保存成功")
+                # 显示成功消息
+                QMessageBox.information(self, "保存成功", "所有手势更改已成功保存")
+                return True
+            else:
+                self.logger.error("手势库保存失败")
+                QMessageBox.warning(self, "保存失败", "无法保存手势库")
+                return False
+        except Exception as e:
+            self.logger.error(f"保存手势库时出错: {e}")
+            QMessageBox.critical(self, "错误", f"保存手势库时出错: {str(e)}")
+            return False
 
+    def name_input_textChanged(self):
+        """名称输入框文本变化时的处理"""
+        self.onFormChanged()
+
+    def direction_combo_changed(self):
+        """方向下拉框变化时的处理"""
+        self.onFormChanged()
+
+    def action_type_combo_changed(self):
+        """动作类型下拉框变化时的处理"""
+        self.onFormChanged()
+
+    def action_value_input_textChanged(self):
+        """动作值输入框文本变化时的处理"""
+        self.onFormChanged()
+
+    def dumpCardContents(self, name=None):
+        """打印卡片内容，用于调试"""
+        if name and name in self.gesture_cards:
+            # 打印单个卡片的内容
+            card = self.gesture_cards[name]
+            content_widget = card.findChild(GestureContentWidget)
+            if content_widget:
+                direction_text = content_widget.direction_label.text()
+                action_text = content_widget.action_label.text()
+                self.logger.debug(f"卡片 '{name}' 内容: 标题={card.get_title()}, {direction_text}, {action_text}")
+        else:
+            # 打印所有卡片的内容
+            for card_name, card in self.gesture_cards.items():
+                content_widget = card.findChild(GestureContentWidget)
+                if content_widget:
+                    direction_text = content_widget.direction_label.text()
+                    action_text = content_widget.action_label.text()
+                    self.logger.debug(f"卡片 '{card_name}' 内容: 标题={card.get_title()}, {direction_text}, {action_text}")
+
+    def highlightCard(self, card):
+        """高亮显示选中的卡片
+        
+        Args:
+            card: 要高亮的卡片控件
+        """
+        # 清除所有卡片的选中状态
+        for name, stored_card in self.gesture_cards.items():
+            stored_card.set_selected(False)
+        
+        # 设置当前卡片为选中状态
+        card.set_selected(True)
+        
+    def clearGestureCards(self):
+        """清除所有手势卡片"""
+        # 清空所有卡片
+        for name, card in list(self.gesture_cards.items()):
+            self.cards_layout.removeWidget(card)
+            card.setParent(None)
+            card.deleteLater()
+        
+        # 清空字典
+        self.gesture_cards.clear()
+        
+    def addGestureCard(self, name, gesture_id, direction, action_type, action_value):
+        """添加手势卡片
+        
+        Args:
+            name: 手势名称
+            gesture_id: 手势ID
+            direction: 手势方向
+            action_type: 动作类型
+            action_value: 动作值
+            
+        Returns:
+            CardWidget: 手势卡片控件
+        """
+        # 确保ID是整数
+        if isinstance(gesture_id, str):
+            try:
+                gesture_id = int(gesture_id)
+            except (ValueError, TypeError):
+                gesture_id = 0
+        
+        self.logger.debug(f"添加手势卡片: {name}, ID: {gesture_id}")
+        
+        # 创建卡片控件
+        card = CardWidget(title=name)
+        card.gesture_id = gesture_id
+        
+        # 使用Qt属性系统设置name和id属性
+        card.setProperty("name", name)
+        card.setProperty("id", gesture_id)
+        
+        # 创建并添加自定义内容组件
+        content_widget = GestureContentWidget(direction, action_type, action_value)
+        card.add_widget(content_widget)
+        
+        # 添加点击事件 - 使用函数工厂模式避免闭包问题
+        def create_click_handler(card_widget):
+            return lambda checked=False: self.onGestureCardClicked(card_widget)
+        card.clicked.connect(create_click_handler(card))
+        
+        # 添加到布局和字典
+        self.cards_layout.addWidget(card)
+        self.gesture_cards[name] = card
+        
+        return card
 
 # 以下代码用于测试手势管理选项卡
 if __name__ == "__main__":

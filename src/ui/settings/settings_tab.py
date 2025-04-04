@@ -2,7 +2,7 @@ import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QSpinBox, QFileDialog, 
-                            QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton)
+                            QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton, QMessageBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 
@@ -174,12 +174,37 @@ class SettingsTab(QWidget):
         self._update_drawing_manager()
     
     def save_settings(self):
-        """保存设置到文件"""
-        self.logger.info("保存设置到文件")
-        self.settings.save()
-        
-        # 更新绘制管理器的参数
-        self._update_drawing_manager()
+        """保存设置"""
+        try:
+            # 获取设置值
+            pen_width = self.pen_width_spinner.value()
+            
+            # 从按钮样式表中提取颜色值
+            style = self.color_button.styleSheet()
+            color_str = style.split('rgb(')[1].split(')')[0]
+            color_parts = color_str.split(',')
+            pen_color = [int(color_parts[0]), int(color_parts[1]), int(color_parts[2])]
+            
+            # 确保设置值更新
+            self.settings.set("pen_width", pen_width)
+            self.settings.set("pen_color", pen_color)
+            
+            # 保存设置
+            success = self.settings.save()
+            
+            if success:
+                self.logger.info("设置已保存")
+                # 显示成功消息
+                QMessageBox.information(self, "保存成功", "设置已保存")
+                return True
+            else:
+                self.logger.error("保存设置失败")
+                QMessageBox.warning(self, "保存失败", "无法保存设置")
+                return False
+        except Exception as e:
+            self.logger.error(f"保存设置时出错: {e}")
+            QMessageBox.critical(self, "错误", f"保存设置时出错: {str(e)}")
+            return False
     
     def _update_drawing_manager(self):
         """更新绘制管理器的参数（内部方法）"""

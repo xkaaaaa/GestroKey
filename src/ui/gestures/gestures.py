@@ -13,6 +13,7 @@ class GestureLibrary:
         self.DEFAULT_GESTURES = self._load_default_gestures()
         self.gestures = self.DEFAULT_GESTURES.copy()
         self.gestures_file = self._get_gestures_file_path()
+        self.has_unsaved_changes = False
         self.load()
     
     def _load_default_gestures(self):
@@ -23,6 +24,10 @@ class GestureLibrary:
             if os.path.exists(default_gestures_path):
                 with open(default_gestures_path, 'r', encoding='utf-8') as f:
                     gestures = json.load(f)
+                
+                # 确保所有手势都有正确的ID
+                self._ensure_valid_ids(gestures)
+                
                 self.logger.info(f"已从 {default_gestures_path} 加载默认手势库")
                 return gestures
             else:
@@ -31,7 +36,51 @@ class GestureLibrary:
         except Exception as e:
             self.logger.error(f"加载默认手势库失败: {e}")
             raise
+    
+    def _ensure_valid_ids(self, gestures):
+        """确保所有手势都有有效的整数ID，并且ID是连续的
         
+        Args:
+            gestures: 手势字典
+        """
+        # 首先提取所有已有的ID
+        valid_ids = []
+        for name, gesture in gestures.items():
+            if "id" in gesture and isinstance(gesture["id"], int):
+                valid_ids.append(gesture["id"])
+        
+        # 排序ID
+        valid_ids.sort()
+        
+        # 创建ID到名称的映射，用于按ID排序
+        id_to_name = {}
+        for name, gesture in gestures.items():
+            if "id" in gesture:
+                id_to_name[gesture["id"]] = name
+        
+        # 从1开始，确保ID是连续的整数
+        next_id = 1
+        for name, gesture in list(gestures.items()):
+            # 如果没有ID或ID不是整数，分配新ID
+            if "id" not in gesture or not isinstance(gesture["id"], int):
+                gesture["id"] = next_id
+                next_id += 1
+                continue
+                
+            # 如果有ID但不连续，重新分配
+            if gesture["id"] != next_id:
+                old_id = gesture["id"]
+                gesture["id"] = next_id
+                self.logger.debug(f"重新分配手势ID: {name}, {old_id} -> {next_id}")
+            
+            next_id += 1
+    
+    def _get_next_id(self):
+        """获取下一个可用的ID"""
+        ids = [gesture.get("id", 0) for gesture in self.gestures.values()]
+        ids = [id for id in ids if isinstance(id, int)]
+        return max(ids + [0]) + 1
+    
     def _get_gestures_file_path(self):
         """获取手势库文件路径"""
         if sys.platform.startswith('win'):
@@ -55,10 +104,14 @@ class GestureLibrary:
                     loaded_gestures = json.load(f)
                     
                 # 更新手势库，确保所有默认手势都存在
-                for key, value in loaded_gestures.items():
-                    self.gestures[key] = value
+                for name, gesture in loaded_gestures.items():
+                    self.gestures[name] = gesture
+                
+                # 确保所有手势都有有效的ID
+                self._ensure_valid_ids(self.gestures)
                         
                 self.logger.info(f"已从 {self.gestures_file} 加载手势库")
+                self.has_unsaved_changes = False
             else:
                 self.logger.info("未找到手势库文件，使用默认手势库")
                 self.save()  # 保存默认手势库
@@ -74,9 +127,13 @@ class GestureLibrary:
             # 确保目录存在
             os.makedirs(os.path.dirname(self.gestures_file), exist_ok=True)
             
+            # 确保所有手势都有有效的ID
+            self._ensure_valid_ids(self.gestures)
+            
             with open(self.gestures_file, 'w', encoding='utf-8') as f:
                 json.dump(self.gestures, f, indent=4, ensure_ascii=False)
             self.logger.info(f"手势库已保存到 {self.gestures_file}")
+            self.has_unsaved_changes = False
             return True
         except Exception as e:
             self.logger.error(f"保存手势库失败: {e}")
@@ -86,9 +143,31 @@ class GestureLibrary:
         """获取指定名称的手势"""
         return self.gestures.get(name)
     
+    def get_gesture_by_id(self, gesture_id):
+        """根据ID获取手势"""
+        for name, gesture in self.gestures.items():
+            if gesture.get("id") == gesture_id:
+                return name, gesture
+        return None, None
+    
     def get_all_gestures(self):
         """获取所有手势"""
         return self.gestures
+    
+    def get_all_gestures_sorted(self):
+        """获取按ID排序的所有手势"""
+        # 获取所有手势
+        gestures = self.get_all_gestures()
+        
+        # 按ID排序
+        sorted_gestures = {}
+        sorted_items = sorted(gestures.items(), key=lambda x: x[1].get("id", 0))
+        
+        # 构建排序后的字典
+        for name, gesture in sorted_items:
+            sorted_gestures[name] = gesture
+            
+        return sorted_gestures
     
     def get_gesture_by_direction(self, direction):
         """根据方向序列获取匹配的手势"""
@@ -100,36 +179,127 @@ class GestureLibrary:
         self.logger.debug(f"未找到匹配方向 {direction} 的手势")
         return None, None
     
-    def add_gesture(self, name, direction, action_type, action_value):
-        """添加或更新手势"""
-        self.gestures[name] = {
+    def add_gesture(self, name, direction, action_type, action_value, gesture_id=None):
+        """添加或更新手势
+        
+        Args:
+            name: 手势名称
+            direction: 手势方向
+            action_type: 动作类型
+            action_value: 动作值
+            gesture_id: 手势ID，如果不提供则自动生成
+        """
+        # 使用整数ID而非字符串
+        if gesture_id is None:
+            # 检查是否是更新已有手势（通过名称查找）
+            existing_gesture = self.gestures.get(name)
+            if existing_gesture:
+                gesture_id = existing_gesture.get("id")
+            
+            # 如果仍然没有ID，生成新的
+            if gesture_id is None:
+                gesture_id = self._get_next_id()
+        
+        # 确保ID是整数
+        if not isinstance(gesture_id, int):
+            try:
+                gesture_id = int(gesture_id)
+            except (ValueError, TypeError):
+                gesture_id = self._get_next_id()
+        
+        # 新的手势数据
+        new_gesture = {
+            "id": gesture_id,
             "direction": direction,
             "action": {
                 "type": action_type,
                 "value": action_value
             }
         }
-        self.logger.info(f"添加手势: {name}, 方向: {direction}, 动作: {action_type}:{action_value}")
+        
+        # 检查是否是修改现有手势
+        current_gesture = self.gestures.get(name, {})
+        if current_gesture != new_gesture:
+            self.gestures[name] = new_gesture
+            self.has_unsaved_changes = True
+            self.logger.info(f"更新手势: {name}, ID: {gesture_id}, 方向: {direction}, 动作: {action_type}:{action_value}, 有未保存更改")
+            return True
+        return False
+    
+    def update_gesture_name(self, old_name, new_name):
+        """更新手势名称
+        
+        Args:
+            old_name: 旧名称
+            new_name: 新名称
+            
+        Returns:
+            bool: 操作是否成功
+        """
+        if old_name not in self.gestures:
+            self.logger.warning(f"尝试重命名不存在的手势: {old_name}")
+            return False
+            
+        if old_name == new_name:
+            return True  # 名称未变，视为成功
+            
+        if new_name in self.gestures:
+            self.logger.warning(f"无法重命名手势，新名称已存在: {new_name}")
+            return False
+            
+        # 复制手势数据并更新名称
+        gesture_data = self.gestures[old_name]
+        self.gestures[new_name] = gesture_data
+        del self.gestures[old_name]
+        
+        self.has_unsaved_changes = True
+        self.logger.info(f"重命名手势: {old_name} -> {new_name}, ID: {gesture_data.get('id')}, 有未保存更改")
         return True
     
     def remove_gesture(self, name):
-        """删除手势"""
-        if name in self.gestures:
-            del self.gestures[name]
-            self.logger.info(f"删除手势: {name}")
+        """删除手势并重新排序剩余手势的ID"""
+        if name not in self.gestures:
+            self.logger.warning(f"尝试删除不存在的手势: {name}")
+            return False
+            
+        # 获取要删除的手势ID
+        deleted_id = self.gestures[name].get("id")
+        
+        # 删除手势
+        del self.gestures[name]
+        
+        # 如果ID无效，无需重排序
+        if not isinstance(deleted_id, int):
+            self.has_unsaved_changes = True
             return True
-        self.logger.warning(f"尝试删除不存在的手势: {name}")
-        return False
+            
+        # 重排序其他手势的ID
+        for other_name, other_gesture in self.gestures.items():
+            other_id = other_gesture.get("id")
+            if isinstance(other_id, int) and other_id > deleted_id:
+                # 将ID减1
+                other_gesture["id"] = other_id - 1
+                self.logger.debug(f"重排序手势ID: {other_name}, {other_id} -> {other_id-1}")
+                
+        self.has_unsaved_changes = True
+        self.logger.info(f"删除手势: {name}, ID: {deleted_id}, 并重排序剩余手势的ID, 有未保存更改")
+        return True
     
     def reset_to_default(self):
         """重置为默认手势库"""
         self.logger.info("重置为默认手势库")
-        self.gestures = self.DEFAULT_GESTURES.copy()
+        if self.gestures != self.DEFAULT_GESTURES:
+            self.gestures = self.DEFAULT_GESTURES.copy()
+            self.has_unsaved_changes = True
         return self.save()
     
     def list_gestures(self):
         """获取所有手势名称列表"""
         return list(self.gestures.keys())
+        
+    def has_changes(self):
+        """检查是否有未保存的更改"""
+        return self.has_unsaved_changes
 
 
 # 创建全局手势库实例

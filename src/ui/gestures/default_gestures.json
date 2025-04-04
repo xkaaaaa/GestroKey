@@ -1,5 +1,6 @@
 {
     "复制": {
+        "id": 1,
         "direction": "右-下",
         "action": {
             "type": "shortcut",
@@ -7,6 +8,7 @@
         }
     },
     "粘贴": {
+        "id": 2,
         "direction": "下-右",
         "action": {
             "type": "shortcut",
@@ -14,6 +16,7 @@
         }
     },
     "剪切": {
+        "id": 3,
         "direction": "左-下",
         "action": {
             "type": "shortcut",
@@ -21,6 +24,7 @@
         }
     },
     "撤销": {
+        "id": 4,
         "direction": "左-上",
         "action": {
             "type": "shortcut",
@@ -28,6 +32,7 @@
         }
     },
     "重做": {
+        "id": 5,
         "direction": "右-上",
         "action": {
             "type": "shortcut",
@@ -35,6 +40,7 @@
         }
     },
     "保存": {
+        "id": 6,
         "direction": "下-左",
         "action": {
             "type": "shortcut",
@@ -42,6 +48,7 @@
         }
     },
     "全选": {
+        "id": 7,
         "direction": "上-左",
         "action": {
             "type": "shortcut",
@@ -49,6 +56,7 @@
         }
     },
     "新建": {
+        "id": 8,
         "direction": "上-右",
         "action": {
             "type": "shortcut",
@@ -56,6 +64,7 @@
         }
     },
     "刷新": {
+        "id": 9,
         "direction": "上-下",
         "action": {
             "type": "shortcut",

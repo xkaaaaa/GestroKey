@@ -347,110 +347,125 @@ settings.reset_to_default()
 
 ### 7. ui/gestures/gestures.py
 
-**功能说明**：手势库管理模块，负责加载、保存和管理用户定义的手势，包括对手势的增加、删除、查询等操作。
+**功能说明**：手势库管理模块，负责保存和加载用户手势库。
 
 **主要类和方法**：
 - `GestureLibrary`：手势库管理器类
-  - `load()`：从文件加载手势库，如不存在则创建默认手势库
+  - `__init__()`：初始化手势库管理器
+  - `load()`：从文件加载手势库
   - `save()`：保存手势库到文件
-  - `get_gesture(name)`：根据名称获取特定手势
+  - `get_gesture(name)`：获取指定名称的手势
+  - `get_gesture_by_id(gesture_id)`：根据ID获取手势
+  - `get_all_gestures()`：获取所有手势
+  - `get_all_gestures_sorted()`：获取按ID排序的所有手势
   - `get_gesture_by_direction(direction)`：根据方向序列获取匹配的手势
-  - `add_gesture(name, direction, action_type, action_value)`：添加新手势
-  - `remove_gesture(name)`：删除指定名称的手势
-  - `get_all_gestures()`：获取所有手势的字典
+  - `add_gesture(name, direction, action_type, action_value, gesture_id=None)`：添加或更新手势
+  - `update_gesture_name(old_name, new_name)`：更新手势名称
+  - `remove_gesture(name)`：删除手势并重新排序剩余手势的ID
   - `reset_to_default()`：重置为默认手势库
-  - `_load_default_gestures()`：加载默认手势库
-- `get_gesture_library()`：获取手势库的全局单例实例
+  - `list_gestures()`：获取所有手势名称列表
+  - `has_changes()`：检查是否有未保存的更改
+
+**数据结构**：
+- 手势使用一个整数ID进行标识，从1开始按顺序排列，ID决定手势在列表中的显示顺序
+- 手势对象的结构：
+  ```json
+  {
+    "id": 1,              // 整数ID，从1开始，按顺序排列
+    "direction": "上-下",   // 手势方向序列
+    "action": {
+      "type": "shortcut",  // 动作类型
+      "value": "ctrl+c"    // 动作值
+    }
+  }
+  ```
+
+**特性说明**：
+- 支持从用户配置目录加载和保存手势库
+- 为每个手势分配唯一的整数ID，ID从1开始连续编号
+- ID决定手势在列表中的显示顺序，ID越小排在越前面
+- 删除手势后自动重排后续手势的ID，保持ID的连续性
+- 提供重命名功能，在变更手势名称时保留所有手势属性
+- 通过名称、ID或方向序列多种方式查找手势
+- 跟踪更改状态，确保在有未保存更改时提示用户
+- 内置默认手势库，包含常用的快捷键手势
+- 支持重置为默认手势库
+- 提供获取全部手势和手势名称列表等批量操作
 
 **使用方法**：
 ```python
 from ui.gestures.gestures import get_gesture_library
 
-# 获取手势库
-gesture_lib = get_gesture_library()
+# 获取手势库实例
+gesture_library = get_gesture_library()
 
 # 获取所有手势
-gestures = gesture_lib.get_all_gestures()
-print(f"当前手势库中共有 {len(gestures)} 个手势")
+all_gestures = gesture_library.get_all_gestures()
 
-# 获取特定手势
-copy_gesture = gesture_lib.get_gesture("复制")
-if copy_gesture:
-    print(f"复制手势的方向是: {copy_gesture['direction']}")
-    print(f"复制手势执行的动作是: {copy_gesture['action']['value']}")
+# 获取按ID排序的所有手势
+sorted_gestures = gesture_library.get_all_gestures_sorted()
 
 # 添加新手势
-gesture_lib.add_gesture(
-    name="我的手势",
-    direction="上-右-下",
+gesture_library.add_gesture(
+    name="复制",
+    direction="右-下",
     action_type="shortcut",
-    action_value="ctrl+alt+t"
+    action_value="ctrl+c"
 )
 
+# 更新手势名称
+gesture_library.update_gesture_name("复制", "复制文本")
+
 # 根据方向获取手势
-name, gesture = gesture_lib.get_gesture_by_direction("上-右-下")
+name, gesture = gesture_library.get_gesture_by_direction("右-下")
 if gesture:
-    print(f"识别到手势: {name}")
+    print(f"找到手势：{name}")
+
+# 删除手势并自动重排后续ID
+gesture_library.remove_gesture("复制文本")
 
 # 保存手势库
-gesture_lib.save()
+gesture_library.save()
 
-# 重置为默认手势库
-gesture_lib.reset_to_default()
+# 检查是否有未保存的更改
+if gesture_library.has_changes():
+    print("有未保存的更改")
 ```
 
-**手势库结构**：
-- 手势库以JSON格式存储在用户目录下的`.gestrokey/config/gestures.json`文件中
-- 每个手势包含名称、方向序列和要执行的动作
-- 如果手势库文件不存在或损坏，程序会自动创建默认手势库
+### 8. ui/gestures/gestures_tab.py
 
-### 8. ui/gestures/default_gestures.json
-
-**功能说明**：默认手势库配置文件（JSON格式），包含预定义的常用手势及其对应的操作，作为初始手势库或备用手势库。
-
-**文件内容**：包含以下预定义手势：
-- 复制 (Ctrl+C)：右-下方向
-- 粘贴 (Ctrl+V)：下-右方向
-- 剪切 (Ctrl+X)：左-下方向
-- 撤销 (Ctrl+Z)：左-上方向
-- 重做 (Ctrl+Y)：右-上方向
-- 保存 (Ctrl+S)：下-左方向
-- 全选 (Ctrl+A)：上-左方向
-- 新建 (Ctrl+N)：上-右方向
-- 刷新 (F5)：上-下方向
-
-**使用方法**：
-文件由手势库管理器（gestures.py）自动加载，通常不需要直接操作此文件。当需要修改默认手势库时，可编辑此文件。
-
-### 9. ui/gestures/gestures_tab.py
-
-**功能说明**：手势管理选项卡模块，提供手势库的可视化管理界面，允许用户查看、添加、删除和编辑手势。
+**功能说明**：手势管理选项卡，提供手势库的管理功能，包括添加、编辑、删除和重置手势。
 
 **主要类和方法**：
 - `GesturesTab`：手势管理选项卡类，继承自`QWidget`
-  - `initUI()`：初始化选项卡界面
-  - `createGestureCardsList()`：创建左侧手势卡片列表区域
-  - `createGestureEditor()`：创建右侧手势编辑区域
-  - `updateGestureCards()`：更新手势卡片列表
-  - `onCardClicked()`：处理卡片点击事件
-  - `onGestureCardClicked(name)`：响应手势卡片选中，更新编辑区域
-  - `addNewGesture()`：添加新手势
-  - `saveGesture()`：保存当前编辑的手势
-  - `deleteGesture()`：删除选中的手势
+  - `initUI()`：初始化用户界面
+  - `createGestureCardsList(parent_layout)`：创建左侧手势卡片列表区域
+  - `createGestureEditor(parent_layout)`：创建右侧手势编辑区域
+  - `updateGestureCards(maintain_selected)`：更新手势卡片列表，按照ID顺序排列卡片，支持保持选中状态
+  - `onGestureCardClicked(card)`：处理手势卡片点击事件
+  - `addNewGesture()`：添加新手势，分配新的ID
+  - `deleteGesture()`：删除手势，并重排后续手势的ID
   - `resetGestures()`：重置为默认手势库
-  - `clearEditor()`：清空编辑区域
-  - `saveGestureLibrary()`：保存手势库到文件
+  - `saveGestureLibrary()`：保存手势库
+  - `onFormChanged()`：表单内容变化时自动应用更改，实时更新左侧卡片显示
+  - `name_input_textChanged()`：名称输入框文本变化时的处理
+  - `direction_combo_changed()`：方向下拉框变化时的处理
+  - `action_type_combo_changed()`：动作类型下拉框变化时的处理
+  - `action_value_input_textChanged()`：动作值输入框文本变化时的处理
 
 **特性说明**：
-- 采用左右分栏布局，左侧为手势卡片列表，右侧为编辑区域
-- 使用自定义卡片组件（CardWidget）来展示手势，提供直观且美观的用户界面
-- 卡片包含手势名称、方向和动作信息，点击卡片可在右侧编辑
-- 卡片具有选中状态，当前编辑的手势卡片会高亮显示
-- 右侧编辑区域提供完整的手势编辑功能，包括名称、方向、动作类型和值
-- 支持添加、编辑、删除、保存手势操作
-- 可以重置为默认手势库
-- 所有界面按钮使用自定义AnimatedButton组件，保持统一视觉风格
-- 滚动区域支持，当手势数量较多时可滚动浏览
+- 左侧显示手势卡片列表，按照ID顺序排列，ID越小排在越前面
+- 右侧为编辑区域，提供手势详情的编辑功能
+- 支持添加、编辑、删除和重置手势操作
+- 卡片点击后显示详细信息，可以编辑手势属性
+- **智能实时更新**：仅在编辑已有手势时，表单字段（名称、方向、动作类型、动作值）的变更会**即时**反映到左侧卡片列表中
+- 未选择任何手势时，表单变更不会自动应用，需要用户点击"添加新手势"按钮才会创建新手势
+- 左侧底部的"保存更改"按钮用于保存所有手势更改
+- 添加新手势时使用当前表单内容创建，并自动分配新的ID（当前最大ID+1）
+- 删除手势后会自动重排所有后续手势的ID，保持ID的连续性
+- 支持更改手势名称而不丢失关联数据，基于手势ID系统
+- 编辑手势时保持其在列表中的原有位置，不会改变ID
+- 支持智能检测重命名操作，确保卡片位置和ID保持一致
 
 **使用方法**：
 ```python
@@ -459,11 +474,11 @@ from ui.gestures.gestures_tab import GesturesTab
 # 创建手势管理选项卡
 gestures_tab = GesturesTab()
 
-# 将选项卡添加到主界面
+# 添加到界面
 # ...
 ```
 
-### 10. core/drawer.py
+### 9. core/drawer.py
 
 **功能说明**：绘画核心模块，实现了透明绘制覆盖层、右键绘制功能和绘制管理。
 
@@ -509,7 +524,7 @@ print(f"最后绘制的方向: {direction}")
 drawer.stop()
 ```
 
-### 11. core/stroke_analyzer.py
+### 10. core/stroke_analyzer.py
 
 **功能说明**：笔画分析模块，负责分析用户绘制的笔画轨迹，识别方向变化和绘制趋势。
 
@@ -551,7 +566,7 @@ print(f"描述: {description}")  # 例如: "先右后上"
 - `DOWN_LEFT`：左下
 - `DOWN_RIGHT`：右下
 
-### 12. core/gesture_executor.py
+### 11. core/gesture_executor.py
 
 **功能说明**：手势执行模块，负责根据识别的手势方向执行相应的操作，目前主要支持快捷键操作。
 
@@ -585,7 +600,7 @@ print(f"手势执行{'成功' if result else '失败'}")
 - 集成到绘画模块中，能够自动识别并执行与绘制方向匹配的手势
 - 从ui.gestures.gestures模块获取手势库，确保使用统一的手势管理系统
 
-### 13. core/logger.py
+### 12. core/logger.py
 
 **功能说明**：日志记录模块，提供统一的日志记录功能，支持不同日志级别和输出目标。
 
@@ -682,7 +697,9 @@ GestroKey实现了完整的手势识别和执行系统：
    - 通过手势管理选项卡(`ui/gestures/gestures_tab.py`)提供可视化的手势管理界面
    - 采用左右分栏布局，左侧使用卡片组件展示手势，右侧为编辑区域
    - 支持对手势库的添加、编辑、删除和重置操作
-   - 卡片式界面提供直观的视觉反馈，突出显示当前选中的手势
+   - 每个手势有一个从1开始的整数ID，ID决定手势在列表中的显示顺序
+   - 删除手势后系统会自动重排后续手势的ID，保持ID的连续性
+   - 卡片式界面提供直观的视觉反馈，按照ID顺序排列显示手势
 
 4. **支持的手势动作**：
    - 快捷键执行：支持绝大多数单键和组合键操作

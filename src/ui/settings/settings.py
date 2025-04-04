@@ -12,6 +12,7 @@ class Settings:
         self.DEFAULT_SETTINGS = self._load_default_settings()
         self.settings = self.DEFAULT_SETTINGS.copy()
         self.settings_file = self._get_settings_file_path()
+        self.has_unsaved_changes = False
         self.load()
     
     def _load_default_settings(self):
@@ -59,6 +60,7 @@ class Settings:
                         self.settings[key] = value
                         
                 self.logger.info(f"已从 {self.settings_file} 加载设置")
+                self.has_unsaved_changes = False
             else:
                 self.logger.info("未找到设置文件，使用默认设置")
                 self.save()  # 保存默认设置
@@ -77,6 +79,7 @@ class Settings:
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, indent=4, ensure_ascii=False)
             self.logger.info(f"设置已保存到 {self.settings_file}")
+            self.has_unsaved_changes = False
             return True
         except Exception as e:
             self.logger.error(f"保存设置失败: {e}")
@@ -89,16 +92,25 @@ class Settings:
     def set(self, key, value):
         """设置设置项"""
         if key in self.settings:
-            self.settings[key] = value
-            self.logger.debug(f"设置项已更新: {key}={value}")
+            # 检查值是否发生变化
+            if self.settings[key] != value:
+                self.settings[key] = value
+                self.has_unsaved_changes = True
+                self.logger.debug(f"设置项已更新: {key}={value}, 有未保存更改")
             return True
         return False
     
     def reset_to_default(self):
         """重置为默认设置"""
         self.logger.info("重置为默认设置")
-        self.settings = self.DEFAULT_SETTINGS.copy()
+        if self.settings != self.DEFAULT_SETTINGS:
+            self.settings = self.DEFAULT_SETTINGS.copy()
+            self.has_unsaved_changes = True
         return self.save()
+        
+    def has_changes(self):
+        """检查是否有未保存的更改"""
+        return self.has_unsaved_changes
 
 
 # 创建全局设置实例
