@@ -2,10 +2,10 @@ import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QLineEdit, QComboBox,
-                            QScrollArea, QHeaderView, QSizePolicy,
-                            QGroupBox, QMessageBox, QPushButton, QAbstractItemView,
-                            QFrame, QGridLayout, QSpacerItem)
-from PyQt5.QtCore import Qt, QSize
+                            QScrollArea, QSizePolicy,
+                            QGroupBox, QMessageBox, QPushButton,
+                            QFrame)
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
 try:
@@ -248,19 +248,6 @@ class GesturesTab(QWidget):
         # 添加到主布局
         parent_layout.addWidget(right_container, 1)  # 设置右侧区域占据更多空间
     
-    def onCardClicked(self):
-        """卡片点击事件处理器"""
-        # 获取发送信号的卡片
-        card = self.sender()
-        if not card:
-            return
-            
-        # 遍历查找对应的手势名称
-        for name, stored_card in self.gesture_cards.items():
-            if stored_card == card:
-                self.onGestureCardClicked(name)
-                break
-    
     def updateGestureCards(self, maintain_selected=True):
         """更新手势卡片列表
         
@@ -331,7 +318,7 @@ class GesturesTab(QWidget):
             self.clearEditor()
             self.delete_button.setEnabled(False)
             return
-            
+        
         # 高亮选中的卡片
         self.highlightCard(card)
         
@@ -573,7 +560,7 @@ class GesturesTab(QWidget):
         """确认删除手势"""
         if not self.current_selected_card:
             return
-            
+        
         name, gesture_id = self.current_selected_card
         
         # 删除手势并重新排序ID
@@ -586,17 +573,17 @@ class GesturesTab(QWidget):
             
             # 重置当前选中的卡片
             self.current_selected_card = None
-            
-            # 更新手势卡片列表
+        
+        # 更新手势卡片列表
             self.updateGestureCards(maintain_selected=False)
-            
+        
             # 禁用删除按钮
             self.delete_button.setEnabled(False)
-            
+        
             self.logger.info(f"成功删除手势: {name}, ID: {gesture_id}")
         else:
             self.logger.warning(f"删除手势失败: {name}")
-            
+    
     def deleteGesture(self):
         """删除当前编辑的手势"""
         # 如果没有选中的手势，则返回
@@ -613,7 +600,6 @@ class GesturesTab(QWidget):
         
         if reply == QMessageBox.Yes:
             self.onDeleteGestureConfirmed()
-            QMessageBox.information(self, "删除成功", f"手势 '{name}' 已删除")
     
     def resetGestures(self):
         """重置为默认手势库"""
@@ -637,7 +623,7 @@ class GesturesTab(QWidget):
     def saveGestureLibrary(self):
         """保存手势库"""
         try:
-            # 保存手势库
+        # 保存手势库
             success = self.gestures.save()
             
             if success:

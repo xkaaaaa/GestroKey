@@ -62,6 +62,17 @@ class GestroKeyApp(QMainWindow):
         self.setWindowTitle('GestroKey')
         self.setGeometry(300, 300, 750, 550)  # 调整窗口大小以适应左侧选项卡
         
+        # 设置应用图标
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images', 'icon.svg')
+        if os.path.exists(icon_path):
+            self.logger.info(f"加载窗口图标: {icon_path}")
+            app_icon = QIcon(icon_path)
+            self.setWindowIcon(app_icon)
+            # 同时设置应用程序图标
+            QApplication.setWindowIcon(app_icon)
+        else:
+            self.logger.warning(f"窗口图标文件不存在: {icon_path}")
+        
         # 创建中央部件和布局
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -233,6 +244,13 @@ if __name__ == "__main__":
     try:
         app = QApplication(sys.argv)
         app.setStyle('Fusion')  # 使用Fusion样式，在所有平台上看起来一致
+        
+        # 在创建主窗口前设置应用程序图标
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images', 'icon.svg')
+        if os.path.exists(icon_path):
+            app_icon = QIcon(icon_path)
+            app.setWindowIcon(app_icon)
+        
         main_window = GestroKeyApp()
         sys.exit(app.exec_())
     except Exception as e:
