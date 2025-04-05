@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
                            QLabel, QApplication, QComboBox, 
                            QMessageBox, QPushButton, QScrollArea, QGroupBox,
                            QSizePolicy, QSpacerItem, QFrame, QSplitter)
-from PyQt5.QtCore import Qt, QTimer, QRect, QEvent, QSize, QPropertyAnimation, QEasingCurve
+from PyQt5.QtCore import Qt, QTimer, QRect, QEvent, QSize
 from PyQt5.QtGui import QIcon, QColor
 
 try:
@@ -87,10 +87,8 @@ class GesturesTab(QWidget):
         self.gestures = get_gesture_library()
         self.gesture_cards = {}  # 存储手势卡片的引用
         self.current_selected_card = None  # 当前选中的卡片
-        self.form_animations = {}  # 存储表单动画
         
         self.initUI()
-        self._setup_animations()  # 设置动画
         self.logger.debug("手势管理选项卡初始化完成")
     
     def initUI(self):
@@ -489,6 +487,55 @@ class GesturesTab(QWidget):
             import traceback
             self.logger.error(traceback.format_exc())
     
+    def onGestureCardClicked(self, card):
+        """处理手势卡片点击事件"""
+        self.logger.debug("手势卡片被点击")
+        
+        # 获取卡片的名称和ID
+        name = card.property("name") if card.property("name") else card.get_title()
+        gesture_id = card.property("id") if card.property("id") is not None else card.gesture_id
+        
+        # 确保ID是整数
+        if isinstance(gesture_id, str):
+            try:
+                gesture_id = int(gesture_id)
+            except (ValueError, TypeError):
+                pass
+        
+        # 检查是否点击了当前已选中的卡片
+        if self.current_selected_card and self.current_selected_card[0] == name and self.current_selected_card[1] == gesture_id:
+            # 如果点击的是已选中的卡片，取消选中
+            self.logger.debug(f"取消选中卡片: {name}, ID: {gesture_id}")
+            card.set_selected(False)
+            self.current_selected_card = None
+            self.clearEditor()
+            self.delete_button.setEnabled(False)
+            return
+        
+        # 高亮选中的卡片
+        self.highlightCard(card)
+        
+        # 设置当前选中的卡片
+        self.current_selected_card = (name, gesture_id)
+        self.logger.debug(f"当前选中卡片: {name}, ID: {gesture_id}")
+        
+        # 获取手势信息
+        gesture = self.gestures.get_gesture(name)
+        if gesture:
+            # 更新表单内容
+            self.name_input.setText(name)
+            self.direction_text.setText(gesture.get("direction", ""))
+            action_type = gesture.get("action", {}).get("type", "")
+            action_value = gesture.get("action", {}).get("value", "")
+            self.action_type_combo.setCurrentText(action_type)
+            self.action_value_input.setText(action_value)
+            
+            # 这里不要设置was_selected=True，因为我们期望表单变化时自动更新
+            self.is_form_ready = True
+        
+        # 更新删除按钮状态
+        self.delete_button.setEnabled(True)
+    
     def addNewGesture(self):
         """添加新手势"""
         self.logger.debug("添加新手势")
@@ -538,17 +585,16 @@ class GesturesTab(QWidget):
                 # 选中新添加的手势卡片
                 for i in range(self.cards_layout.count()):
                     card = self.cards_layout.itemAt(i).widget()
-                    if card and (card.property("name") == name or card.get_title() == name):
-                        # 使用新的函数
-                        self.selectedGestureCard(name, next_id)
+                    if card and card.property("name") == name:
+                        self.onGestureCardClicked(card)
                         break
                 
-                # 添加完清空表单
-                self.clearEditor()
+                # 保存手势库
+                self.gestures.save()
             else:
-                self.logger.error(f"添加新手势失败: {name}")
+                self.logger.warning(f"添加手势时没有变化: {name}")
         except Exception as e:
-            self.logger.error(f"添加新手势时发生错误: {e}")
+            self.logger.error(f"添加新手势失败: {e}")
             import traceback
             self.logger.error(traceback.format_exc())
     
@@ -772,15 +818,17 @@ class GesturesTab(QWidget):
                     self.logger.debug(f"卡片 '{card_name}' 内容: 标题={card.get_title()}, {direction_text}, {action_text}")
 
     def highlightCard(self, card):
-        """高亮显示指定的卡片"""
-        # 取消所有卡片的高亮显示
-        for c in self.gesture_cards.values():
-            if c:
-                c.set_selected(False)
+        """高亮显示选中的卡片
         
-        # 高亮当前卡片
-        if card:
-            card.set_selected(True)
+        Args:
+            card: 要高亮的卡片控件
+        """
+        # 清除所有卡片的选中状态
+        for name, stored_card in self.gesture_cards.items():
+            stored_card.set_selected(False)
+        
+        # 设置当前卡片为选中状态
+        card.set_selected(True)
         
     def clearGestureCards(self):
         """清除所有手势卡片"""
@@ -827,8 +875,10 @@ class GesturesTab(QWidget):
         content_widget = GestureContentWidget(direction, action_type, action_value)
         card.add_widget(content_widget)
         
-        # 添加点击事件 - 使用新的动画选中函数
-        card.clicked.connect(lambda checked=False: self.selectedGestureCard(name, gesture_id))
+        # 添加点击事件 - 使用函数工厂模式避免闭包问题
+        def create_click_handler(card_widget):
+            return lambda checked=False: self.onGestureCardClicked(card_widget)
+        card.clicked.connect(create_click_handler(card))
         
         # 添加到布局和字典
         self.cards_layout.addWidget(card)
@@ -954,132 +1004,6 @@ class GesturesTab(QWidget):
             import traceback
             self.logger.error(traceback.format_exc())
             return False
-
-    def _setup_animations(self):
-        """设置表单元素的动画效果"""
-        self.form_animations = {}
-        self.animation_duration = 300  # 动画持续时间
-
-    def updateFormContent(self, name, direction, action_type, action_value):
-        """使用动画更新表单内容"""
-        # 停止之前的动画
-        for anim in self.form_animations.values():
-            if anim and anim.state() == QPropertyAnimation.Running:
-                anim.stop()
-        
-        # 清空动画字典
-        self.form_animations = {}
-        
-        # 设置新值前先保存旧值，用于动画起始点
-        old_name = self.name_input.text()
-        old_direction = self.direction_text.text()
-        old_action_value = self.action_value_input.text()
-        
-        # 暂时阻断信号，避免触发onFormChanged
-        self.name_input.blockSignals(True)
-        self.direction_text.blockSignals(True)
-        self.action_type_combo.blockSignals(True)
-        self.action_value_input.blockSignals(True)
-
-        # 设置名称输入框的动画
-        self.name_input.setText("")  # 先清空，然后使用动画填充
-        self._animate_text_input(self.name_input, old_name, name, "name_input")
-        
-        # 设置方向文本框的动画
-        self.direction_text.setText("")
-        self._animate_text_input(self.direction_text, old_direction, direction, "direction_text")
-        
-        # 设置动作类型下拉框
-        display_action_type = "执行快捷键" if action_type == "shortcut" else action_type
-        index = self.action_type_combo.findText(display_action_type)
-        if index >= 0:
-            self.action_type_combo.setCurrentIndex(index)
-        
-        # 设置动作值输入框的动画
-        self.action_value_input.setText("")
-        self._animate_text_input(self.action_value_input, old_action_value, action_value, "action_value_input")
-        
-        # 恢复信号连接
-        self.name_input.blockSignals(False)
-        self.direction_text.blockSignals(False)
-        self.action_type_combo.blockSignals(False)
-        self.action_value_input.blockSignals(False)
-        
-        # 启用删除按钮
-        self.delete_button.setEnabled(True)
-
-    def _animate_text_input(self, input_widget, old_text, new_text, animation_name):
-        """为文本输入框创建打字动画效果"""
-        # 如果没有变化，直接设置文本
-        if old_text == new_text:
-            input_widget.setText(new_text)
-            return
-            
-        # 创建一个定时器来模拟打字效果
-        timer = QTimer(self)
-        timer.setInterval(30)  # 每个字符的间隔时间
-        
-        # 保存动画相关数据
-        animation_data = {
-            "timer": timer,
-            "current_index": 0,
-            "target_text": new_text
-        }
-        
-        self.form_animations[animation_name] = animation_data
-        
-        # 定时器触发时的处理函数
-        def update_text():
-            current_index = animation_data["current_index"]
-            target_text = animation_data["target_text"]
-            
-            if current_index <= len(target_text):
-                input_widget.setText(target_text[:current_index])
-                animation_data["current_index"] += 1
-            else:
-                timer.stop()  # 动画完成
-                
-        # 连接定时器信号
-        timer.timeout.connect(update_text)
-        
-        # 开始动画
-        timer.start()
-
-    def selectedGestureCard(self, name, gesture_id):
-        """选中手势卡片"""
-        # 如果点击了已选中的卡片，不执行任何操作
-        if self.current_selected_card and self.current_selected_card[0] == name:
-            return
-            
-        # 取消之前选中的卡片高亮显示
-        if self.current_selected_card:
-            old_name, old_gesture_id = self.current_selected_card
-            if old_name in self.gesture_cards:
-                self.gesture_cards[old_name].set_selected(False)
-        
-        # 高亮显示当前选中的卡片
-        if name in self.gesture_cards:
-            self.highlightCard(self.gesture_cards[name])
-        
-        # 设置当前选中的卡片
-        self.current_selected_card = (name, gesture_id)
-        self.logger.debug(f"当前选中卡片: {name}, ID: {gesture_id}")
-        
-        # 获取手势信息
-        gesture = self.gestures.get_gesture(name)
-        if gesture:
-            # 更新表单内容（使用动画）
-            direction = gesture.get("direction", "")
-            action_type = gesture.get("action", {}).get("type", "")
-            action_value = gesture.get("action", {}).get("value", "")
-            
-            self.updateFormContent(name, direction, action_type, action_value)
-            
-            # 这里不要设置was_selected=True，因为我们期望表单变化时自动更新
-            self.is_form_ready = True
-        
-        # 更新删除按钮状态
-        self.delete_button.setEnabled(True)
 
 # 以下代码用于测试手势管理选项卡
 if __name__ == "__main__":
