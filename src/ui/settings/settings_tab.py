@@ -15,6 +15,7 @@ try:
     from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
+    from ui.components.toast_notification import show_info, show_error, show_warning, show_success  # 导入Toast通知组件
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append('../../')
@@ -25,6 +26,7 @@ except ImportError:
     from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
+    from ui.components.toast_notification import show_info, show_error, show_warning, show_success  # 导入Toast通知组件
     from version import APP_NAME  # 导入应用名称
 
 class SettingsTab(QWidget):
@@ -189,9 +191,9 @@ class SettingsTab(QWidget):
         self.settings.set("pen_color", color)
         self.preview_widget.update_color(color)
         
-        # 更新绘制管理器
-        self._update_drawing_manager()
-        
+        # 不再立即更新绘制管理器，只在保存或重置时更新
+        # self._update_drawing_manager()
+    
     def show_color_dialog(self):
         """
         废弃的方法，使用AnimatedColorPicker替代
@@ -211,8 +213,8 @@ class SettingsTab(QWidget):
         # 更新预览
         self.preview_widget.update_width(value)
         
-        # 更新绘制管理器
-        self._update_drawing_manager()
+        # 不再立即更新绘制管理器，只在保存或重置时更新
+        # self._update_drawing_manager()
     
     def pen_width_spinner_sync(self, value):
         """微调框值变化时同步滑块的值"""
@@ -235,7 +237,7 @@ class SettingsTab(QWidget):
             self.logger.info("用户选择重置所有设置为默认值")
             
             # 重置设置
-            self.settings.reset_to_defaults()
+            self.settings.reset_to_default()
             
             # 更新UI
             pen_width = self.settings.get("pen_width")
@@ -255,8 +257,8 @@ class SettingsTab(QWidget):
             # 更新绘制管理器
             self._update_drawing_manager()
             
-            # 弹出成功消息
-            QMessageBox.information(self, f"{APP_NAME} - 重置成功", "已成功将所有设置重置为默认值。")
+            # 显示成功消息
+            show_success(self, "已成功将所有设置重置为默认值。")
             self.logger.info("设置已重置为默认值")
     
     def save_settings(self):
@@ -275,7 +277,7 @@ class SettingsTab(QWidget):
             # 检查是否真的有改变需要保存
             if not self.settings.has_changes():
                 self.logger.info("设置未发生实际变化，无需保存")
-                QMessageBox.information(self, "无需保存", "设置未发生实际变化，无需保存")
+                show_info(self, "设置未发生实际变化，无需保存")
                 return True
                 
             # 保存设置
@@ -286,15 +288,15 @@ class SettingsTab(QWidget):
                 # 应用设置到绘制管理器
                 self._update_drawing_manager()
                 # 显示成功消息
-                QMessageBox.information(self, "保存成功", "设置已保存并应用")
+                show_success(self, "设置已保存并应用")
                 return True
             else:
                 self.logger.error("保存设置失败")
-                QMessageBox.warning(self, "保存失败", "无法保存设置")
+                show_warning(self, "无法保存设置")
                 return False
         except Exception as e:
             self.logger.error(f"保存设置时出错: {e}")
-            QMessageBox.critical(self, "错误", f"保存设置时出错: {str(e)}")
+            show_error(self, f"保存设置时出错: {str(e)}")
             return False
     
     def _update_drawing_manager(self):
@@ -314,6 +316,14 @@ class SettingsTab(QWidget):
                         self.logger.warning("更新绘制管理器参数失败")
         except Exception as e:
             self.logger.error(f"尝试更新绘制管理器参数时发生错误: {e}")
+    
+    def has_unsaved_changes(self):
+        """检查是否有未保存的更改"""
+        try:
+            return self.settings.has_changes()
+        except Exception as e:
+            self.logger.error(f"检查设置更改状态时出错: {e}")
+            return False
 
 
 class PenPreviewWidget(QWidget):

@@ -2,7 +2,7 @@ import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, 
                            QLabel, QApplication, QComboBox, 
-                           QMessageBox, QPushButton, QScrollArea, QGroupBox,
+                           QPushButton, QScrollArea, QGroupBox,
                            QSizePolicy, QSpacerItem, QFrame, QSplitter)
 from PyQt5.QtCore import Qt, QTimer, QRect, QEvent, QSize
 from PyQt5.QtGui import QIcon, QColor
@@ -16,6 +16,7 @@ try:
     from ui.components.combobox.qcustomcombobox import QCustomComboBox
     from ui.components.animated_stacked_widget import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
+    from ui.components.toast_notification import show_info, show_error, show_warning, show_success
 except ImportError:
     sys.path.append('../../')
     from core.logger import get_logger
@@ -26,6 +27,7 @@ except ImportError:
     from ui.components.combobox.qcustomcombobox import QCustomComboBox
     from ui.components.animated_stacked_widget import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
+    from ui.components.toast_notification import show_info, show_error, show_warning, show_success
 
 class GestureContentWidget(QWidget):
     """自定义的手势内容显示组件，专门用于解决刷新问题"""
@@ -590,7 +592,7 @@ class GesturesTab(QWidget):
                         break
                 
                 # 提示用户需要点击保存按钮才能应用更改
-                QMessageBox.information(self, "添加成功", f"成功添加手势「{name}」，请点击「保存更改」按钮保存并应用。")
+                show_success(self, f"成功添加手势「{name}」，请点击「保存更改」按钮保存并应用。")
             else:
                 self.logger.warning(f"添加手势时没有变化: {name}")
         except Exception as e:
@@ -722,7 +724,7 @@ class GesturesTab(QWidget):
             self.logger.info(f"成功删除手势: {name}, ID: {gesture_id}")
             
             # 提示用户保存更改
-            QMessageBox.information(self, "删除成功", f"手势「{name}」已删除，请点击「保存更改」按钮保存并应用。")
+            show_success(self, f"手势「{name}」已删除，请点击「保存更改」按钮保存并应用。")
         else:
             self.logger.warning(f"删除手势失败: {name}")
     
@@ -730,12 +732,14 @@ class GesturesTab(QWidget):
         """删除当前编辑的手势"""
         # 如果没有选中的手势，则返回
         if not self.current_selected_card:
-            QMessageBox.warning(self, "删除错误", "请先选择要删除的手势")
+            show_warning(self, "请先选择要删除的手势")
             return
         
         name, gesture_id = self.current_selected_card
         
         # 确认删除
+        # 这里还是需要使用确认对话框，因为需要用户做选择
+        from PyQt5.QtWidgets import QMessageBox
         reply = QMessageBox.question(self, "确认删除", 
                                     f"确定要删除手势 '{name}' 吗?",
                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -745,6 +749,8 @@ class GesturesTab(QWidget):
     
     def resetGestures(self):
         """重置为默认手势库"""
+        # 这里还是需要使用确认对话框，因为需要用户做选择
+        from PyQt5.QtWidgets import QMessageBox
         reply = QMessageBox.question(self, "确认重置", 
                                     "确定要重置为默认手势库吗? 这将覆盖所有当前的手势设置。",
                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -772,13 +778,13 @@ class GesturesTab(QWidget):
             self.clearEditor()
             
             self.logger.info("重置为默认手势库并已保存应用")
-            QMessageBox.information(self, "重置成功", "已重置为默认手势库并应用成功。")
+            show_success(self, "已重置为默认手势库并应用成功。")
     
     def saveGestureLibrary(self):
         """保存手势库"""
         # 检查是否有实际变更
         if not self.gestures.has_changes():
-            QMessageBox.information(self, "无需保存", "手势库没有任何修改，无需保存。")
+            show_info(self, "手势库没有任何修改，无需保存。")
             return
             
         # 保存手势库
@@ -793,8 +799,8 @@ class GesturesTab(QWidget):
         except Exception as e:
             self.logger.error(f"刷新手势执行器失败: {e}")
         
-        self.logger.info("手势库已保存")
-        QMessageBox.information(self, "保存成功", "手势库已保存并应用成功。")
+        self.logger.info("手势库保存成功")
+        show_success(self, "手势库已保存并应用成功。")
     
     def name_input_textChanged(self):
         """名称输入框文本变化时的处理"""
@@ -1017,6 +1023,14 @@ class GesturesTab(QWidget):
             self.logger.error(f"更新卡片内容失败: {e}")
             import traceback
             self.logger.error(traceback.format_exc())
+            return False
+
+    def has_unsaved_changes(self):
+        """检查是否有未保存的更改"""
+        try:
+            return self.gestures.has_changes()
+        except Exception as e:
+            self.logger.error(f"检查手势库更改状态时出错: {e}")
             return False
 
 # 以下代码用于测试手势管理选项卡

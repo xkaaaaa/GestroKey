@@ -1,7 +1,7 @@
 import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
-                            QLabel, QMainWindow, QHBoxLayout, QMessageBox, QSizePolicy)
+                            QLabel, QMainWindow, QHBoxLayout, QSizePolicy)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 
@@ -18,6 +18,7 @@ try:
     from ui.gestures.gestures_tab import GesturesTab  # 导入手势管理选项卡
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.side_tab import SideTabWidget  # 导入左侧选项卡组件
+    from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
 except ImportError:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from ui.console import ConsoleTab
@@ -27,6 +28,7 @@ except ImportError:
     from ui.gestures.gestures_tab import GesturesTab  # 导入手势管理选项卡
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.side_tab import SideTabWidget  # 导入左侧选项卡组件
+    from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
 
 class GestroKeyApp(QMainWindow):
     """GestroKey应用程序主窗口"""
@@ -40,7 +42,14 @@ class GestroKeyApp(QMainWindow):
         # 在程序启动时初始化设置和手势库
         self.init_global_resources()
         
+        # 初始化UI
         self.initUI()
+        
+        # 初始化Toast管理器并设置主窗口引用
+        toast_manager = get_toast_manager()
+        toast_manager.set_main_window(self)
+        self.logger.debug("初始化Toast管理器并设置主窗口引用")
+        
         self.logger.info("GestroKey应用程序已启动")
     
     def init_global_resources(self):
@@ -198,72 +207,78 @@ class GestroKeyApp(QMainWindow):
         # 检查是否有未保存的更改
         unsaved_settings = False
         unsaved_gestures = False
-        settings_manager = None
-        gestures_library = None
         
-        # 检查设置更改
-        try:
-            settings_manager = get_settings()
-            if settings_manager and settings_manager.has_changes():
-                unsaved_settings = True
-                self.logger.info("检测到未保存的设置更改")
-        except Exception as e:
-            self.logger.warning(f"检查设置更改状态失败: {e}")
+        # 检查设置是否有未保存的更改
+        if hasattr(self, 'settings_tab') and self.settings_tab.has_unsaved_changes():
+            unsaved_settings = True
         
-        # 检查手势库更改
-        try:
-            gestures_library = get_gesture_library()
-            if gestures_library and gestures_library.has_changes():
-                unsaved_gestures = True
-                self.logger.info("检测到未保存的手势库更改")
-        except Exception as e:
-            self.logger.warning(f"检查手势库更改状态失败: {e}")
+        # 检查手势库是否有未保存的更改
+        if hasattr(self, 'gestures_tab') and self.gestures_tab.has_unsaved_changes():
+            unsaved_gestures = True
         
-        # 如果有未保存的更改，弹出提示
+        # 如果存在未保存的更改，询问用户
         if unsaved_settings or unsaved_gestures:
-            # 准备提示消息
-            message = "您有未保存的更改:\n"
-            if unsaved_settings:
-                message += "- 应用程序设置\n"
-            if unsaved_gestures:
-                message += "- 手势库\n"
-            message += "\n是否保存这些更改？"
+            self.logger.info("检测到未保存的更改")
+            # 使用自定义对话框而不是QMessageBox
+            is_saved = False
             
-            # 显示确认对话框
-            reply = QMessageBox.question(self, '保存更改', 
-                                         message,
+            # 这里我们还是需要使用确认对话框，因为需要用户做选择
+            from PyQt5.QtWidgets import QMessageBox
+            reply = QMessageBox.question(self, '保存更改',
+                                         '检测到未保存的更改，是否保存后退出？',
                                          QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
                                          QMessageBox.Save)
             
             if reply == QMessageBox.Save:
-                # 保存所有更改
-                self.logger.info("用户选择保存更改")
-                if unsaved_settings and settings_manager:
-                    try:
-                        settings_manager.save()
-                        self.logger.info("设置已保存")
-                    except Exception as e:
-                        self.logger.error(f"保存设置失败: {e}")
-                        QMessageBox.warning(self, "错误", f"保存设置失败: {str(e)}")
+                try:
+                    # 保存设置
+                    if unsaved_settings:
+                        self.logger.info("正在保存设置...")
+                        if self.settings_tab.save_settings():
+                            self.logger.info("设置已保存")
+                            is_saved = True
+                        else:
+                            self.logger.error("保存设置失败")
+                            show_warning(self, "错误", "保存设置失败")
+                            event.ignore()
+                            return
+                except Exception as e:
+                    self.logger.error(f"保存设置时出现异常: {e}")
+                    show_warning(self, f"保存设置失败: {str(e)}")
+                    event.ignore()
+                    return
                 
-                if unsaved_gestures and gestures_library:
-                    try:
-                        gestures_library.save()
-                        self.logger.info("手势库已保存")
-                    except Exception as e:
-                        self.logger.error(f"保存手势库失败: {e}")
-                        QMessageBox.warning(self, "错误", f"保存手势库失败: {str(e)}")
+                try:
+                    # 保存手势库
+                    if unsaved_gestures:
+                        self.logger.info("正在保存手势库...")
+                        if self.gestures_tab.save_gestures():
+                            self.logger.info("手势库已保存")
+                            is_saved = True
+                        else:
+                            self.logger.error("保存手势库失败")
+                            show_warning(self, f"保存手势库失败: {str(e)}")
+                            event.ignore()
+                            return
+                except Exception as e:
+                    self.logger.error(f"保存手势库时出现异常: {e}")
+                    show_warning(self, f"保存手势库失败: {str(e)}")
+                    event.ignore()
+                    return
                 
-                event.accept()
             elif reply == QMessageBox.Discard:
-                # 放弃所有更改
-                self.logger.info("用户选择放弃更改")
-                event.accept()
+                self.logger.info("放弃未保存的更改")
+                # 用户选择放弃更改，不需要做任何事情
             else:
-                # 取消关闭
-                self.logger.info("用户取消关闭")
+                # 用户选择取消关闭，取消事件
+                self.logger.info("取消关闭窗口")
                 event.ignore()
                 return
+        
+        # 记录日志
+        self.logger.info("程序正常关闭")
+        # 接受事件，关闭窗口
+        event.accept()
 
 
 if __name__ == "__main__":

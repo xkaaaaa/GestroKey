@@ -30,6 +30,7 @@ GestroKey是一款功能强大的手势控制工具，允许用户通过鼠标�
     - [2.2.8 滑块组件](#228-uicomponentssliderpy)
     - [2.2.9 取色器组件](#229-uicomponentscolor_pickerpy)
     - [2.2.10 数字选择器组件](#2210-uicomponentsnumber_spinnerpy)
+    - [2.2.11 消息提示组件](#2211-uicomponentstoast_notificationpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 drawer.py](#31-coredrawerpy)
   - [3.2 stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -71,6 +72,7 @@ src/
 │       ├── input_field.py   # 自定义动画输入框组件
 │       ├── slider.py        # 自定义动画滑块组件
 │       ├── color_picker.py  # 自定义颜色选择器组件
+│       ├── toast_notification.py  # 现代通知提示组件
 │       ├── combobox/        # 下拉菜单组件
 │       │   ├── icons/       # 下拉菜单图标文件
 │       │   └── qcustomcombobox.py  # 自定义下拉菜单实现
@@ -1832,6 +1834,75 @@ int_spinner.setValue(75)
 # 获取当前值
 current_value = float_spinner.value()
 ```
+
+##### 2.2.11 ui/components/toast_notification.py
+
+**功能说明**：优雅的消息提示组件，在窗口右上角（或其他角落）显示带有平滑动画的通知提示，支持自动消失、鼠标悬停暂停计时、滚动长文本等功能，用于替代传统的弹出对话框，提供更现代的用户体验。
+
+**主要类和方法**：
+- `ElegantToast`：高级消息提示类
+  - `__init__(parent=None, message="", toast_type=INFO, duration=3000, icon=None, position='top-right', text_mode=TEXT_TRUNCATE)`：初始化提示组件
+    - `parent`：父窗口
+    - `message`：消息文本
+    - `toast_type`：提示类型（INFO、SUCCESS、WARNING、ERROR）
+    - `duration`：显示持续时间（毫秒）
+    - `icon`：自定义图标（默认根据类型设置）
+    - `position`：屏幕位置（'top-right', 'top-left', 'bottom-right', 'bottom-left'）
+    - `text_mode`：文本显示模式（'truncate', 'scroll', 'wrap'）
+  - `start_closing()`：开始关闭动画
+  - `paintEvent(event)`：绘制通知提示效果
+
+- `ToastManager`：管理多个通知提示的类
+  - `show_toast(parent, message, toast_type, duration, ...)`：显示提示
+  - `arrange_toasts(parent, position)`：排列多个提示，防止重叠
+  - `close_all()`：关闭所有活动提示
+
+- 全局辅助函数
+  - `show_info(parent, message, ...)`：显示信息类型提示
+  - `show_success(parent, message, ...)`：显示成功类型提示
+  - `show_warning(parent, message, ...)`：显示警告类型提示
+  - `show_error(parent, message, ...)`：显示错误类型提示
+
+**特性说明**：
+- **优雅的动画效果**：平滑的淡入淡出、位置调整、错误提示晃动等动画
+- **4种预设类型**：信息（蓝色）、成功（绿色）、警告（黄色）、错误（红色）
+- **自定义外观**：可设置持续时间、位置、文本模式等
+- **3种文本模式**：截断、滚动、自动换行，适应不同长度的消息
+- **互动功能**：鼠标悬停暂停自动消失计时器，显示关闭按钮
+- **错误提示晃动**：错误类型通知显示时自动添加左右晃动动画，增强注意度
+- **智能定位**：多个通知同时显示时自动堆叠排列，避免重叠
+- **类型图标**：每种类型都有对应的图标，增强视觉识别
+- **自适应布局**：窗口大小变化时自动重新排列通知
+- **高性能**：使用Qt的属性动画系统，低CPU占用
+- **简洁API**：提供简单易用的全局函数，替代传统的QMessageBox
+
+**使用方法**：
+```python
+from ui.components.toast_notification import show_info, show_success, show_warning, show_error
+
+# 显示信息提示
+show_info(self, "这是一条信息提示", duration=3000)
+
+# 显示成功提示
+show_success(self, "操作已成功完成", duration=5000, position='top-right')
+
+# 显示警告提示，使用滚动模式显示长文本
+from ui.components.toast_notification import ElegantToast
+show_warning(self, "这是一条较长的警告提示，将会自动滚动显示...", text_mode=ElegantToast.TEXT_SCROLL)
+
+# 显示错误提示，使用自动换行模式
+show_error(self, "发生严重错误！\n请检查日志获取详情。", text_mode=ElegantToast.TEXT_WRAP)
+
+# 获取toast管理器关闭所有通知
+from ui.components.toast_notification import get_toast_manager
+get_toast_manager().close_all()
+```
+
+**注意事项**：
+- 使用toast通知替换标准的QMessageBox.information, QMessageBox.warning和QMessageBox.error
+- 对于需要用户选择的场景（如确认删除），仍然使用标准的QMessageBox.question
+- 长文本消息建议使用TEXT_SCROLL或TEXT_WRAP模式
+- 重要的错误信息使用ERROR类型，会自动添加晃动动画提高用户注意度
 
 ### 3. 核心功能模块
 
