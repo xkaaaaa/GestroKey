@@ -13,6 +13,7 @@ from pynput import mouse
 try:
     from logger import get_logger
     from stroke_analyzer import StrokeAnalyzer
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
     from ui.settings.settings import get_settings
     from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
     from core.gesture_executor import get_gesture_executor
@@ -60,7 +61,7 @@ class TransparentDrawingOverlay(QWidget):
         self.stroke_analyzer = StrokeAnalyzer()
         
         # 绘制效果控制
-        self.pen_color = QColor(0, 120, 255, 220)  # 线条颜色
+        self.pen_color = QColor(0, 120, 255, 255)  # 线条颜色，设置完全不透明
         self.pen_width = 2  # 线条宽度，将由DrawingManager设置
         
         # 缓冲区和更新控制
@@ -90,8 +91,8 @@ class TransparentDrawingOverlay(QWidget):
         """设置笔尖颜色"""
         if isinstance(color, list) and len(color) >= 3:
             r, g, b = color[0], color[1], color[2]
-            # 确保透明度为220
-            alpha = 220
+            # 设置完全不透明
+            alpha = 255
             self.pen_color = QColor(r, g, b, alpha)
             self.logger.debug(f"笔尖颜色已设置为: RGB({r},{g},{b})")
             return True
@@ -190,7 +191,6 @@ class TransparentDrawingOverlay(QWidget):
         
         # 绘制线段
         painter.drawLine(self.last_point, current_point)
-        painter.end()
         
         # 记录当前点
         current_time = time.time()
@@ -198,6 +198,8 @@ class TransparentDrawingOverlay(QWidget):
         
         # 更新上一个点的位置
         self.last_point = current_point
+        
+        painter.end()
         
         # 更新显示
         self.update()
