@@ -27,6 +27,8 @@ GestroKey是一款功能强大的手势控制工具，允许用户通过鼠标�
     - [2.2.5 下拉菜单](#225-uicomponentscombobox)
     - [2.2.6 动画堆栈组件](#226-uicomponentsanimated_stacked_widgetpy)
     - [2.2.7 输入框组件](#227-uicomponentsinput_fieldpy)
+    - [2.2.8 滑块组件](#228-uicomponentssliderpy)
+    - [2.2.9 取色器组件](#229-uicomponentscolor_pickerpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 drawer.py](#31-coredrawerpy)
   - [3.2 stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -66,6 +68,8 @@ src/
 │       ├── scrollbar.py     # 自定义滚动条和滚动区域组件
 │       ├── side_tab.py      # 左侧选项卡组件
 │       ├── input_field.py   # 自定义动画输入框组件
+│       ├── slider.py        # 自定义动画滑块组件
+│       ├── color_picker.py  # 自定义颜色选择器组件
 │       ├── combobox/        # 下拉菜单组件
 │       │   ├── icons/       # 下拉菜单图标文件
 │       │   └── qcustomcombobox.py  # 自定义下拉菜单实现
@@ -1601,6 +1605,154 @@ input_field1.textChanged.connect(lambda text: print(f"文本变化: {text}"))
 5. 优化的禁用状态样式
 6. 精细的阴影效果
 7. 自动文本截断处理
+
+##### 2.2.8 ui/components/slider.py
+
+**功能说明**：
+自定义滑块组件，提供美观的动画滑块，支持水平和垂直方向，包含交互反馈和视觉特效。
+
+**主要类**：
+- `GesturePattern`：自定义SVG样式手势图案，用于滑块的滑块部分
+  - `__init__(self, parent=None, size=24, primary_color=None)`：初始化手势图案
+  - `set_value(self, value)`：设置要显示的值
+  - `set_show_value(self, show)`：设置是否显示值
+  - `update_animation(self)`：更新动画参数
+  - `set_primary_color(self, color)`：设置主要颜色
+  - `paintEvent(self, event)`：绘制自定义SVG样式手势图案
+
+- `SliderTrack`：滑块轨道组件，绘制背景和进度
+  - `__init__(self, parent=None, orientation=Qt.Horizontal, color=None)`：初始化滑块轨道
+  - `set_track_color(self, color)`：设置轨道颜色
+  - `set_progress(self, progress)`：设置进度值 (0.0 到 1.0)
+  - `get_progress(self)`：获取当前进度值
+  - `enterEvent(self, event)`：处理鼠标进入事件，启动悬停动画
+  - `leaveEvent(self, event)`：处理鼠标离开事件，启动悬停动画
+  - `paintEvent(self, event)`：绘制轨道和进度，动态调整透明度和发光效果
+
+- `AnimatedSlider`：动画滑块组件，整合手势图案和轨道组件
+  - `__init__(self, orientation=Qt.Horizontal, parent=None)`：初始化动画滑块
+  - `setValue(self, value)`：设置滑块值
+  - `value(self)`：获取当前值
+  - `setMinimum(self, min_value)`：设置最小值
+  - `minimum(self)`：获取最小值
+  - `setMaximum(self, max_value)`：设置最大值
+  - `maximum(self)`：获取最大值
+  - `setRange(self, min_value, max_value)`：设置值范围
+  - `setPrimaryColor(self, color)`：设置主题颜色
+  - `setStep(self, step)`：设置步长
+  - `step(self)`：获取步长
+
+**主要信号**：
+- `valueChanged`：值变化时发出，传递新值
+- `sliderPressed`：滑块被按下时发出
+- `sliderReleased`：滑块被释放时发出
+- `sliderMoved`：滑块移动时发出，传递当前值
+
+**特性说明**：
+- 流畅动画：滑块移动、悬停和按下状态都有平滑过渡动画
+- 互动反馈：鼠标悬停时轨道发光，滑块大小动态调整
+- 自定义外观：支持设置颜色、大小和方向
+- 优雅设计：轨道带有渐变和阴影效果，滑块使用动画SVG样式图案
+- 悬停动画：鼠标经过时显示发光效果，提升用户体验
+- 步长吸附：可设置值的步长，拖动时自动吸附到最近的步长值
+- 双向支持：支持水平和垂直两种方向的滑块
+
+**使用方法**：
+```python
+from ui.components.slider import AnimatedSlider
+from PyQt5.QtCore import Qt
+
+# 创建水平滑块
+slider = AnimatedSlider(Qt.Horizontal)
+slider.setRange(0, 100)  # 设置范围
+slider.setValue(50)      # 设置初始值
+slider.setStep(5)        # 设置步长为5
+slider.setPrimaryColor([52, 152, 219])  # 设置蓝色主题
+
+# 连接信号
+slider.valueChanged.connect(lambda value: print(f"值变化为: {value}"))
+slider.sliderPressed.connect(lambda: print("滑块被按下"))
+slider.sliderReleased.connect(lambda: print("滑块被释放"))
+
+# 添加到布局
+layout.addWidget(slider)
+
+# 创建垂直滑块
+v_slider = AnimatedSlider(Qt.Vertical)
+v_slider.setRange(0, 255)
+v_slider.setValue(128)
+v_slider.setPrimaryColor([231, 76, 60])  # 设置红色主题
+layout.addWidget(v_slider)
+```
+
+##### 2.2.9 ui/components/color_picker.py
+
+**功能说明**：
+颜色选择器组件，提供预设颜色选择和自定义颜色对话框，支持RGB精确调色。
+
+**主要类**：
+- `ColorSwatch`：颜色样本组件，用于显示单一颜色
+  - `__init__(self, color=[0, 120, 255], size=30, selected=False, parent=None)`：初始化颜色样本
+  - `set_color(self, color)`：设置颜色
+  - `set_selected(self, selected)`：设置选中状态
+  - `paintEvent(self, event)`：绘制颜色样本，包括悬停和选中的视觉效果
+
+- `RainbowColorButton`：彩虹颜色按钮，用于打开更多颜色选择
+  - `__init__(self, size=30, parent=None)`：初始化彩虹按钮
+  - `paintEvent(self, event)`：绘制彩虹色按钮和中心加号
+
+- `ColorDialogPanel`：自定义颜色对话框面板
+  - `__init__(self, initial_color=[52, 152, 219], parent=None)`：初始化颜色对话框
+  - `initUI(self)`：初始化用户界面，创建调色板和RGB滑块
+  - `updateColorDisplay(self)`：更新颜色显示
+  - `onSliderColorChanged(self)`：处理滑块颜色变化
+  - `onColorSelected(self, color)`：处理颜色样本选择
+  - `setColor(self, color)`：设置当前颜色
+
+- `AnimatedColorPicker`：动画色彩选择器，整合上述组件
+  - `__init__(self, parent=None)`：初始化色彩选择器
+  - `initUI(self)`：初始化用户界面，创建预设颜色样本
+  - `open_color_dialog(self)`：打开颜色对话框
+  - `on_color_selected(self, color)`：处理颜色选择事件
+  - `set_color(self, color)`：设置当前颜色
+  - `get_color(self)`：获取当前颜色
+
+**主要信号**：
+- `clicked` (ColorSwatch)：颜色样本被点击时发出，传递RGB颜色列表
+- `clicked` (RainbowColorButton)：彩虹按钮被点击时发出
+- `colorSelected` (ColorDialogPanel)：颜色对话框中选择确认颜色时发出
+- `colorChanged` (AnimatedColorPicker)：颜色发生变化时发出，传递RGB颜色列表
+
+**特性说明**：
+- 预设颜色：提供16种精心设计的预设颜色供快速选择
+- 动画交互：样本和按钮支持悬停和选中状态的动画效果
+- 精确调色：通过RGB滑块实现精确的颜色调整
+- 扩展调色板：包含40种扩展颜色样本，涵盖多种色系
+- 圆形样本：使用圆形设计的颜色样本，带有渐变和阴影效果
+- 彩虹按钮：直观的彩虹环形按钮，用于打开更多颜色选择
+- 无缝集成：可轻松集成到任何需要色彩选择功能的界面
+
+**使用方法**：
+```python
+from ui.components.color_picker import AnimatedColorPicker
+
+# 创建色彩选择器
+color_picker = AnimatedColorPicker()
+color_picker.set_color([52, 152, 219])  # 设置初始颜色为蓝色
+
+# 连接信号
+def on_color_change(color):
+    r, g, b = color[0], color[1], color[2]
+    print(f"选择的颜色: RGB({r}, {g}, {b})")
+
+color_picker.colorChanged.connect(on_color_change)
+
+# 添加到布局
+layout.addWidget(color_picker)
+
+# 获取当前颜色
+current_color = color_picker.get_color()  # 返回[r, g, b]列表
+```
 
 ### 3. 核心功能模块
 

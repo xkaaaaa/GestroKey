@@ -12,6 +12,8 @@ try:
     from ui.settings.settings import get_settings
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
+    from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
+    from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append('../../')
@@ -19,6 +21,8 @@ except ImportError:
     from ui.settings.settings import get_settings
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
+    from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
+    from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from version import APP_NAME  # 导入应用名称
 
 class SettingsTab(QWidget):
@@ -71,35 +75,39 @@ class SettingsTab(QWidget):
         pen_label = QLabel("笔尖粗细:")
         pen_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         
+        # 使用自定义动画滑块替代普通SpinBox
+        self.pen_width_slider = AnimatedSlider(Qt.Horizontal)
+        self.pen_width_slider.setRange(1, 20)
+        self.pen_width_slider.setValue(self.settings.get("pen_width"))
+        self.pen_width_slider.valueChanged.connect(self.pen_width_changed)
+        self.pen_width_slider.setMinimumWidth(200)
+        self.pen_width_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+        # 保留SpinBox，与滑块配合使用
         self.pen_width_spinner = QSpinBox()
         self.pen_width_spinner.setRange(1, 20)
         self.pen_width_spinner.setValue(self.settings.get("pen_width"))
-        self.pen_width_spinner.valueChanged.connect(self.pen_width_changed)
+        self.pen_width_spinner.valueChanged.connect(self.pen_width_slider_sync)
         self.pen_width_spinner.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         
         pen_layout.addWidget(pen_label)
+        pen_layout.addWidget(self.pen_width_slider)
         pen_layout.addWidget(self.pen_width_spinner)
-        pen_layout.addStretch()
         drawing_layout.addLayout(pen_layout)
         
         # 笔尖颜色设置
-        color_layout = QHBoxLayout()
+        color_layout = QVBoxLayout()  # 改为垂直布局
         color_label = QLabel("笔尖颜色:")
         color_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         
-        # 使用原生QPushButton而不是AnimatedButton作为颜色选择按钮
-        current_color = self.settings.get("pen_color")
-        self.color_button = QPushButton("")
-        self.color_button.setMinimumSize(50, 25)  # 设置最小按钮大小，而不是固定大小
-        self.color_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.color_button.setCursor(Qt.PointingHandCursor)  # 设置光标为手型
-        self.update_color_button(current_color)
-        
-        self.color_button.clicked.connect(self.show_color_dialog)
+        # 使用自定义色彩选择器组件替代简单的按钮
+        self.color_picker = AnimatedColorPicker()
+        self.color_picker.set_color(self.settings.get("pen_color"))
+        self.color_picker.colorChanged.connect(self.color_changed)
+        self.color_picker.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
         color_layout.addWidget(color_label)
-        color_layout.addWidget(self.color_button)
-        color_layout.addStretch()
+        color_layout.addWidget(self.color_picker)
         drawing_layout.addLayout(color_layout)
         
         # 绘制预览框
@@ -169,52 +177,40 @@ class SettingsTab(QWidget):
         # 记录窗口大小变化
         self.logger.debug(f"设置选项卡大小已调整: {self.width()}x{self.height()}")
     
-    def update_color_button(self, color):
-        """更新颜色按钮的背景色"""
-        if isinstance(color, list) and len(color) >= 3:
-            r, g, b = color[0], color[1], color[2]
-            
-            # 使用样式表设置按钮背景色
-            self.color_button.setStyleSheet(
-                f"background-color: rgb({r}, {g}, {b}); "
-                f"border: 1px solid #888888; "
-                f"border-radius: 4px;"
-            )
-            
-            # 空文本
-            self.color_button.setText("")
-    
+    def color_changed(self, color):
+        """处理颜色变化事件"""
+        self.logger.debug(f"设置笔尖颜色: RGB({color[0]}, {color[1]}, {color[2]})")
+        self.settings.set("pen_color", color)
+        self.preview_widget.update_color(color)
+        
+        # 更新绘制管理器
+        self._update_drawing_manager()
+        
     def show_color_dialog(self):
-        """显示颜色选择对话框"""
-        current_color = self.settings.get("pen_color")
-        r, g, b = current_color[0], current_color[1], current_color[2]
-        
-        color = QColorDialog.getColor(
-            QColor(r, g, b), 
-            self, 
-            "选择笔尖颜色",
-            QColorDialog.DontUseNativeDialog
-        )
-        
-        if color.isValid():
-            new_color = [color.red(), color.green(), color.blue()]
-            self.settings.set("pen_color", new_color)
-            self.update_color_button(new_color)
-            self.preview_widget.update_color(new_color)
-            
-            # 实时更新绘制管理器的参数
-            # self._update_drawing_manager()
-            
-            self.logger.debug(f"笔尖颜色已更改为: RGB({color.red()},{color.green()},{color.blue()})")
+        """
+        废弃的方法，使用AnimatedColorPicker替代
+        保留此方法是为了兼容性，避免调用错误
+        """
+        self.logger.debug("show_color_dialog方法已废弃，使用AnimatedColorPicker替代")
+        pass
     
     def pen_width_changed(self, value):
-        """处理笔尖粗细变化"""
-        self.logger.debug(f"笔尖粗细已更改为: {value}")
-        self.preview_widget.update_width(value)
+        """笔尖粗细变化时的回调"""
+        self.logger.debug(f"设置笔尖粗细: {value}")
         self.settings.set("pen_width", value)
+        self.preview_widget.update_width(value)
         
-        # 实时更新绘制管理器的参数
-        # self._update_drawing_manager()
+        # 同步微调框的值
+        if self.pen_width_spinner.value() != value:
+            self.pen_width_spinner.setValue(value)
+            
+        # 更新绘制管理器
+        self._update_drawing_manager()
+        
+    def pen_width_slider_sync(self, value):
+        """微调框值变化时同步滑块的值"""
+        if self.pen_width_slider.value() != value:
+            self.pen_width_slider.setValue(value)
     
     def reset_settings(self):
         """重置为默认设置"""
@@ -227,7 +223,7 @@ class SettingsTab(QWidget):
         
         # 更新颜色按钮和预览
         color = self.settings.get("pen_color")
-        self.update_color_button(color)
+        self.color_picker.set_color(color)
         self.preview_widget.update_color(color)
         
         # 保存设置并应用

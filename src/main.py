@@ -61,8 +61,8 @@ class GestroKeyApp(QMainWindow):
         """初始化用户界面"""
         # 设置窗口属性
         self.setWindowTitle(APP_NAME)
-        self.setGeometry(300, 300, 850, 650)  # 增大默认窗口大小以适应更丰富的内容
-        self.setMinimumSize(640, 480)  # 设置最小窗口大小，确保内容可见
+        self.setGeometry(300, 300, 1000, 680)  # 增大默认窗口大小，宽度从850增加到1000，高度从650增加到680
+        self.setMinimumSize(800, 500)  # 增加最小窗口大小，宽度从640增加到800，高度从480增加到500
         
         # 设置应用图标
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images', 'icon.svg')
