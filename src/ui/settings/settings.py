@@ -16,6 +16,7 @@ class Settings:
         self.logger = get_logger("Settings")
         self.DEFAULT_SETTINGS = self._load_default_settings()
         self.settings = self.DEFAULT_SETTINGS.copy()
+        self.saved_settings = {}  # 用于存储最后一次保存的设置
         self.settings_file = self._get_settings_file_path()
         self.has_unsaved_changes = False
         self.load()
@@ -72,6 +73,8 @@ class Settings:
                         
                 self.logger.info(f"已从 {self.settings_file} 加载设置")
                 self.has_unsaved_changes = False
+                # 保存当前加载的设置到saved_settings
+                self.saved_settings = self.settings.copy()
             else:
                 self.logger.info("未找到设置文件，使用默认设置")
                 self.save()  # 保存默认设置
@@ -91,6 +94,8 @@ class Settings:
                 json.dump(self.settings, f, indent=4, ensure_ascii=False)
             self.logger.info(f"设置已保存到 {self.settings_file}")
             self.has_unsaved_changes = False
+            # 保存当前设置到saved_settings
+            self.saved_settings = self.settings.copy()
             return True
         except Exception as e:
             self.logger.error(f"保存设置失败: {e}")
@@ -105,9 +110,16 @@ class Settings:
         if key in self.settings:
             # 检查值是否发生变化
             if self.settings[key] != value:
+                # 更新当前值
                 self.settings[key] = value
-                self.has_unsaved_changes = True
-                self.logger.debug(f"设置项已更新: {key}={value}, 有未保存更改")
+                
+                # 检查是否与保存的值不同，只有在真正不同时才设置has_unsaved_changes标志
+                if not self.saved_settings or key not in self.saved_settings or self.saved_settings[key] != value:
+                    self.has_unsaved_changes = True
+                    self.logger.debug(f"设置项已更新: {key}={value}, 有未保存更改")
+                else:
+                    # 设置值与保存的值相同，可能是先改后改回
+                    self.logger.debug(f"设置项已更新: {key}={value}, 但与保存的值相同")
             return True
         return False
     
@@ -117,11 +129,38 @@ class Settings:
         if self.settings != self.DEFAULT_SETTINGS:
             self.settings = self.DEFAULT_SETTINGS.copy()
             self.has_unsaved_changes = True
-        return self.save()
+            
+        # 保存设置并更新saved_settings
+        success = self.save()
+        if success:
+            self.saved_settings = self.settings.copy()
+            self.has_unsaved_changes = False
+        return success
         
     def has_changes(self):
         """检查是否有未保存的更改"""
-        return self.has_unsaved_changes
+        # 首先根据标志快速判断
+        if not self.has_unsaved_changes:
+            return False
+            
+        # 如果标志为True，进一步比较当前设置与已保存的设置
+        if not self.saved_settings:
+            # 如果没有已保存的设置记录，则认为有未保存的更改
+            return True
+            
+        # 逐一比较设置项
+        for key, value in self.settings.items():
+            if key not in self.saved_settings or self.saved_settings[key] != value:
+                return True
+                
+        # 检查是否有已保存的设置项在当前设置中不存在
+        for key in self.saved_settings:
+            if key not in self.settings:
+                return True
+                
+        # 实际上没有差异，重置标志
+        self.has_unsaved_changes = False
+        return False
 
 
 # 创建全局设置实例

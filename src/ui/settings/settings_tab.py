@@ -203,7 +203,7 @@ class SettingsTab(QWidget):
             self.preview_widget.update_color(new_color)
             
             # 实时更新绘制管理器的参数
-            self._update_drawing_manager()
+            # self._update_drawing_manager()
             
             self.logger.debug(f"笔尖颜色已更改为: RGB({color.red()},{color.green()},{color.blue()})")
     
@@ -214,7 +214,7 @@ class SettingsTab(QWidget):
         self.settings.set("pen_width", value)
         
         # 实时更新绘制管理器的参数
-        self._update_drawing_manager()
+        # self._update_drawing_manager()
     
     def reset_settings(self):
         """重置为默认设置"""
@@ -230,8 +230,14 @@ class SettingsTab(QWidget):
         self.update_color_button(color)
         self.preview_widget.update_color(color)
         
-        # 更新绘制管理器的参数
-        self._update_drawing_manager()
+        # 保存设置并应用
+        if self.settings.save():
+            self._update_drawing_manager()
+            self.logger.info("默认设置已保存并应用")
+            QMessageBox.information(self, "重置成功", "已重置为默认设置并应用")
+        else:
+            self.logger.error("保存默认设置失败")
+            QMessageBox.warning(self, "重置失败", "无法保存默认设置")
     
     def save_settings(self):
         """保存设置"""
@@ -246,13 +252,21 @@ class SettingsTab(QWidget):
             self.settings.set("pen_width", pen_width)
             self.settings.set("pen_color", pen_color)
             
+            # 检查是否真的有改变需要保存
+            if not self.settings.has_changes():
+                self.logger.info("设置未发生实际变化，无需保存")
+                QMessageBox.information(self, "无需保存", "设置未发生实际变化，无需保存")
+                return True
+                
             # 保存设置
             success = self.settings.save()
             
             if success:
                 self.logger.info("设置已保存")
+                # 应用设置到绘制管理器
+                self._update_drawing_manager()
                 # 显示成功消息
-                QMessageBox.information(self, "保存成功", "设置已保存")
+                QMessageBox.information(self, "保存成功", "设置已保存并应用")
                 return True
             else:
                 self.logger.error("保存设置失败")
