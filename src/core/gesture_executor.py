@@ -88,9 +88,9 @@ class GestureExecutor:
             self.gesture_library = get_gesture_library()
             self.logger.info("手势库加载成功")
             
-            # 获取所有手势
-            gestures = self.gesture_library.get_all_gestures()
-            self.logger.info(f"成功加载手势库，包含 {len(gestures)} 个手势")
+            # 获取所有手势 - 使用已保存的手势库
+            gestures = self.gesture_library.get_all_gestures(use_saved=True)
+            self.logger.info(f"成功加载已保存的手势库，包含 {len(gestures)} 个手势")
             
             # 打印所有已加载的手势
             for name, gesture in gestures.items():
@@ -236,6 +236,18 @@ class GestureExecutor:
             
         except Exception as e:
             self.logger.error(f"按键操作失败: {e}")
+            self.logger.error(traceback.format_exc())
+
+    def refresh_gestures(self):
+        """刷新手势库，确保使用最新的已保存手势库"""
+        try:
+            if self.gesture_library:
+                gestures = self.gesture_library.get_all_gestures(use_saved=True)
+                self.logger.info(f"已刷新手势库，共有 {len(gestures)} 个保存的手势")
+            else:
+                self.logger.warning("手势库实例不存在，无法刷新")
+        except Exception as e:
+            self.logger.error(f"刷新手势库失败: {e}")
             self.logger.error(traceback.format_exc())
 
 

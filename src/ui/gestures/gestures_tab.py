@@ -589,8 +589,8 @@ class GesturesTab(QWidget):
                         self.onGestureCardClicked(card)
                         break
                 
-                # 保存手势库
-                self.gestures.save()
+                # 提示用户需要点击保存按钮才能应用更改
+                QMessageBox.information(self, "添加成功", f"成功添加手势「{name}」，请点击「保存更改」按钮保存并应用。")
             else:
                 self.logger.warning(f"添加手势时没有变化: {name}")
         except Exception as e:
@@ -707,22 +707,22 @@ class GesturesTab(QWidget):
         
         # 删除手势并重新排序ID
         if self.gestures.remove_gesture(name):
-            # 保存手势库
-            self.gestures.save()
-            
             # 清除表单
             self.clearEditor()
             
             # 重置当前选中的卡片
             self.current_selected_card = None
         
-        # 更新手势卡片列表
+            # 更新手势卡片列表
             self.updateGestureCards(maintain_selected=False)
         
             # 禁用删除按钮
             self.delete_button.setEnabled(False)
         
             self.logger.info(f"成功删除手势: {name}, ID: {gesture_id}")
+            
+            # 提示用户保存更改
+            QMessageBox.information(self, "删除成功", f"手势「{name}」已删除，请点击「保存更改」按钮保存并应用。")
         else:
             self.logger.warning(f"删除手势失败: {name}")
     
@@ -753,35 +753,49 @@ class GesturesTab(QWidget):
             # 重置手势库
             self.gestures.reset_to_default()
             
+            # 保存手势库
+            self.gestures.save()
+            
+            # 刷新手势执行器，确保使用最新的已保存手势库
+            try:
+                from core.gesture_executor import get_gesture_executor
+                gesture_executor = get_gesture_executor()
+                gesture_executor.refresh_gestures()
+                self.logger.info("已刷新手势执行器")
+            except Exception as e:
+                self.logger.error(f"刷新手势执行器失败: {e}")
+            
             # 更新列表
             self.updateGestureCards()
             
             # 清空编辑区域
             self.clearEditor()
             
-            self.logger.info("重置为默认手势库")
-            QMessageBox.information(self, "重置成功", "已重置为默认手势库，记得点击「保存更改」按钮保存更改。")
+            self.logger.info("重置为默认手势库并已保存应用")
+            QMessageBox.information(self, "重置成功", "已重置为默认手势库并应用成功。")
     
     def saveGestureLibrary(self):
         """保存手势库"""
-        try:
-        # 保存手势库
-            success = self.gestures.save()
+        # 检查是否有实际变更
+        if not self.gestures.has_changes():
+            QMessageBox.information(self, "无需保存", "手势库没有任何修改，无需保存。")
+            return
             
-            if success:
-                self.logger.info("手势库保存成功")
-                # 显示成功消息
-                QMessageBox.information(self, "保存成功", "所有手势更改已成功保存")
-                return True
-            else:
-                self.logger.error("手势库保存失败")
-                QMessageBox.warning(self, "保存失败", "无法保存手势库")
-                return False
+        # 保存手势库
+        self.gestures.save()
+        
+        # 刷新手势执行器，确保使用最新的已保存手势库
+        try:
+            from core.gesture_executor import get_gesture_executor
+            gesture_executor = get_gesture_executor()
+            gesture_executor.refresh_gestures()
+            self.logger.info("已刷新手势执行器")
         except Exception as e:
-            self.logger.error(f"保存手势库时出错: {e}")
-            QMessageBox.critical(self, "错误", f"保存手势库时出错: {str(e)}")
-            return False
-
+            self.logger.error(f"刷新手势执行器失败: {e}")
+        
+        self.logger.info("手势库已保存")
+        QMessageBox.information(self, "保存成功", "手势库已保存并应用成功。")
+    
     def name_input_textChanged(self):
         """名称输入框文本变化时的处理"""
         self.onFormChanged()
