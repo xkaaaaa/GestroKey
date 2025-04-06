@@ -29,6 +29,7 @@ GestroKey是一款功能强大的手势控制工具，允许用户通过鼠标�
     - [2.2.7 输入框组件](#227-uicomponentsinput_fieldpy)
     - [2.2.8 滑块组件](#228-uicomponentssliderpy)
     - [2.2.9 取色器组件](#229-uicomponentscolor_pickerpy)
+    - [2.2.10 数字选择器组件](#2210-uicomponentsnumber_spinnerpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 drawer.py](#31-coredrawerpy)
   - [3.2 stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -1752,6 +1753,84 @@ layout.addWidget(color_picker)
 
 # 获取当前颜色
 current_color = color_picker.get_color()  # 返回[r, g, b]列表
+```
+
+##### 2.2.10 ui/components/number_spinner.py
+
+**功能说明**：
+数字选择器组件，提供美观的数字输入和调整界面，支持直接输入和按钮/滚轮调整数值。
+
+**主要类**：
+- `SpinnerButton`：数字选择器按钮类
+  - `__init__(self, button_type="add", size=24, primary_color=None, parent=None)`：初始化按钮
+  - `set_primary_color(self, color)`：设置主要颜色
+  - `paintEvent(self, event)`：绘制按钮
+
+- `NumberValidator`：数字输入验证器
+  - `__init__(self, min_value, max_value, step=1, parent=None)`：初始化验证器
+  - `validate(self, input_text, pos)`：验证输入内容
+  - `fixup(self, input_text)`：修正输入内容
+
+- `AnimatedNumberSpinner`：动画数字选择器组件
+  - `__init__(self, parent=None, min_value=0, max_value=100, step=1, value=0, primary_color=None)`：初始化数字选择器
+  - `setValue(self, value)`：设置当前值
+  - `value(self)`：获取当前值
+  - `increment(self)`：增加数值
+  - `decrement(self)`：减少数值
+  - `setRange(self, min_value, max_value)`：设置数值范围
+  - `setStep(self, step)`：设置步长
+  - `setPrimaryColor(self, color)`：设置主题颜色
+
+**主要信号**：
+- `valueChanged`：值变化时发出，传递新值
+
+**特性说明**：
+- 动画按钮：加减按钮具有悬停和点击动画效果
+- 数值动画：数值变化时有平滑过渡动画
+- 多种输入方式：
+  - 直接编辑输入框
+  - 点击加减按钮
+  - 鼠标滚轮调整
+- 智能验证：验证输入文本，支持整数和小数，自动纠正无效输入
+- 范围限制：自动限制数值在指定范围内
+- 格式自适应：根据步长自动决定显示整数或小数(保留相应小数位)
+- 自定义样式：可设置颜色、步长和范围
+
+**使用方法**：
+```python
+from ui.components.number_spinner import AnimatedNumberSpinner
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QLabel
+
+# 创建布局和标签
+layout = QVBoxLayout()
+label = QLabel("数量:")
+layout.addWidget(label)
+
+# 创建整数数字选择器
+int_spinner = AnimatedNumberSpinner(
+    min_value=0, 
+    max_value=100, 
+    step=1,  # 整数步长
+    value=50
+)
+int_spinner.valueChanged.connect(lambda v: print(f"值变化为: {v}"))
+layout.addWidget(int_spinner)
+
+# 创建小数数字选择器
+float_spinner = AnimatedNumberSpinner(
+    min_value=0, 
+    max_value=5, 
+    step=0.1,  # 小数步长
+    value=2.5,
+    primary_color=[231, 76, 60]  # 自定义颜色(红色)
+)
+layout.addWidget(float_spinner)
+
+# 设置值
+int_spinner.setValue(75)
+
+# 获取当前值
+current_value = float_spinner.value()
 ```
 
 ### 3. 核心功能模块

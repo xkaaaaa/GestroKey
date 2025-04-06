@@ -1,7 +1,7 @@
 import sys
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
-                            QLabel, QApplication, QSpinBox, QFileDialog, 
+                            QLabel, QApplication, QFileDialog, 
                             QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton, QMessageBox,
                             QSizePolicy, QSpacerItem)
 from PyQt5.QtCore import Qt
@@ -14,6 +14,7 @@ try:
     from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
     from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
+    from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append('../../')
@@ -23,6 +24,7 @@ except ImportError:
     from ui.components.scrollbar import AnimatedScrollArea  # 导入自定义滚动区域
     from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
+    from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
     from version import APP_NAME  # 导入应用名称
 
 class SettingsTab(QWidget):
@@ -83,11 +85,15 @@ class SettingsTab(QWidget):
         self.pen_width_slider.setMinimumWidth(200)
         self.pen_width_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         
-        # 保留SpinBox，与滑块配合使用
-        self.pen_width_spinner = QSpinBox()
-        self.pen_width_spinner.setRange(1, 20)
-        self.pen_width_spinner.setValue(self.settings.get("pen_width"))
-        self.pen_width_spinner.valueChanged.connect(self.pen_width_slider_sync)
+        # 使用自定义数字选择器替代普通SpinBox
+        self.pen_width_spinner = AnimatedNumberSpinner(
+            min_value=1, 
+            max_value=20, 
+            step=1, 
+            value=self.settings.get("pen_width"),
+            primary_color=[52, 152, 219]  # 蓝色主题
+        )
+        self.pen_width_spinner.valueChanged.connect(self.pen_width_spinner_sync)
         self.pen_width_spinner.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         
         pen_layout.addWidget(pen_label)
@@ -198,42 +204,60 @@ class SettingsTab(QWidget):
         """笔尖粗细变化时的回调"""
         self.logger.debug(f"设置笔尖粗细: {value}")
         self.settings.set("pen_width", value)
-        self.preview_widget.update_width(value)
-        
-        # 同步微调框的值
+        # 更新微调框
         if self.pen_width_spinner.value() != value:
             self.pen_width_spinner.setValue(value)
-            
+        
+        # 更新预览
+        self.preview_widget.update_width(value)
+        
         # 更新绘制管理器
         self._update_drawing_manager()
-        
-    def pen_width_slider_sync(self, value):
+    
+    def pen_width_spinner_sync(self, value):
         """微调框值变化时同步滑块的值"""
         if self.pen_width_slider.value() != value:
             self.pen_width_slider.setValue(value)
+            # 设置值（通过滑块的valueChanged信号间接调用pen_width_changed）
     
     def reset_settings(self):
         """重置为默认设置"""
-        self.logger.info("重置为默认设置")
-        self.settings.reset_to_default()
+        # 弹出确认对话框
+        reply = QMessageBox.question(
+            self, 
+            f"{APP_NAME} - 确认重置", 
+            "是否确定将所有设置重置为默认值？", 
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.No
+        )
         
-        # 更新UI显示
-        self.pen_width_spinner.setValue(self.settings.get("pen_width"))
-        self.preview_widget.update_width(self.settings.get("pen_width"))
-        
-        # 更新颜色按钮和预览
-        color = self.settings.get("pen_color")
-        self.color_picker.set_color(color)
-        self.preview_widget.update_color(color)
-        
-        # 保存设置并应用
-        if self.settings.save():
+        if reply == QMessageBox.Yes:
+            self.logger.info("用户选择重置所有设置为默认值")
+            
+            # 重置设置
+            self.settings.reset_to_defaults()
+            
+            # 更新UI
+            pen_width = self.settings.get("pen_width")
+            pen_color = self.settings.get("pen_color")
+            
+            # 更新笔尖粗细控件
+            self.pen_width_slider.setValue(pen_width)
+            self.pen_width_spinner.setValue(pen_width)
+            
+            # 更新笔尖颜色
+            self.color_picker.set_color(pen_color)
+            
+            # 更新预览
+            self.preview_widget.update_width(pen_width)
+            self.preview_widget.update_color(pen_color)
+            
+            # 更新绘制管理器
             self._update_drawing_manager()
-            self.logger.info("默认设置已保存并应用")
-            QMessageBox.information(self, "重置成功", "已重置为默认设置并应用")
-        else:
-            self.logger.error("保存默认设置失败")
-            QMessageBox.warning(self, "重置失败", "无法保存默认设置")
+            
+            # 弹出成功消息
+            QMessageBox.information(self, f"{APP_NAME} - 重置成功", "已成功将所有设置重置为默认值。")
+            self.logger.info("设置已重置为默认值")
     
     def save_settings(self):
         """保存设置"""
