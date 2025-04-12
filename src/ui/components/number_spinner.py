@@ -1,11 +1,11 @@
 import sys
 import math
 import os
-from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, 
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, 
                            QLabel, QApplication, QSizePolicy, QGraphicsDropShadowEffect,
                            QPushButton, QFrame, QLineEdit)
-from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QPoint, QPointF, QRectF, pyqtProperty, QTimer
-from PyQt5.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, QBrush, QFont, QFontMetrics, QValidator
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QPoint, QPointF, QRectF, pyqtProperty, QTimer
+from PyQt6.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, QBrush, QFont, QFontMetrics, QValidator
 
 try:
     from core.logger import get_logger
@@ -61,7 +61,7 @@ class SpinnerButton(QWidget):
         # 创建动画
         self.scale_animation = QPropertyAnimation(self, b"scale")
         self.scale_animation.setDuration(150)
-        self.scale_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.scale_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
     
     # 定义Qt属性，用于动画效果
     @pyqtProperty(float)
@@ -106,7 +106,7 @@ class SpinnerButton(QWidget):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.pressed = True
             self.scale_animation.setStartValue(self._scale)
             self.scale_animation.setEndValue(0.95)
@@ -116,7 +116,7 @@ class SpinnerButton(QWidget):
     
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
-        if self.pressed and event.button() == Qt.LeftButton:
+        if self.pressed and event.button() == Qt.MouseButton.LeftButton:
             self.pressed = False
             self.scale_animation.setStartValue(self._scale)
             
@@ -138,7 +138,7 @@ class SpinnerButton(QWidget):
     def paintEvent(self, event):
         """绘制按钮"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         
         # 获取组件尺寸
         width = self.width()
@@ -159,7 +159,7 @@ class SpinnerButton(QWidget):
             gradient.setColorAt(1, QColor(int(self.primary_color[0]), int(self.primary_color[1]), int(self.primary_color[2])))
         
         painter.setBrush(QBrush(gradient))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         
         # 绘制圆形背景
         painter.drawEllipse(QRectF(center_x - scale_size/2, center_y - scale_size/2, scale_size, scale_size))
@@ -195,23 +195,23 @@ class NumberValidator(QValidator):
     def validate(self, input_text, pos):
         """验证输入内容"""
         if not input_text:
-            return QValidator.Intermediate, input_text, pos  # 允许空输入，后续处理
+            return QValidator.State.Intermediate, input_text, pos  # 允许空输入，后续处理
         
         # 尝试将输入转换为浮点数
         try:
             value = float(input_text)
             # 整数验证
             if self.is_integer and value != int(value):
-                return QValidator.Intermediate, input_text, pos
+                return QValidator.State.Intermediate, input_text, pos
             
             # 范围验证
             if value < self.min_value or value > self.max_value:
-                return QValidator.Intermediate, input_text, pos
+                return QValidator.State.Intermediate, input_text, pos
                 
-            return QValidator.Acceptable, input_text, pos
+            return QValidator.State.Acceptable, input_text, pos
         except ValueError:
             # 非数字内容，但允许编辑（例如正在输入负号、小数点等）
-            return QValidator.Intermediate, input_text, pos
+            return QValidator.State.Intermediate, input_text, pos
 
     def fixup(self, input_text):
         """修正输入内容"""
@@ -324,7 +324,7 @@ class AnimatedNumberSpinner(QWidget):
         
         # 创建数值输入框
         self.value_label = QLineEdit(self._format_display_value(self._value))
-        self.value_label.setAlignment(Qt.AlignCenter)
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.value_label.setStyleSheet("""
             font-weight: bold;
             color: #24292F;
@@ -359,17 +359,17 @@ class AnimatedNumberSpinner(QWidget):
         
         # 设置布局
         self.setLayout(main_layout)
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         
         # 启用鼠标滚轮事件
-        self.value_container.setFocusPolicy(Qt.StrongFocus)
+        self.value_container.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.value_container.installEventFilter(self)
     
     def setupAnimations(self):
         """设置动画"""
         self._value_animation = QPropertyAnimation(self, b"display_value")
         self._value_animation.setDuration(200)
-        self._value_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._value_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._value_animation.valueChanged.connect(self._update_display)
     
     def _clamp_value(self, value):
@@ -396,7 +396,7 @@ class AnimatedNumberSpinner(QWidget):
     
     def _animate_value(self, old_value, new_value):
         """动画显示值的变化"""
-        if self._value_animation.state() == QPropertyAnimation.Running:
+        if self._value_animation.state() == QPropertyAnimation.State.Running:
             self._value_animation.stop()
         
         self._old_value = old_value
@@ -511,7 +511,7 @@ class AnimatedNumberSpinner(QWidget):
 
     def eventFilter(self, obj, event):
         """事件过滤器，处理鼠标滚轮事件"""
-        if obj == self.value_container and event.type() == event.Wheel:
+        if obj == self.value_container and event.type() == event.Type.Wheel:
             # 获取滚轮方向
             angle_delta = event.angleDelta().y()
             
@@ -588,13 +588,13 @@ if __name__ == "__main__":
     
     # 添加标题
     title = QLabel("GestroKey 数字选择器")
-    title.setAlignment(Qt.AlignCenter)
+    title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title.setStyleSheet("font-size: 18pt; font-weight: bold; margin: 10px;")
     layout.addWidget(title)
     
     # 添加说明
     desc = QLabel("可通过点击按钮或滚轮调整数值")
-    desc.setAlignment(Qt.AlignCenter)
+    desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
     desc.setStyleSheet("font-size: 10pt; margin-bottom: 20px;")
     layout.addWidget(desc)
     
@@ -639,4 +639,4 @@ if __name__ == "__main__":
     window.setLayout(layout)
     window.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

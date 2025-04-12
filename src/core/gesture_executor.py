@@ -3,13 +3,16 @@ import time
 from pynput.keyboard import Controller, Key, KeyCode
 import re
 import traceback
+import sys
+import os
 
 try:
-    from logger import get_logger
-    from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
-except ImportError:
     from core.logger import get_logger
-    from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
+    from ui.gestures.gestures import get_gesture_library
+except ImportError:
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+    from core.logger import get_logger
+    from ui.gestures.gestures import get_gesture_library
 
 class GestureExecutor:
     """

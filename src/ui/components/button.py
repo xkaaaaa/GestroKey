@@ -1,9 +1,9 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout
-from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, pyqtProperty, QPoint, QRectF, QSequentialAnimationGroup, QParallelAnimationGroup
-from PyQt5.QtGui import QColor, QPainter, QFont, QPixmap, QIcon, QPainterPath, QBrush, QPen, QFontMetrics, QTransform
-from PyQt5.QtWidgets import QStyle
+from PyQt6.QtWidgets import QApplication, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout
+from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, pyqtProperty, QPoint, QRectF, QSequentialAnimationGroup, QParallelAnimationGroup
+from PyQt6.QtGui import QColor, QPainter, QFont, QPixmap, QIcon, QPainterPath, QBrush, QPen, QFontMetrics, QTransform
+from PyQt6.QtWidgets import QStyle
 
 try:
     from core.logger import get_logger
@@ -97,7 +97,7 @@ class AnimatedButton(QPushButton):
         
         # 设置样式
         self.setFlat(True)  # 设置为平面按钮，去除默认样式
-        self.setCursor(Qt.PointingHandCursor)  # 设置鼠标样式为手型
+        self.setCursor(Qt.CursorShape.PointingHandCursor)  # 设置鼠标样式为手型
         
         # 设置属性以允许样式表选择器
         self.setProperty("custom_animated", True)
@@ -124,21 +124,21 @@ class AnimatedButton(QPushButton):
         # 按钮缩放动画 - 用于点击效果
         self._scale_animation = QPropertyAnimation(self, b"scale_factor")
         self._scale_animation.setDuration(150)  # 150毫秒
-        self._scale_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._scale_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 颜色过渡动画 - 用于悬停效果
         self._color_animation = QPropertyAnimation(self, b"opacity")
         self._color_animation.setDuration(200)  # 200毫秒
-        self._color_animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self._color_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         
         # 文字动画 - 悬停时的文字效果
         self._text_y_animation = QPropertyAnimation(self, b"text_y_offset")
         self._text_y_animation.setDuration(200)
-        self._text_y_animation.setEasingCurve(QEasingCurve.OutQuad)
+        self._text_y_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         
         self._text_scale_animation = QPropertyAnimation(self, b"text_scale")
         self._text_scale_animation.setDuration(200)
-        self._text_scale_animation.setEasingCurve(QEasingCurve.OutQuad)
+        self._text_scale_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         
         # 悬停动画组
         self._hover_animation_group = QParallelAnimationGroup()
@@ -152,12 +152,12 @@ class AnimatedButton(QPushButton):
         # 按下时的文字Y轴动画
         self._press_text_y_animation = QPropertyAnimation(self, b"text_y_offset")
         self._press_text_y_animation.setDuration(100)
-        self._press_text_y_animation.setEasingCurve(QEasingCurve.OutQuad)
+        self._press_text_y_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         
         # 按下时的文字缩放动画
         self._press_text_scale_animation = QPropertyAnimation(self, b"text_scale")
         self._press_text_scale_animation.setDuration(100)
-        self._press_text_scale_animation.setEasingCurve(QEasingCurve.OutQuad)
+        self._press_text_scale_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         
         self._press_animation_group.addAnimation(self._press_text_y_animation)
         self._press_animation_group.addAnimation(self._press_text_scale_animation)
@@ -178,9 +178,9 @@ class AnimatedButton(QPushButton):
             
             # 更新鼠标指针样式
             if enabled:
-                self.setCursor(Qt.PointingHandCursor)
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
             else:
-                self.setCursor(Qt.ArrowCursor)
+                self.setCursor(Qt.CursorShape.ArrowCursor)
                 # 禁用时重置所有动画状态
                 self._hovered = False
                 self._pressed = False
@@ -272,7 +272,7 @@ class AnimatedButton(QPushButton):
         if not self.isEnabled():
             return
             
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._pressed = True
             
             # 按钮缩放动画
@@ -302,7 +302,7 @@ class AnimatedButton(QPushButton):
         if not self.isEnabled():
             return
             
-        if event.button() == Qt.LeftButton and self._pressed:
+        if event.button() == Qt.MouseButton.LeftButton and self._pressed:
             self._pressed = False
             
             # 按钮回弹动画
@@ -336,7 +336,7 @@ class AnimatedButton(QPushButton):
     def paintEvent(self, event):
         """绘制事件"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 确定要使用的颜色 - 根据按钮状态选择
         if not self.isEnabled():
@@ -404,25 +404,25 @@ class AnimatedButton(QPushButton):
             inner_shadow_color = QColor(0, 0, 0, 15)  # 微妙的内阴影
             painter.fillPath(inner_shadow, inner_shadow_color)
         
-        painter.restore()
-        
-        # 绘制图标
+        # 绘制图标 - 移到这里，让图标应用相同的缩放和变换
         if not self.icon().isNull():
             icon_rect = QRect(8, (self.height() - self.iconSize().height()) // 2,
                              self.iconSize().width(), self.iconSize().height())
             
             # 禁用状态时使用灰色图标
             if not self.isEnabled():
-                self.icon().paint(painter, icon_rect, Qt.AlignCenter, QIcon.Disabled)
+                self.icon().paint(painter, icon_rect, Qt.AlignmentFlag.AlignCenter, QIcon.Mode.Disabled)
             else:
-                self.icon().paint(painter, icon_rect)
+                # 根据按钮状态设置图标模式
+                icon_mode = QIcon.Mode.Normal
+                if self._pressed:
+                    icon_mode = QIcon.Mode.Active
+                elif self._hovered:
+                    icon_mode = QIcon.Mode.Selected
+                    
+                self.icon().paint(painter, icon_rect, Qt.AlignmentFlag.AlignCenter, icon_mode)
         
         # 绘制文本 - 带动画效果
-        painter.save()
-        
-        # 设置文本颜色
-        painter.setPen(text_color)
-        
         # 获取字体并调整大小
         font = self.font()
         font.setPointSize(10)  # 可根据需要调整字体大小
@@ -434,6 +434,9 @@ class AnimatedButton(QPushButton):
         
         # 应用文本动画效果 - 禁用状态下不应用动画效果
         if self.isEnabled():
+            # 保存当前状态以应用文本特殊变换
+            painter.save()
+            
             painter.translate(text_rect.center())
             painter.scale(self._text_scale, self._text_scale)
             painter.translate(-text_rect.center())
@@ -441,9 +444,17 @@ class AnimatedButton(QPushButton):
             # 应用文本Y轴偏移
             text_rect = text_rect.adjusted(0, int(self._text_y_offset), 0, int(self._text_y_offset))
         
-        # 居中绘制文本
-        painter.drawText(text_rect, Qt.AlignCenter, self.text())
+        # 设置文本颜色
+        painter.setPen(text_color)
         
+        # 居中绘制文本
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self.text())
+        
+        if self.isEnabled():
+            # 恢复为应用了按钮整体变换的状态
+            painter.restore()
+        
+        # 恢复原始状态
         painter.restore()
     
     # 定义动画属性
@@ -530,7 +541,7 @@ if __name__ == "__main__":
     
     # 添加标题
     title = QLabel("AnimatedButton 组件示例")
-    title.setAlignment(Qt.AlignCenter)
+    title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     font = title.font()
     font.setPointSize(18)
     font.setBold(True)
@@ -567,7 +578,7 @@ if __name__ == "__main__":
         # 如果没有提供图标且环境中有图标主题，使用一个默认图标
         if "icon" not in button_config and i % 2 == 0:  # 偶数索引的按钮添加图标
             # 使用内置的QStyle标准图标替代主题图标
-            button.setIcon(button.style().standardIcon(QStyle.SP_DialogOkButton))
+            button.setIcon(button.style().standardIcon(QStyle.StandardPixmap.SP_DialogOkButton))
             button.setIconSize(QSize(20, 20))
         
         # 添加到网格，每行2个按钮
@@ -580,7 +591,7 @@ if __name__ == "__main__":
     
     # 添加禁用状态按钮展示
     disabled_section_title = QLabel("禁用状态按钮示例")
-    disabled_section_title.setAlignment(Qt.AlignCenter)
+    disabled_section_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     font = disabled_section_title.font()
     font.setPointSize(16)
     font.setBold(True)
@@ -602,7 +613,7 @@ if __name__ == "__main__":
     # 添加图标并禁用按钮
     for i, button in enumerate(disabled_buttons):
         if i == 1:  # 为中间的按钮添加图标
-            button.setIcon(button.style().standardIcon(QStyle.SP_DialogSaveButton))
+            button.setIcon(button.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
             button.setIconSize(QSize(20, 20))
         button.setEnabled(False)  # 禁用按钮
         disabled_layout.addWidget(button)
@@ -642,7 +653,7 @@ if __name__ == "__main__":
     </p>
     </html>
     """)
-    info.setAlignment(Qt.AlignCenter)
+    info.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(info)
     
     # 添加控制按钮示例
@@ -704,4 +715,4 @@ if __name__ == "__main__":
     window.setLayout(layout)
     window.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

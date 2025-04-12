@@ -4,9 +4,9 @@ import math
 import os
 import traceback
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout
-from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal, QObject
-from PyQt5.QtGui import QPainter, QPen, QColor, QPainterPath, QPixmap, QBrush, QPainterPathStroker
+from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout
+from PyQt6.QtCore import Qt, QPoint, QTimer, pyqtSignal, QObject
+from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath, QPixmap, QBrush, QPainterPathStroker
 from pynput import mouse
 
 # 导入笔画分析器
@@ -20,19 +20,9 @@ try:
 except ImportError:
     from core.logger import get_logger
     from core.stroke_analyzer import StrokeAnalyzer
-    try:
-        from ui.settings.settings import get_settings
-        from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
-        from core.gesture_executor import get_gesture_executor
-    except ImportError:
-        # 如果导入失败，记录错误但不提供默认实现
-        # 程序依赖于settings模块，没有它无法正常工作
-        logger = get_logger("DrawerImport")
-        logger.error("无法导入settings或gestures模块，程序可能无法正常工作")
-        
-        # 定义一个空的settings获取函数，避免语法错误，但不提供实际功能
-        def get_settings():
-            return None
+    from ui.settings.settings import get_settings
+    from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
+    from core.gesture_executor import get_gesture_executor
 
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
@@ -103,20 +93,22 @@ class TransparentDrawingOverlay(QWidget):
     def initUI(self):
         # 创建一个全屏、透明、无边框的窗口，用于绘制
         self.setWindowFlags(
-            Qt.FramelessWindowHint | 
-            Qt.WindowStaysOnTopHint | 
-            Qt.Tool
+            Qt.WindowType.FramelessWindowHint | 
+            Qt.WindowType.WindowStaysOnTopHint | 
+            Qt.WindowType.Tool
         )
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 完全透明，不影响鼠标事件
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)  # 完全透明，不影响鼠标事件
         
         # 获取屏幕尺寸
-        screen_geometry = QApplication.desktop().screenGeometry()
+        from PyQt6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.geometry()
         self.setGeometry(screen_geometry)
         
         # 创建绘图缓冲区
         self.image = QPixmap(screen_geometry.width(), screen_geometry.height())
-        self.image.fill(Qt.transparent)
+        self.image.fill(Qt.GlobalColor.transparent)
         
         # 隐藏窗口，仅在绘制时显示
         self.hide()
@@ -147,7 +139,7 @@ class TransparentDrawingOverlay(QWidget):
         if self.image is None or self.image.size() != self.size():
             self.image = QPixmap(self.size())
         # 始终清空画布，确保每次新绘制开始时没有旧内容
-        self.image.fill(Qt.transparent)
+        self.image.fill(Qt.GlobalColor.transparent)
             
         # 记录起始点
         current_time = time.time()
@@ -179,14 +171,14 @@ class TransparentDrawingOverlay(QWidget):
         
         # 在图像上绘制新线段
         painter = QPainter(self.image)
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         
         # 设置画笔
         pen = QPen()
         pen.setColor(self.pen_color)
         pen.setWidth(self.pen_width)
-        pen.setCapStyle(Qt.RoundCap)
-        pen.setJoinStyle(Qt.RoundJoin)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
         
         # 绘制线段
@@ -317,7 +309,7 @@ class TransparentDrawingOverlay(QWidget):
             return
             
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         
         if self.fading:
             # 绘制淡出效果
@@ -333,7 +325,7 @@ class TransparentDrawingOverlay(QWidget):
         """窗口大小改变时调整画布大小"""
         if self.size().width() > 0 and self.size().height() > 0:
             new_image = QPixmap(self.size())
-            new_image.fill(Qt.transparent)
+            new_image.fill(Qt.GlobalColor.transparent)
             
             if self.image:
                 # 将原有内容绘制到新画布上
@@ -588,7 +580,7 @@ if __name__ == "__main__":
         
         # 运行应用程序主循环
         app = QApplication.instance()
-        sys.exit(app.exec_())
+        sys.exit(app.exec())
     except Exception as e:
         # 获取一个独立的日志记录器记录主程序异常
         error_logger = get_logger("MainError")

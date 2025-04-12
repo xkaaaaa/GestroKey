@@ -1,10 +1,13 @@
 import math
 from collections import deque
+import sys
+import os
 
 # 动态导入日志模块
 try:
-    from logger import get_logger
+    from core.logger import get_logger
 except ImportError:
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
     from core.logger import get_logger
 
 class StrokeAnalyzer:

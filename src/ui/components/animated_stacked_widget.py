@@ -1,9 +1,9 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication, QStackedWidget, QWidget
-from PyQt5.QtCore import (Qt, QPropertyAnimation, QEasingCurve, QPoint, 
+from PyQt6.QtWidgets import QApplication, QStackedWidget, QWidget
+from PyQt6.QtCore import (Qt, QPropertyAnimation, QEasingCurve, QPoint, 
                         pyqtProperty, pyqtSignal, QParallelAnimationGroup)
-from PyQt5.QtGui import QPainter
+from PyQt6.QtGui import QPainter
 
 try:
     from core.logger import get_logger
@@ -42,7 +42,7 @@ class AnimatedStackedWidget(QStackedWidget):
         # 动画设置
         self._animation_type = self.ANIMATION_RIGHT_TO_LEFT  # 默认动画类型
         self._animation_duration = 300                       # 默认动画持续时间（毫秒）
-        self._animation_curve = QEasingCurve.OutCubic       # 默认动画曲线
+        self._animation_curve = QEasingCurve.Type.OutCubic       # 默认动画曲线
         self._animations_enabled = True                      # 是否启用动画
         
         # 动画组
@@ -58,9 +58,9 @@ class AnimatedStackedWidget(QStackedWidget):
         self._next_index = -1
         
         # 设置属性，允许窗口更新
-        self.setAttribute(Qt.WA_Hover, True)
-        self.setAttribute(Qt.WA_OpaquePaintEvent, False)
-        self.setAttribute(Qt.WA_NoSystemBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         
         # 启用自动填充背景
         self.setAutoFillBackground(False)
@@ -149,7 +149,7 @@ class AnimatedStackedWidget(QStackedWidget):
         
         # 创建画笔
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if self._animation_type == self.ANIMATION_FADE:
             # 淡入淡出效果
@@ -321,10 +321,10 @@ if __name__ == "__main__":
         page.setStyleSheet(f"background-color: {color}; color: white; font-size: 24px;")
         page.setAutoFillBackground(True)
         
-        import PyQt5.QtWidgets as QtWidgets
+        import PyQt6.QtWidgets as QtWidgets
         layout = QtWidgets.QVBoxLayout(page)
         label = QtWidgets.QLabel(text)
-        label.setAlignment(Qt.AlignCenter)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(label)
         
         stacked_widget.addWidget(page)
@@ -373,4 +373,4 @@ if __name__ == "__main__":
     main_widget.resize(500, 400)
     main_widget.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

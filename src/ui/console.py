@@ -1,8 +1,8 @@
 import os
 import sys
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QSizePolicy, QSpacerItem, QHBoxLayout, QGridLayout, QProgressBar
-from PyQt5.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt5.QtGui import QCursor, QColor
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QSizePolicy, QSpacerItem, QHBoxLayout, QGridLayout, QProgressBar
+from PyQt6.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt6.QtGui import QCursor, QColor
 
 try:
     from core.logger import get_logger
@@ -12,7 +12,7 @@ try:
     from ui.components.card import CardWidget  # 导入自定义卡片组件
     from version import APP_NAME  # 导入应用名称
 except ImportError:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
     from core.logger import get_logger
     from core.drawer import DrawingManager
     from core.system_monitor import SystemMonitor, format_bytes
@@ -36,7 +36,7 @@ class AnimatedProgressBar(QProgressBar):
         # 动画相关属性
         self._animation = QPropertyAnimation(self, b"value")
         self._animation.setDuration(800)  # 动画持续800毫秒
-        self._animation.setEasingCurve(QEasingCurve.OutCubic)  # 平滑的减速动画效果
+        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)  # 平滑的减速动画效果
         
         # 颜色相关属性
         self._base_color = QColor(46, 204, 113)  # 绿色 (低使用率)
@@ -132,34 +132,34 @@ class ConsoleTab(QWidget):
         """初始化用户界面"""
         # 创建布局
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignTop)  # 改为顶部对齐，与其他选项卡一致
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # 改为顶部对齐，与其他选项卡一致
         
         # 顶部空白间距，增加灵活性
-        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
         
         # 标题标签 - 去掉APP_NAME前缀
         title_label = QLabel("控制台")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(title_label)
         
         # 状态标签
         self.status_label = QLabel("准备就绪")
         self.status_label.setStyleSheet("font-size: 10pt; margin-bottom: 20px;")
-        self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.status_label)
         
         # 使用单个按钮，根据状态切换文本和颜色
         self.action_button = AnimatedButton("开始绘制", primary_color=[41, 128, 185])  # 初始为蓝色"开始绘制"按钮
         self.action_button.setMinimumSize(150, 40)
-        self.action_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.action_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.action_button.clicked.connect(self.toggle_drawing)
-        layout.addWidget(self.action_button, 0, Qt.AlignCenter)
+        layout.addWidget(self.action_button, 0, Qt.AlignmentFlag.AlignCenter)
         
         # 添加系统信息卡片区域
-        layout.addSpacerItem(QSpacerItem(20, 30, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        layout.addSpacerItem(QSpacerItem(20, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
         
         # 创建卡片网格布局
         cards_layout = QGridLayout()
@@ -185,11 +185,11 @@ class ConsoleTab(QWidget):
         layout.addLayout(cards_layout)
         
         # 底部空白间距，增加灵活性
-        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # 设置布局和大小策略
         self.setLayout(layout)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # 设置尺寸变化事件处理
         self.logger.debug("已启用自适应布局")
@@ -207,7 +207,7 @@ class ConsoleTab(QWidget):
         # 创建值标签
         value_label = QLabel(value)
         value_label.setStyleSheet("font-size: 16pt; font-weight: bold; color: white;")
-        value_label.setAlignment(Qt.AlignCenter)
+        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         content_layout.addWidget(value_label)
         
         # 如果是CPU或内存卡片，添加动画进度条
@@ -344,4 +344,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     widget = ConsoleTab()
     widget.show()
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

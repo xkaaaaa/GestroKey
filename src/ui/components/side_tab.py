@@ -1,10 +1,10 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QTabBar, QStackedWidget, QStyleOption, QStyle)
-from PyQt5.QtCore import (Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, 
+from PyQt6.QtCore import (Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, 
                         pyqtProperty, QPoint, QRectF, QParallelAnimationGroup, pyqtSignal)
-from PyQt5.QtGui import (QColor, QPainter, QFont, QIcon, QPainterPath, 
+from PyQt6.QtGui import (QColor, QPainter, QFont, QIcon, QPainterPath, 
                         QBrush, QPen, QLinearGradient)
 
 try:
@@ -50,7 +50,7 @@ class AnimatedTabButton(QWidget):
         self.setMinimumWidth(160)
         
         # 设置鼠标样式
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         # 设置动画
         self._setup_animations()
@@ -63,17 +63,17 @@ class AnimatedTabButton(QWidget):
         # 高亮动画
         self._highlight_animation = QPropertyAnimation(self, b"highlight_opacity")
         self._highlight_animation.setDuration(200)
-        self._highlight_animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self._highlight_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         
         # 指示器位置动画
         self._indicator_pos_animation = QPropertyAnimation(self, b"indicator_position")
         self._indicator_pos_animation.setDuration(300)
-        self._indicator_pos_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._indicator_pos_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 指示器透明度动画
         self._indicator_opacity_animation = QPropertyAnimation(self, b"indicator_opacity")
         self._indicator_opacity_animation.setDuration(250)
-        self._indicator_opacity_animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self._indicator_opacity_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         
         # 创建动画组
         self._indicator_animation_group = QParallelAnimationGroup()
@@ -152,7 +152,7 @@ class AnimatedTabButton(QWidget):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             # 发射点击信号
             self.clicked.emit()
         super().mousePressEvent(event)
@@ -160,7 +160,7 @@ class AnimatedTabButton(QWidget):
     def paintEvent(self, event):
         """绘制事件"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 绘制背景
         if self._highlight_opacity > 0:
@@ -193,8 +193,8 @@ class AnimatedTabButton(QWidget):
             # 将浮点数转换为整数，避免QRect类型错误
             icon_rect = QRect(int(icon_x), int(icon_y), icon_size, icon_size)
             
-            self._icon.paint(painter, icon_rect, Qt.AlignCenter, 
-                           QIcon.Normal if not self._selected else QIcon.Selected)
+            self._icon.paint(painter, icon_rect, Qt.AlignmentFlag.AlignCenter, 
+                          QIcon.Mode.Normal if not self._selected else QIcon.Mode.Selected)
         
         # 绘制文本
         if self._text:
@@ -223,7 +223,7 @@ class AnimatedTabButton(QWidget):
             # 文本位置（考虑图标）
             text_x = icon_size + 30 if self._icon else 20
             text_rect = self.rect().adjusted(text_x, 0, -10, 0)
-            painter.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, self._text)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._text)
     
     # 动画属性定义
     def _get_highlight_opacity(self):
@@ -319,7 +319,7 @@ class SideTabWidget(QWidget):
         self._stack = AnimatedStackedWidget()
         self._stack.setAnimationType(AnimatedStackedWidget.ANIMATION_RIGHT_TO_LEFT)
         self._stack.setAnimationDuration(300)
-        self._stack.setAnimationCurve(QEasingCurve.OutCubic)
+        self._stack.setAnimationCurve(QEasingCurve.Type.OutCubic)
         
         # 添加到主布局
         self._main_layout.addWidget(self._tab_area, 0)  # 固定宽度
@@ -576,7 +576,7 @@ if __name__ == "__main__":
     </p>
     </html>
     """)
-    info.setAlignment(Qt.AlignCenter)
+    info.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(info)
     
     # 添加位置切换按钮
@@ -596,4 +596,4 @@ if __name__ == "__main__":
     layout.addLayout(buttons_layout)
     
     window.show()
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

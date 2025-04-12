@@ -1,18 +1,17 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QLineEdit, QApplication, QWidget, QVBoxLayout, 
+from PyQt6.QtWidgets import (QLineEdit, QApplication, QWidget, QVBoxLayout, 
                             QGraphicsDropShadowEffect, QLabel, QHBoxLayout,
-                            QAction, QPushButton, QGraphicsOpacityEffect)
-from PyQt5.QtCore import (Qt, QPropertyAnimation, QEasingCurve, QSize, pyqtProperty, 
+                            QPushButton, QGraphicsOpacityEffect)
+from PyQt6.QtCore import (Qt, QPropertyAnimation, QEasingCurve, QSize, pyqtProperty, 
                          pyqtSignal, QRect, QSequentialAnimationGroup, QParallelAnimationGroup, 
                          QTimer, QPoint, QRectF, QEvent, QLineF)
-from PyQt5.QtGui import (QColor, QPainter, QFont, QPainterPath, QBrush, QPen, 
-                        QIcon, QPixmap, QPalette, QValidator, QLinearGradient, QFontMetrics)
+from PyQt6.QtGui import (QColor, QPainter, QFont, QPainterPath, QBrush, QPen, 
+                        QIcon, QPixmap, QPalette, QValidator, QLinearGradient, QFontMetrics, QAction)
 
 try:
     from core.logger import get_logger
 except ImportError:
-    # 相对导入处理，便于直接运行此文件进行测试
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
 
@@ -58,7 +57,20 @@ def _get_border_color(self):
 def _set_border_color(self, color):
     """设置边框颜色"""
     self._current_border_color = color
-    self.update()  # 触发重绘
+    
+    # 立即更新容器样式，使颜色变化更平滑
+    container = self.findChild(QWidget, "InputContainer")
+    if container:
+        container.setStyleSheet(f"""
+            QWidget#InputContainer {{
+                background-color: {self._background_color.name()};
+                border: 1px solid {color.name()};
+                border-radius: 6px;
+            }}
+        """)
+    
+    # 触发重绘
+    self.update()
 
 def _get_border_width(self):
     """获取边框宽度"""
@@ -186,18 +198,25 @@ class AnimatedInputField(QWidget):
         self._setup_layout()
         
         # 立即强制居中标签，确保初始状态正确
-        QTimer.singleShot(0, self._force_center_label)
+        self._force_center_label()
         
-        # 在创建完成后设置连接
+        # 设置连接
         self._setup_connections()
         
         # 初始样式
         self._update_styles()
         
-        # 确保标签居中对齐 - 多次调用以确保成功
-        QTimer.singleShot(50, self._force_center_label)  # 50ms后再次尝试
-        QTimer.singleShot(100, self._force_center_label) # 100ms后再次尝试
-        QTimer.singleShot(200, self._force_center_label) # 200ms后再次尝试
+        # 确保标签居中对齐 - 使用多次调用，确保标签能够正确居中
+        # 第一轮立即尝试
+        QTimer.singleShot(0, self._force_center_label)
+        # 第二轮在组件布局计算完成后尝试
+        QTimer.singleShot(10, self._force_center_label)
+        QTimer.singleShot(50, self._force_center_label)
+        QTimer.singleShot(100, self._force_center_label)
+        QTimer.singleShot(200, self._force_center_label)
+        # 第三轮在窗口可能完全显示后再次尝试
+        QTimer.singleShot(500, self._force_center_label)
+        QTimer.singleShot(1000, self._force_center_label)
         
         # 确保在初始状态下标签可见且透明度正常
         self._label_widget.setVisible(True)
@@ -221,21 +240,21 @@ class AnimatedInputField(QWidget):
         # 创建输入框
         self._line_edit = QLineEdit(self)
         self._line_edit.setPlaceholderText("")  # 清空默认占位符，我们使用自定义标签
-        self._line_edit.setAttribute(Qt.WA_MacShowFocusRect, False)  # 移除macOS上的聚焦矩形
+        self._line_edit.setAttribute(Qt.WidgetAttribute.WA_MacShowFocusRect, False)  # 移除macOS上的聚焦矩形
         self._line_edit.setFrame(False)  # 移除默认边框
-        self._line_edit.setCursorMoveStyle(Qt.LogicalMoveStyle)  # 确保光标移动逻辑一致
+        self._line_edit.setCursorMoveStyle(Qt.CursorMoveStyle.LogicalMoveStyle)  # 确保光标移动逻辑一致
         
         # 设置鼠标光标为文本光标样式
-        self._line_edit.setCursor(Qt.IBeamCursor)  # 使用标准的I形状文本编辑光标
+        self._line_edit.setCursor(Qt.CursorShape.IBeamCursor)  # 使用标准的I形状文本编辑光标
         
         # 创建标签 - 强制设置文本居中对齐
         self._label_widget = QLabel(self._label, self)
         self._label_widget.setObjectName("AnimatedLabel")
-        self._label_widget.setAlignment(Qt.AlignCenter)  # 设置文本居中对齐
-        self._label_widget.setTextFormat(Qt.PlainText)   # 使用纯文本格式
+        self._label_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)  # 设置文本居中对齐
+        self._label_widget.setTextFormat(Qt.TextFormat.PlainText)   # 使用纯文本格式
         # 设置省略号模式
         self._label_widget.setWordWrap(False)  # 禁用自动换行
-        self._label_widget.setTextInteractionFlags(Qt.NoTextInteraction)  # 禁用文本交互
+        self._label_widget.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)  # 禁用文本交互
         
         # 强制设置标签居中样式，确保覆盖所有情况
         self._label_widget.setStyleSheet("""
@@ -248,7 +267,7 @@ class AnimatedInputField(QWidget):
         # 创建波纹效果容器
         self._ripple_container = QWidget(self)
         self._ripple_container.setObjectName("RippleContainer")
-        self._ripple_container.setAttribute(Qt.WA_TransparentForMouseEvents)  # 鼠标事件穿透
+        self._ripple_container.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)  # 鼠标事件穿透
         self._ripple_container.setStyleSheet("background: transparent;")
         self._ripple_container.setVisible(True)
         
@@ -264,37 +283,37 @@ class AnimatedInputField(QWidget):
         # 标签位置动画
         self._label_pos_animation = QPropertyAnimation(self._label_widget, b"pos", self)
         self._label_pos_animation.setDuration(300)
-        self._label_pos_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._label_pos_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
         # 标签大小动画 - 修改为fontSize属性
         self._label_size_animation = QPropertyAnimation(self, b"label_size", self)
         self._label_size_animation.setDuration(300)
-        self._label_size_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._label_size_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
-        # 边框颜色动画
+        # 边框颜色动画 - 增加持续时间，使边框颜色变化更加明显
         self._border_color_animation = QPropertyAnimation(self, b"border_color", self)
-        self._border_color_animation.setDuration(300)
-        self._border_color_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._border_color_animation.setDuration(400) # 增加为400ms，使颜色渐变更流畅
+        self._border_color_animation.setEasingCurve(QEasingCurve.Type.OutCubic) # 使用OutCubic缓动，更平滑
         
         # 边框宽度动画
         self._border_width_animation = QPropertyAnimation(self, b"border_width", self)
         self._border_width_animation.setDuration(300)
-        self._border_width_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._border_width_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
         # 悬停动画
         self._hover_color_animation = QPropertyAnimation(self, b"hover_color", self)
         self._hover_color_animation.setDuration(300)
-        self._hover_color_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._hover_color_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
         # 背景颜色动画
         self._bg_color_animation = QPropertyAnimation(self, b"background_color", self)
         self._bg_color_animation.setDuration(300)
-        self._bg_color_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._bg_color_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
         # 阴影动画
         self._shadow_animation = QPropertyAnimation(self, b"shadow_strength", self)
         self._shadow_animation.setDuration(300)
-        self._shadow_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._shadow_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         
         # 创建动画组
         self._focus_animation_group = QParallelAnimationGroup(self)
@@ -317,8 +336,8 @@ class AnimatedInputField(QWidget):
         container.setMinimumHeight(32)  # 减小容器高度
         
         # 设置容器为可点击
-        container.setAttribute(Qt.WA_StyledBackground)
-        container.setCursor(Qt.IBeamCursor)  # 设置文本输入光标
+        container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+        container.setCursor(Qt.CursorShape.IBeamCursor)  # 设置文本输入光标
         
         # 创建容器布局
         container_layout = QHBoxLayout(container)
@@ -340,7 +359,7 @@ class AnimatedInputField(QWidget):
         self._label_widget.setParent(container)
         
         # 强制设置标签居中对齐
-        self._label_widget.setAlignment(Qt.AlignCenter)
+        self._label_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # 初始化标签位置 (水平居中)
         container_width = container.width() if container.width() > 0 else 200
@@ -350,10 +369,30 @@ class AnimatedInputField(QWidget):
         # 计算水平居中位置和垂直居中位置
         x_pos = (container_width - label_width) // 2
         container_height = container.height() if container.height() > 0 else 32
+        
+        # 确保container_height是有效值
+        if container_height <= 0:
+            container_height = 32
+            
         if self._has_text or self._is_focused:
             y_pos = 1  # 上边距
         else:
-            y_pos = (container_height - 14) // 2  # 垂直居中
+            # 使用更精确的方式计算垂直居中位置
+            font = self._label_widget.font()
+            metrics = QFontMetrics(font)
+            text_height = metrics.height()
+            
+            # 如果无法获取文本高度，使用默认值
+            if text_height <= 0:
+                text_height = 14
+                
+            y_pos = (container_height - text_height) // 2
+            
+            # 确保y_pos在合理范围内
+            if y_pos < 0 or y_pos >= container_height:
+                y_pos = container_height // 2 - 7  # 更准确的垂直居中位置
+                
+        self.logger.debug(f"标签初始位置计算: container_height={container_height}, y_pos={y_pos}")
         
         # 设置标签位置
         self._label_widget.move(x_pos, y_pos)
@@ -411,19 +450,19 @@ class AnimatedInputField(QWidget):
     def eventFilter(self, obj, event):
         """事件过滤器，用于捕获各种事件"""
         if obj == self:
-            if event.type() == QEvent.Resize:
+            if event.type() == QEvent.Type.Resize:
                 # 窗口大小变化时重新居中标签
                 QTimer.singleShot(0, self._force_center_label)
-            elif event.type() == QEvent.Show:
+            elif event.type() == QEvent.Type.Show:
                 # 窗口显示时重新居中标签
                 QTimer.singleShot(0, self._force_center_label)
                 QTimer.singleShot(50, self._force_center_label)  # 额外保证
         elif obj == self.findChild(QWidget, "InputContainer") or obj == self._line_edit:
-            if event.type() == QEvent.MouseButtonPress:
+            if event.type() == QEvent.Type.MouseButtonPress:
                 # 如果点击的是输入框容器或输入框本身，设置焦点
                 self._line_edit.setFocus()
                 return True
-            elif event.type() == QEvent.Enter:
+            elif event.type() == QEvent.Type.Enter:
                 # 鼠标进入时的动画
                 if not self._is_focused and obj == self.findChild(QWidget, "InputContainer"):
                     self._hover_color_animation.stop()
@@ -435,7 +474,7 @@ class AnimatedInputField(QWidget):
                     self._hover_color_animation.start()
                     self._bg_color_animation.start()
                 return False
-            elif event.type() == QEvent.Leave:
+            elif event.type() == QEvent.Type.Leave:
                 # 鼠标离开时的动画
                 if not self._is_focused and obj == self.findChild(QWidget, "InputContainer"):
                     self._hover_color_animation.stop()
@@ -463,7 +502,7 @@ class AnimatedInputField(QWidget):
             self._label_widget.show()  # 确保标签可见
             
         # 强制设置标签对齐方式
-        self._label_widget.setAlignment(Qt.AlignCenter)
+        self._label_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # 设置标签宽度
         container_width = container.width()
@@ -487,12 +526,21 @@ class AnimatedInputField(QWidget):
         if self._has_text or self._is_focused:
             y_pos = 1  # 减小顶部边距
         else:
-            label_height = 14  # 减小标签高度
+            # 获取标签实际高度，如果不可用则使用固定值
+            label_height = self._label_widget.height()
+            if label_height <= 0:
+                label_height = 14  # 使用更准确的标签高度
+            
+            # 精确计算垂直居中位置
             y_pos = (container_height - label_height) // 2
+            
+            # 确保y_pos在合理范围内，防止极端值
+            if y_pos < 0 or y_pos > container_height:
+                y_pos = container_height // 2 - 7  # 强制居中作为后备方案
                 
-            # 设置新位置
-            self._label_widget.move(x_pos, y_pos)
-        self.logger.debug(f"标签新位置: x={x_pos}, y={y_pos}, 宽度={label_width}")
+        # 设置新位置
+        self._label_widget.move(x_pos, y_pos)
+        self.logger.debug(f"标签新位置: x={x_pos}, y={y_pos}, 宽度={label_width}, 容器高度={container_height}")
             
         # 获取标签字体
         font = self._label_widget.font()
@@ -715,11 +763,25 @@ class AnimatedInputField(QWidget):
         self._current_border_color = self._focus_color
         self._current_shadow_color = self._focus_color
         
+        # 立即更新标签颜色为聚焦颜色
+        self._label_widget.setStyleSheet(f"""
+            QLabel#AnimatedLabel {{
+                color: {self._focus_color.name()};
+                background-color: transparent;
+                font-size: {11 if self._has_text or self._is_focused else 13}px;
+                qproperty-alignment: AlignCenter;
+                text-align: center;
+            }}
+        """)
+        
         # 执行聚焦动画
         self._animate_focus(True)
         
         # 重绘控件
         self._line_edit.update()
+        
+        # 发送焦点变化信号
+        self.focusChanged.emit(True)
     
     def _focus_out_event(self, event):
         """输入框失去焦点事件"""
@@ -740,11 +802,25 @@ class AnimatedInputField(QWidget):
             self._current_border_color = self._border_color
             self._current_shadow_color = self._focus_color
         
+        # 立即更新标签颜色为普通颜色
+        self._label_widget.setStyleSheet(f"""
+            QLabel#AnimatedLabel {{
+                color: {self._label_color.name()};
+                background-color: transparent;
+                font-size: {11 if self._has_text or self._is_focused else 13}px;
+                qproperty-alignment: AlignCenter;
+                text-align: center;
+            }}
+        """)
+        
         # 执行失焦动画
         self._animate_focus(False)
         
         # 重绘控件
         self._line_edit.update()
+        
+        # 发送焦点变化信号
+        self.focusChanged.emit(False)
     
     def _start_ripple_animation(self, position):
         """开始波纹动画"""
@@ -764,14 +840,14 @@ class AnimatedInputField(QWidget):
         self._ripple_animation.setStartValue(0)
         self._ripple_animation.setEndValue(max_radius)
         self._ripple_animation.setDuration(400)
-        self._ripple_animation.setEasingCurve(QEasingCurve.OutQuad)
+        self._ripple_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         
         # 创建不透明度动画
         self._ripple_opacity_animation = QPropertyAnimation(self, b"ripple_opacity")
         self._ripple_opacity_animation.setStartValue(0.35)
         self._ripple_opacity_animation.setEndValue(0.0)
         self._ripple_opacity_animation.setDuration(400)
-        self._ripple_opacity_animation.setEasingCurve(QEasingCurve.OutQuad)
+        self._ripple_opacity_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         
         # 创建动画组
         ripple_group = QParallelAnimationGroup(self)  # 设置父对象，确保内存管理
@@ -782,7 +858,7 @@ class AnimatedInputField(QWidget):
         ripple_group.finished.connect(self._on_ripple_finished)
         
         # 启动动画
-        ripple_group.start(QPropertyAnimation.DeleteWhenStopped)
+        ripple_group.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
         
         # 设置波纹可见
         self._ripple_container.setVisible(True)
@@ -820,13 +896,44 @@ class AnimatedInputField(QWidget):
         if self._focus_animation_group:
             self._focus_animation_group.stop()
         
+        # 立即更新标签颜色 - 确保用户能立即看到颜色变化
+        label_color = self._focus_color if focused else self._label_color
+        self._label_widget.setStyleSheet(f"""
+            QLabel#AnimatedLabel {{
+                color: {label_color.name()};
+                background-color: transparent;
+                font-size: {self._label_widget.font().pointSizeF()}px;
+                qproperty-alignment: AlignCenter;
+                text-align: center;
+            }}
+        """)
+        
         # 设置边框颜色动画
         current_container = self.findChild(QWidget, "InputContainer")
         if current_container and self._border_color_animation:
             current_color = self._current_border_color
-            target_color = self._focus_color if focused else (self._error_color if not self._is_valid else self._border_color)
+            
+            # 根据状态设置目标颜色
+            if focused:
+                # 聚焦时边框变为蓝色，颜色更鲜艳，透明度稍高
+                target_color = self._focus_color
+                # 更新当前颜色状态
+                self._current_border_color = target_color
+            else:
+                # 失焦时根据验证状态变色
+                if not self._is_valid:
+                    target_color = self._error_color
+                else:
+                    target_color = self._border_color
+                # 更新当前颜色状态
+                self._current_border_color = target_color
+                
+            # 设置颜色动画
             self._border_color_animation.setStartValue(current_color)
             self._border_color_animation.setEndValue(target_color)
+            
+            # 立即应用初始颜色到容器样式，确保动画有正确的起点
+            self._update_container_style()
         
         # 设置边框宽度动画
         if self._border_width_animation:
@@ -878,6 +985,18 @@ class AnimatedInputField(QWidget):
         truncated_text = self._truncate_text_with_ellipsis(self._label, label_width, font)
         self._label_widget.setText(truncated_text)
         
+        # 立即更新标签颜色 - 确保标签颜色随焦点状态变化
+        label_color = self._focus_color if self._is_focused else self._label_color
+        self._label_widget.setStyleSheet(f"""
+            QLabel#AnimatedLabel {{
+                color: {label_color.name()};
+                background-color: transparent;
+                font-size: {11 if self._has_text or self._is_focused else 13}px;
+                qproperty-alignment: AlignCenter;
+                text-align: center;
+            }}
+        """)
+        
         # 计算水平居中位置
         x_pos = (container_width - label_width) // 2
         
@@ -917,7 +1036,7 @@ class AnimatedInputField(QWidget):
     
     def eventFilter(self, obj, event):
         """事件过滤器，用于捕获鼠标点击事件"""
-        if event.type() == QEvent.MouseButtonPress:
+        if event.type() == QEvent.Type.MouseButtonPress:
             # 如果点击的是输入框容器或输入框本身，设置焦点
             if obj == self or obj == self._line_edit:
                 self._line_edit.setFocus()
@@ -1064,8 +1183,29 @@ class AnimatedInputField(QWidget):
     
     def _force_center_label(self):
         """强制标签居中，并刷新显示"""
+        container = self.findChild(QWidget, "InputContainer")
+        if not container:
+            self.logger.warning("强制居中标签失败：找不到InputContainer")
+            return
+            
         # 确保标签居中
         self._ensure_label_centered()
+        
+        # 强制更新字体大小和颜色
+        font = self._label_widget.font()
+        if self._has_text or self._is_focused:
+            font.setPointSizeF(11.0)
+        else:
+            font.setPointSizeF(13.0)
+        self._label_widget.setFont(font)
+        
+        # 获取当前位置进行记录
+        current_pos = self._label_widget.pos()
+        
+        # 记录当前标签状态信息
+        self.logger.debug(f"强制标签居中 - 位置: ({current_pos.x()}, {current_pos.y()}), "
+                          f"状态: 聚焦={self._is_focused}, 有文本={self._has_text}, "
+                          f"字体大小={font.pointSizeF()}")
         
         # 主动触发重绘
         self.update()
@@ -1076,7 +1216,9 @@ class AnimatedInputField(QWidget):
         # 确保标签也更新
         self._label_widget.update()
         
-        self.logger.debug("强制标签居中并刷新显示")
+        # 如果container有效，尝试更新它的布局
+        if container:
+            container.updateGeometry()
 
     def _create_opacity_effect(self, opacity=1.0):
         """创建透明度效果"""
@@ -1090,7 +1232,7 @@ class AnimatedInputField(QWidget):
         container = self.findChild(QWidget, "InputContainer")
         if container:
             container.installEventFilter(self)
-            container.setAttribute(Qt.WA_Hover)  # 启用悬停事件
+            container.setAttribute(Qt.WidgetAttribute.WA_Hover)  # 启用悬停事件
         self._line_edit.installEventFilter(self)
         
         # 连接文本变化信号
@@ -1182,19 +1324,24 @@ class AnimatedInputField(QWidget):
     def showEvent(self, event):
         """显示事件处理，确保标签居中"""
         super().showEvent(event)
-        # 确保标签在显示时立即居中
+        
+        # 立即尝试居中
         self._force_center_label()
-        # 并延迟多次尝试，确保成功
+        
+        # 使用递增延迟多次尝试，确保成功
         QTimer.singleShot(50, self._force_center_label)
         QTimer.singleShot(100, self._force_center_label)
         QTimer.singleShot(200, self._force_center_label)
         QTimer.singleShot(300, self._force_center_label)
-    
+        # 添加更长时间的尝试，确保布局完全初始化后再次调整
+        QTimer.singleShot(500, self._force_center_label)
+        QTimer.singleShot(1000, self._force_center_label)
+
     def changeEvent(self, event):
         """变化事件处理，捕获窗口状态变化"""
         super().changeEvent(event)
         # 当窗口状态变化时（如禁用/启用状态变化）
-        if event.type() == QEvent.EnabledChange:
+        if event.type() == QEvent.Type.EnabledChange:
             QTimer.singleShot(0, self._force_center_label)
     
     def moveEvent(self, event):
@@ -1236,6 +1383,7 @@ class AnimatedInputField(QWidget):
         """更新容器样式"""
         container = self.findChild(QWidget, "InputContainer")
         if container:
+            # 更新容器样式
             container.setStyleSheet(f"""
                 QWidget#InputContainer {{
                     background-color: {self._background_color.name()};
@@ -1243,6 +1391,19 @@ class AnimatedInputField(QWidget):
                     border-radius: 4px;
                 }}
             """)
+            
+            # 同时更新标签颜色 - 确保边框颜色变化时标签颜色也随之变化
+            if hasattr(self, '_label_widget') and self._label_widget:
+                label_color = self._focus_color if self._is_focused else self._label_color
+                self._label_widget.setStyleSheet(f"""
+                    QLabel#AnimatedLabel {{
+                        color: {label_color.name()};
+                        background-color: transparent;
+                        font-size: {11 if hasattr(self, '_has_text') and (self._has_text or self._is_focused) else 13}px;
+                        qproperty-alignment: AlignCenter;
+                        text-align: center;
+                    }}
+                """)
 
 # 独立运行测试
 if __name__ == "__main__":
@@ -1454,4 +1615,4 @@ if __name__ == "__main__":
     window.resize(700, 550)  # 增加窗口大小以适应更多内容
     window.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

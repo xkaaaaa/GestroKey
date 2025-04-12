@@ -1,11 +1,11 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QFileDialog, 
                             QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton, QMessageBox,
-                            QSizePolicy, QSpacerItem)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+                            QSizePolicy, QSpacerItem, QFrame)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 
 try:
     from core.logger import get_logger
@@ -15,10 +15,10 @@ try:
     from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
-    from ui.components.toast_notification import show_info, show_error, show_warning, show_success  # 导入Toast通知组件
+    from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
     from version import APP_NAME  # 导入应用名称
 except ImportError:
-    sys.path.append('../../')
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
     from ui.settings.settings import get_settings
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
@@ -26,7 +26,7 @@ except ImportError:
     from ui.components.slider import AnimatedSlider  # 导入自定义滑块组件
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
-    from ui.components.toast_notification import show_info, show_error, show_warning, show_success  # 导入Toast通知组件
+    from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
     from version import APP_NAME  # 导入应用名称
 
 class SettingsTab(QWidget):
@@ -37,6 +37,10 @@ class SettingsTab(QWidget):
         self.logger = get_logger("SettingsTab")
         self.settings = get_settings()
         
+        # 预加载通知系统
+        ensure_toast_system_initialized()
+        self.logger.debug("通知组件已预加载")
+        
         self.initUI()
         self.logger.debug("设置选项卡初始化完成")
     
@@ -44,48 +48,48 @@ class SettingsTab(QWidget):
         """初始化用户界面"""
         # 创建主布局
         main_layout = QVBoxLayout(self)
-        main_layout.setAlignment(Qt.AlignTop)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         # 创建滚动区域，以便在窗口较小时可以滚动查看所有设置
         # 使用自定义动画滚动区域替代标准滚动区域
         scroll_area = AnimatedScrollArea()
-        scroll_area.setFrameShape(AnimatedScrollArea.NoFrame)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
         # 创建内容部件
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setAlignment(Qt.AlignTop)
+        content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         content_layout.setContentsMargins(10, 10, 10, 10)
         
         # 标题标签
         title_label = QLabel("设置")
         title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         content_layout.addWidget(title_label)
         
         # 添加顶部间距
-        content_layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        content_layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
         
         # 绘制设置组
         drawing_group = QGroupBox("绘制设置")
-        drawing_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        drawing_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         drawing_layout = QVBoxLayout()
         
         # 笔尖粗细设置
         pen_layout = QHBoxLayout()
         pen_label = QLabel("笔尖粗细:")
-        pen_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        pen_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         # 使用自定义动画滑块替代普通SpinBox
-        self.pen_width_slider = AnimatedSlider(Qt.Horizontal)
+        self.pen_width_slider = AnimatedSlider(Qt.Orientation.Horizontal)
         self.pen_width_slider.setRange(1, 20)
         self.pen_width_slider.setValue(self.settings.get("pen_width"))
         self.pen_width_slider.valueChanged.connect(self.pen_width_changed)
         self.pen_width_slider.setMinimumWidth(200)
-        self.pen_width_slider.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.pen_width_slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         # 使用自定义数字选择器替代普通SpinBox
         self.pen_width_spinner = AnimatedNumberSpinner(
@@ -96,7 +100,7 @@ class SettingsTab(QWidget):
             primary_color=[52, 152, 219]  # 蓝色主题
         )
         self.pen_width_spinner.valueChanged.connect(self.pen_width_spinner_sync)
-        self.pen_width_spinner.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.pen_width_spinner.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
         pen_layout.addWidget(pen_label)
         pen_layout.addWidget(self.pen_width_slider)
@@ -106,13 +110,13 @@ class SettingsTab(QWidget):
         # 笔尖颜色设置
         color_layout = QVBoxLayout()  # 改为垂直布局
         color_label = QLabel("笔尖颜色:")
-        color_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        color_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         # 使用自定义色彩选择器组件替代简单的按钮
         self.color_picker = AnimatedColorPicker()
         self.color_picker.set_color(self.settings.get("pen_color"))
         self.color_picker.colorChanged.connect(self.color_changed)
-        self.color_picker.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.color_picker.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         color_layout.addWidget(color_label)
         color_layout.addWidget(self.color_picker)
@@ -121,13 +125,13 @@ class SettingsTab(QWidget):
         # 绘制预览框
         preview_layout = QHBoxLayout()
         preview_label = QLabel("笔尖预览:")
-        preview_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        preview_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
         self.preview_widget = PenPreviewWidget(
             self.settings.get("pen_width"), 
             self.settings.get("pen_color")
         )
-        self.preview_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.preview_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         
         preview_layout.addWidget(preview_label)
         preview_layout.addWidget(self.preview_widget)
@@ -138,7 +142,7 @@ class SettingsTab(QWidget):
         content_layout.addWidget(drawing_group)
         
         # 添加中间间距
-        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
+        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
         
         # 重置和保存按钮
         buttons_layout = QHBoxLayout()
@@ -146,22 +150,22 @@ class SettingsTab(QWidget):
         # 使用自定义动画按钮替换标准按钮
         reset_button = AnimatedButton("重置为默认设置", primary_color=[108, 117, 125])  # 灰色
         reset_button.setMinimumSize(140, 36)  # 设置最小大小而不是固定大小
-        reset_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        reset_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         reset_button.clicked.connect(self.reset_settings)
         
         save_button = AnimatedButton("保存设置", primary_color=[41, 128, 185])  # 蓝色
         save_button.setMinimumSize(120, 36)  # 设置最小大小而不是固定大小
-        save_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        save_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         save_button.clicked.connect(self.save_settings)
         
         buttons_layout.addWidget(reset_button)
-        buttons_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        buttons_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         buttons_layout.addWidget(save_button)
         
         content_layout.addLayout(buttons_layout)
         
         # 底部弹性空间
-        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # 设置内容部件
         content_widget.setLayout(content_layout)
@@ -172,7 +176,7 @@ class SettingsTab(QWidget):
         
         # 设置布局和大小策略
         self.setLayout(main_layout)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # 记录自适应布局启用
         self.logger.debug("设置选项卡自适应布局已启用")
@@ -229,11 +233,11 @@ class SettingsTab(QWidget):
             self, 
             f"{APP_NAME} - 确认重置", 
             "是否确定将所有设置重置为默认值？", 
-            QMessageBox.Yes | QMessageBox.No, 
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self.logger.info("用户选择重置所有设置为默认值")
             
             # 重置设置
@@ -348,16 +352,16 @@ class PenPreviewWidget(QWidget):
     def paintEvent(self, event):
         """绘制预览"""
         import math
-        from PyQt5.QtGui import QPainter, QPen, QColor
+        from PyQt6.QtGui import QPainter, QPen, QColor
         
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 设置画笔
         r, g, b = self.pen_color[0], self.pen_color[1], self.pen_color[2]
         pen = QPen(QColor(r, g, b))
         pen.setWidth(self.pen_width)
-        pen.setCapStyle(Qt.RoundCap)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         
         # 绘制水平线
@@ -378,4 +382,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     widget = SettingsTab()
     widget.show()
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

@@ -1,19 +1,18 @@
 import os
 import sys
-from PyQt5.QtCore import (Qt, QPropertyAnimation, QEasingCurve, 
+from PyQt6.QtCore import (Qt, QPropertyAnimation, QEasingCurve, 
                          QParallelAnimationGroup, QSequentialAnimationGroup,
                          QTimer, pyqtProperty, pyqtSignal, QPoint, QEvent, QRect)
-from PyQt5.QtGui import (QColor, QPainter, QBrush, QPen, QTransform, 
+from PyQt6.QtGui import (QColor, QPainter, QBrush, QPen, QTransform, 
                         QPixmap, QImage, QLinearGradient, QFont, QFontMetrics)
-from PyQt5.QtWidgets import (QComboBox, QStyledItemDelegate, QListView, 
+from PyQt6.QtWidgets import (QComboBox, QStyledItemDelegate, QListView, 
                             QApplication, QWidget, QGraphicsDropShadowEffect,
-                            QStyleOptionComboBox, QStyle, QVBoxLayout)
-from PyQt5.QtSvg import QSvgRenderer
+                            QStyleOptionComboBox, QStyle, QVBoxLayout, QGraphicsOpacityEffect)
+from PyQt6.QtSvg import QSvgRenderer
 
 try:
     from core.logger import get_logger
 except ImportError:
-    # 相对导入处理，便于直接运行此文件进行测试
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
     from core.logger import get_logger
 
@@ -37,7 +36,7 @@ class QCustomComboBox(QComboBox):
         
         # 设置基本属性
         self.setMinimumWidth(100)
-        self.setCursor(Qt.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         # 获取图标路径
         self._icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
@@ -130,22 +129,22 @@ class QCustomComboBox(QComboBox):
         # 悬停动画
         self._hoverAnimation = QPropertyAnimation(self, b"hoverProgress")
         self._hoverAnimation.setDuration(200)
-        self._hoverAnimation.setEasingCurve(QEasingCurve.OutCubic)
+        self._hoverAnimation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 按下动画
         self._pressAnimation = QPropertyAnimation(self, b"pressProgress")
         self._pressAnimation.setDuration(100)
-        self._pressAnimation.setEasingCurve(QEasingCurve.OutCubic)
+        self._pressAnimation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 箭头旋转动画
         self._arrowRotationAnimation = QPropertyAnimation(self, b"arrowRotation")
         self._arrowRotationAnimation.setDuration(400)  # 增加箭头旋转动画时间
-        self._arrowRotationAnimation.setEasingCurve(QEasingCurve.OutBack)
+        self._arrowRotationAnimation.setEasingCurve(QEasingCurve.Type.OutBack)
         
         # 下拉框显示动画
         self._popupAnimation = QPropertyAnimation(self, b"popupProgress")
         self._popupAnimation.setDuration(400)  # 增加下拉显示动画时间
-        self._popupAnimation.setEasingCurve(QEasingCurve.OutCubic)
+        self._popupAnimation.setEasingCurve(QEasingCurve.Type.OutCubic)
     
     def _onHoverEnter(self):
         """鼠标悬停进入事件处理"""
@@ -277,26 +276,26 @@ class QCustomComboBox(QComboBox):
         """事件过滤器，处理各种事件"""
         if obj == self:
             # 处理自身的事件
-            if event.type() == QEvent.Enter:
+            if event.type() == QEvent.Type.Enter:
                 # 鼠标进入
                 self._hovered = True
                 self.hoverEntered.emit()
                 return True
             
-            elif event.type() == QEvent.Leave:
+            elif event.type() == QEvent.Type.Leave:
                 # 鼠标离开
                 self._hovered = False
                 if not self._popupVisible:
                     self.hoverLeft.emit()
                 return True
             
-            elif event.type() == QEvent.MouseButtonPress:
+            elif event.type() == QEvent.Type.MouseButtonPress:
                 # 鼠标按下
                 self._pressed = True
                 self.clicked.emit()
                 return False  # 不拦截，让ComboBox处理下拉逻辑
             
-            elif event.type() == QEvent.MouseButtonRelease:
+            elif event.type() == QEvent.Type.MouseButtonRelease:
                 # 鼠标释放
                 self._pressed = False
                 self.released.emit()
@@ -304,17 +303,17 @@ class QCustomComboBox(QComboBox):
         
         # 监听popup window事件
         elif obj == self.view.window():
-            if event.type() == QEvent.Show:
+            if event.type() == QEvent.Type.Show:
                 self._onPopupShow()
-            elif event.type() == QEvent.Hide:
+            elif event.type() == QEvent.Type.Hide:
                 self._onPopupHide()
             # 处理下拉列表中的鼠标点击事件
-            elif event.type() == QEvent.MouseButtonRelease:
+            elif event.type() == QEvent.Type.MouseButtonRelease:
                 # 如果在列表项上松开鼠标，应该隐藏下拉框
                 # 在下一个事件循环中执行，确保项目选择完成后再隐藏
                 QTimer.singleShot(150, self.hidePopup)
         # 处理窗口外点击
-        elif event.type() == QEvent.MouseButtonPress and self._popupVisible:
+        elif event.type() == QEvent.Type.MouseButtonPress and self._popupVisible:
             # 如果下拉框显示时，点击了其他位置，则隐藏下拉框
             self.hidePopup()
             
@@ -340,14 +339,14 @@ class QCustomComboBox(QComboBox):
         
         # 获取下拉列表视图窗口
         popup = self.view.window()
-        if popup:
+        if popup and popup.isVisible():
             # 取消滚动条显示，避免动画过程中出现滚动条
-            self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             
             # 保存原始几何信息
             original_geometry = popup.geometry()
             
-            # 设置结束高度为0
+            # 设置结束高度为0，保持同样的顶部位置
             end_geometry = QRect(
                 original_geometry.left(),
                 original_geometry.top(),
@@ -355,16 +354,16 @@ class QCustomComboBox(QComboBox):
                 0
             )
             
-            # 配置收回动画
-            animation = QPropertyAnimation(popup, b"geometry")
-            animation.setDuration(400)  # 收回动画持续时间延长到400毫秒
-            animation.setStartValue(original_geometry)
-            animation.setEndValue(end_geometry)
-            animation.setEasingCurve(QEasingCurve.InCubic)
+            # 使用一个简单的QPropertyAnimation进行收缩
+            height_anim = QPropertyAnimation(popup, b"geometry")
+            height_anim.setDuration(250)
+            height_anim.setStartValue(original_geometry)
+            height_anim.setEndValue(end_geometry)
+            height_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
             
-            # 动画完成后调用父类的hidePopup
-            animation.finished.connect(lambda: QComboBox.hidePopup(self))
-            animation.start()
+            # 在动画完成后调用基类的hidePopup方法
+            height_anim.finished.connect(lambda: super(QCustomComboBox, self).hidePopup())
+            height_anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
             
             # 箭头旋转动画
             self._arrowRotationAnimation.stop()
@@ -376,6 +375,7 @@ class QCustomComboBox(QComboBox):
                 # 清除悬停状态
                 self._onHoverLeave()
         else:
+            # 如果弹出窗口不可见，直接调用父类的方法
             super().hidePopup()
     
     # 自定义方法
@@ -434,9 +434,9 @@ class QCustomComboBox(QComboBox):
     def paintEvent(self, event):
         """自定义绘制事件"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.TextAntialiasing)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         
         # 计算当前状态下的颜色
         bgColor = self._interpolateColor(self._backgroundColor, self._backgroundHoverColor, self._hoverProgress)
@@ -466,9 +466,9 @@ class QCustomComboBox(QComboBox):
         
         # 检查文本是否过长，需要省略
         metrics = QFontMetrics(self.font())
-        elidedText = metrics.elidedText(currentText, Qt.ElideRight, textRect.width())
+        elidedText = metrics.elidedText(currentText, Qt.TextElideMode.ElideRight, textRect.width())
         
-        painter.drawText(textRect, Qt.AlignVCenter | Qt.AlignLeft, elidedText)
+        painter.drawText(textRect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elidedText)
         
         # 绘制箭头
         arrowRect = QRect(self.width() - 25, (self.height() - 12) // 2, 16, 12)
@@ -487,14 +487,14 @@ class QCustomComboBox(QComboBox):
             svgRect = QRect(self.width() - 25, (self.height() - 16) // 2, 16, 16)
             
             # 绘制普通图标和焦点图标的混合
-            normalImage = QImage(svgRect.size(), QImage.Format_ARGB32_Premultiplied)
-            normalImage.fill(Qt.transparent)
+            normalImage = QImage(svgRect.size(), QImage.Format.Format_ARGB32_Premultiplied)
+            normalImage.fill(Qt.GlobalColor.transparent)
             normalPainter = QPainter(normalImage)
             self._normal_svg_renderer.render(normalPainter)
             normalPainter.end()
             
-            focusImage = QImage(svgRect.size(), QImage.Format_ARGB32_Premultiplied)
-            focusImage.fill(Qt.transparent)
+            focusImage = QImage(svgRect.size(), QImage.Format.Format_ARGB32_Premultiplied)
+            focusImage.fill(Qt.GlobalColor.transparent)
             focusPainter = QPainter(focusImage)
             self._focus_svg_renderer.render(focusPainter)
             focusPainter.end()
@@ -510,8 +510,8 @@ class QCustomComboBox(QComboBox):
             painter.drawImage(svgRect, focusImage)
         else:
             # 如果SVG不可用，手动绘制箭头
-            painter.setPen(QPen(arrowColor, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(arrowColor, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             
             # 绘制一个简单的三角形
             points = [
@@ -659,10 +659,10 @@ class QCustomComboBox(QComboBox):
         self._arrowRotationAnimation.setDuration(arrow_duration)
         self._popupAnimation.setDuration(popup_duration)
     
-    def setAnimationEasingCurve(self, hover_curve=QEasingCurve.OutCubic, 
-                               press_curve=QEasingCurve.OutCubic,
-                               arrow_curve=QEasingCurve.OutBack,
-                               popup_curve=QEasingCurve.OutCubic):
+    def setAnimationEasingCurve(self, hover_curve=QEasingCurve.Type.OutCubic, 
+                               press_curve=QEasingCurve.Type.OutCubic,
+                               arrow_curve=QEasingCurve.Type.OutBack,
+                               popup_curve=QEasingCurve.Type.OutCubic):
         """设置动画缓动曲线"""
         self._hoverAnimation.setEasingCurve(hover_curve)
         self._pressAnimation.setEasingCurve(press_curve)
@@ -780,12 +780,12 @@ class ComboBoxDelegate(QStyledItemDelegate):
         painter.save()
         
         # 设置抗锯齿
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setRenderHint(QPainter.TextAntialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         
         # 获取状态
-        isSelected = bool(option.state & QStyle.State_Selected)
-        isHovered = bool(option.state & QStyle.State_MouseOver)
+        isSelected = bool(option.state & QStyle.StateFlag.State_Selected)
+        isHovered = bool(option.state & QStyle.StateFlag.State_MouseOver)
         
         # 设置颜色
         if isSelected:
@@ -801,19 +801,19 @@ class ComboBoxDelegate(QStyledItemDelegate):
         # 绘制背景
         rect = option.rect.adjusted(2, 2, -2, -2)  # 留出边距
         painter.setBrush(QBrush(bgColor))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect, 3, 3)
         
         # 绘制文本
         painter.setPen(QPen(textColor))
         textRect = option.rect.adjusted(10, 0, -10, 0)  # 左右各留出10px
-        text = index.data(Qt.DisplayRole)
+        text = index.data(Qt.ItemDataRole.DisplayRole)
         
         # 检查文本是否过长，需要省略
         metrics = QFontMetrics(option.font)
-        elidedText = metrics.elidedText(text, Qt.ElideRight, textRect.width())
+        elidedText = metrics.elidedText(text, Qt.TextElideMode.ElideRight, textRect.width())
         
-        painter.drawText(textRect, Qt.AlignVCenter | Qt.AlignLeft, elidedText)
+        painter.drawText(textRect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elidedText)
         
         painter.restore()
 
@@ -867,4 +867,4 @@ if __name__ == "__main__":
     layout.addWidget(comboBox)
     
     window.show()
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

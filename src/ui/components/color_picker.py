@@ -1,11 +1,11 @@
 import sys
 import math
 import os
-from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, 
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, 
                            QLabel, QApplication, QSizePolicy, QGraphicsDropShadowEffect, QGridLayout, QPushButton,
                            QSlider, QFrame, QDialog)
-from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QPoint, QPointF, QRect, QRectF, pyqtProperty
-from PyQt5.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, QBrush, QConicalGradient
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QPoint, QPointF, QRect, QRectF, pyqtProperty
+from PyQt6.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, QBrush, QConicalGradient
 
 try:
     from core.logger import get_logger
@@ -49,7 +49,7 @@ class ColorSwatch(QWidget):
         # 创建动画
         self.scale_animation = QPropertyAnimation(self, b"scale")
         self.scale_animation.setDuration(200)
-        self.scale_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.scale_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
     
     # 定义Qt属性，用于动画效果
     @pyqtProperty(float)
@@ -111,7 +111,7 @@ class ColorSwatch(QWidget):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.color)
             event.accept()
         else:
@@ -120,7 +120,7 @@ class ColorSwatch(QWidget):
     def paintEvent(self, event):
         """绘制颜色样本"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         
         # 获取组件中心
         width = self.width()
@@ -128,8 +128,16 @@ class ColorSwatch(QWidget):
         center_x = width / 2
         center_y = height / 2
         
+        # 保存画家状态以应用缩放
+        painter.save()
+        
+        # 应用缩放变换 - 从中心点缩放
+        painter.translate(center_x, center_y)
+        painter.scale(self._scale, self._scale)
+        painter.translate(-center_x, -center_y)
+        
         # 计算实际绘制尺寸，考虑缩放因子
-        actual_radius = (min(width, height) / 2 - 2) * self._scale
+        actual_radius = min(width, height) / 2 - 2
         
         # 定义样本形状
         path = QPainterPath()
@@ -144,16 +152,19 @@ class ColorSwatch(QWidget):
         gradient.setColorAt(1, QColor(r, g, b))
         
         # 绘制背景
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(gradient))
         painter.drawPath(path)
         
+        # 恢复画家状态
+        painter.restore()
+        
         # 如果选中，绘制边框
         if self.selected:
-            pen = QPen(Qt.white)
+            pen = QPen(Qt.GlobalColor.white)
             pen.setWidth(2)
             painter.setPen(pen)
-            painter.setBrush(Qt.NoBrush)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(QPointF(center_x, center_y), actual_radius + 1, actual_radius + 1)
         
         # 如果悬停但未选中，绘制半透明边框
@@ -161,7 +172,7 @@ class ColorSwatch(QWidget):
             pen = QPen(QColor(255, 255, 255, 120))
             pen.setWidth(1)
             painter.setPen(pen)
-            painter.setBrush(Qt.NoBrush)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(QPointF(center_x, center_y), actual_radius + 1, actual_radius + 1)
 
 class RainbowColorButton(QWidget):
@@ -194,7 +205,7 @@ class RainbowColorButton(QWidget):
         # 创建动画
         self.scale_animation = QPropertyAnimation(self, b"scale")
         self.scale_animation.setDuration(200)
-        self.scale_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.scale_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 定义彩虹颜色
         self.rainbow_colors = [
@@ -213,8 +224,7 @@ class RainbowColorButton(QWidget):
     @scale.setter
     def scale(self, value):
         self._scale = value
-        size = int(self.base_size * value)
-        self.setFixedSize(size, size)
+        # 移除setFixedSize调用，不改变组件实际大小
         self.update()
     
     def enterEvent(self, event):
@@ -241,7 +251,7 @@ class RainbowColorButton(QWidget):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
             event.accept()
         else:
@@ -250,13 +260,21 @@ class RainbowColorButton(QWidget):
     def paintEvent(self, event):
         """绘制彩虹色按钮"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         
         # 获取组件中心和尺寸
         width = self.width()
         height = self.height()
         center_x = width / 2
         center_y = height / 2
+        
+        # 保存画家状态
+        painter.save()
+        
+        # 应用缩放变换 - 从中心点缩放
+        painter.translate(center_x, center_y)
+        painter.scale(self._scale, self._scale)
+        painter.translate(-center_x, -center_y)
         
         # 定义基本形状
         radius = min(width, height) / 2 - 2
@@ -273,13 +291,13 @@ class RainbowColorButton(QWidget):
             # 设置颜色
             color = self.rainbow_colors[i]
             painter.setBrush(QBrush(QColor(color[0], color[1], color[2])))
-            painter.setPen(Qt.NoPen)
+            painter.setPen(Qt.PenStyle.NoPen)
             
             # 绘制扇形
             painter.drawPie(outer_circle, int(start_angle * 16), int(span_angle * 16))
         
         # 绘制白色中心圆和加号
-        painter.setBrush(QBrush(Qt.white))
+        painter.setBrush(QBrush(Qt.GlobalColor.white))
         painter.drawEllipse(QPointF(center_x, center_y), radius * 0.5, radius * 0.5)
         
         # 绘制加号
@@ -300,12 +318,15 @@ class RainbowColorButton(QWidget):
             QPointF(center_x, center_y + line_length/2)
         )
         
-        # 如果悬停，绘制边框
+        # 恢复画家状态
+        painter.restore()
+        
+        # 如果悬停，绘制边框（在原始大小上绘制边框）
         if self.hovered:
             pen = QPen(QColor(255, 255, 255, 180))
             pen.setWidth(2)
             painter.setPen(pen)
-            painter.setBrush(Qt.NoBrush)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(QPointF(center_x, center_y), radius + 1, radius + 1)
 
 class ColorDialogPanel(QDialog):
@@ -318,7 +339,7 @@ class ColorDialogPanel(QDialog):
         self.logger = get_logger("ColorDialogPanel")
         
         # 设置无边框窗口
-        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         
         # 初始颜色
         self.color = initial_color.copy()
@@ -344,20 +365,20 @@ class ColorDialogPanel(QDialog):
         # 创建标题标签
         title = QLabel("精确调色")
         title.setStyleSheet("color: #333; font-weight: bold; font-size: 14px;")
-        title.setAlignment(Qt.AlignCenter)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title)
         
         # 创建颜色预览框
         self.color_preview = QFrame()
         self.color_preview.setFixedHeight(50)  # 固定高度
-        self.color_preview.setFrameShape(QFrame.NoFrame)
+        self.color_preview.setFrameShape(QFrame.Shape.NoFrame)
         self.color_preview.setStyleSheet("border-radius: 5px;")
         main_layout.addWidget(self.color_preview)
         
         # 添加分隔线
         separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
         separator.setStyleSheet("background-color: #ddd;")
         main_layout.addWidget(separator)
         
@@ -403,7 +424,7 @@ class ColorDialogPanel(QDialog):
                 swatch = ColorSwatch(color, swatch_size)
                 swatch.clicked.connect(self.onColorSelected)
                 # 添加到网格布局，确保每个样本位置正确
-                palette_layout.addWidget(swatch, row, col, Qt.AlignCenter)
+                palette_layout.addWidget(swatch, row, col, Qt.AlignmentFlag.AlignCenter)
                 self.swatches.append(swatch)
         
         # 添加面板到主布局
@@ -411,8 +432,8 @@ class ColorDialogPanel(QDialog):
         
         # 添加分隔线
         separator2 = QFrame()
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setFrameShadow(QFrame.Sunken)
+        separator2.setFrameShape(QFrame.Shape.HLine)
+        separator2.setFrameShadow(QFrame.Shadow.Sunken)
         separator2.setStyleSheet("background-color: #ddd;")
         main_layout.addWidget(separator2)
         
@@ -426,7 +447,7 @@ class ColorDialogPanel(QDialog):
         r_label.setStyleSheet("color: #E74C3C; font-weight: bold;")
         r_label.setMinimumWidth(15)
         
-        self.r_slider = AnimatedSlider(Qt.Horizontal)
+        self.r_slider = AnimatedSlider(Qt.Orientation.Horizontal)
         self.r_slider.setRange(0, 255)
         self.r_slider.setValue(self.color[0])
         self.r_slider.setPrimaryColor([231, 76, 60])  # 红色
@@ -434,7 +455,7 @@ class ColorDialogPanel(QDialog):
         
         self.r_value = QLabel(str(self.color[0]))
         self.r_value.setMinimumWidth(30)
-        self.r_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.r_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
         r_layout.addWidget(r_label)
         r_layout.addWidget(self.r_slider)
@@ -447,7 +468,7 @@ class ColorDialogPanel(QDialog):
         g_label.setStyleSheet("color: #27AE60; font-weight: bold;")
         g_label.setMinimumWidth(15)
         
-        self.g_slider = AnimatedSlider(Qt.Horizontal)
+        self.g_slider = AnimatedSlider(Qt.Orientation.Horizontal)
         self.g_slider.setRange(0, 255)
         self.g_slider.setValue(self.color[1])
         self.g_slider.setPrimaryColor([46, 204, 113])  # 绿色
@@ -455,7 +476,7 @@ class ColorDialogPanel(QDialog):
         
         self.g_value = QLabel(str(self.color[1]))
         self.g_value.setMinimumWidth(30)
-        self.g_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.g_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
         g_layout.addWidget(g_label)
         g_layout.addWidget(self.g_slider)
@@ -468,7 +489,7 @@ class ColorDialogPanel(QDialog):
         b_label.setStyleSheet("color: #3498DB; font-weight: bold;")
         b_label.setMinimumWidth(15)
         
-        self.b_slider = AnimatedSlider(Qt.Horizontal)
+        self.b_slider = AnimatedSlider(Qt.Orientation.Horizontal)
         self.b_slider.setRange(0, 255)
         self.b_slider.setValue(self.color[2])
         self.b_slider.setPrimaryColor([52, 152, 219])  # 蓝色
@@ -476,7 +497,7 @@ class ColorDialogPanel(QDialog):
         
         self.b_value = QLabel(str(self.color[2]))
         self.b_value.setMinimumWidth(30)
-        self.b_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.b_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
         b_layout.addWidget(b_label)
         b_layout.addWidget(self.b_slider)
@@ -582,7 +603,7 @@ class ColorDialogPanel(QDialog):
         
         # 绘制边框
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 设置画笔
         pen = QPen(QColor(200, 200, 200))
@@ -657,7 +678,7 @@ class AnimatedColorPicker(QWidget):
         self.setLayout(layout)
         
         # 调整大小策略
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
     
     def open_color_dialog(self):
         """打开颜色对话框"""
@@ -672,7 +693,7 @@ class AnimatedColorPicker(QWidget):
         )
         
         # 显示对话框
-        result = self.color_dialog.exec_()
+        result = self.color_dialog.exec()
     
     def on_color_selected(self, color):
         """处理颜色选择事件"""
@@ -741,13 +762,13 @@ if __name__ == "__main__":
     
     # 添加标题
     title = QLabel("GestroKey 色彩选择器")
-    title.setAlignment(Qt.AlignCenter)
+    title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title.setStyleSheet("font-size: 18pt; font-weight: bold; margin: 10px;")
     layout.addWidget(title)
     
     # 添加说明
     desc = QLabel("选择一个预设颜色，或点击+号打开自定义颜色对话框")
-    desc.setAlignment(Qt.AlignCenter)
+    desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
     desc.setStyleSheet("font-size: 10pt; margin-bottom: 20px;")
     layout.addWidget(desc)
     
@@ -768,11 +789,11 @@ if __name__ == "__main__":
     picker.colorChanged.connect(on_color_change)
     
     # 添加到布局
-    layout.addWidget(picker, alignment=Qt.AlignCenter)
+    layout.addWidget(picker, alignment=Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(color_display, 1)
     
     # 显示窗口
     window.setLayout(layout)
     window.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

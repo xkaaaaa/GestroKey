@@ -1,10 +1,10 @@
 import sys
 import math
 import os
-from PyQt5.QtWidgets import (QWidget, QSlider, QHBoxLayout, QVBoxLayout, 
+from PyQt6.QtWidgets import (QWidget, QSlider, QHBoxLayout, QVBoxLayout, 
                              QLabel, QApplication, QSizePolicy, QGraphicsDropShadowEffect)
-from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty, QRectF, QPoint, pyqtSignal, QTimer
-from PyQt5.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, QBrush, QFont, QFontMetrics, QRadialGradient
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty, QRectF, QPoint, pyqtSignal, QTimer
+from PyQt6.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, QBrush, QFont, QFontMetrics, QRadialGradient
 
 try:
     from core.logger import get_logger
@@ -38,7 +38,7 @@ class GesturePattern(QWidget):
         self.animation_timer.start(50)  # 20fps
         
         # 透明背景
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         # 值显示
         self.show_value = False
@@ -71,7 +71,7 @@ class GesturePattern(QWidget):
     def paintEvent(self, event):
         """绘制自定义SVG样式手势图案"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         
         # 获取组件尺寸
         width = self.width()
@@ -86,7 +86,7 @@ class GesturePattern(QWidget):
         gradient.setColorAt(1, QColor(int(self.secondary_color[0]), int(self.secondary_color[1]), int(self.secondary_color[2]), 50))
         
         painter.setBrush(QBrush(gradient))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QRectF(2, 2, width-4, height-4))
         
         # 如果显示值，绘制带值的视图
@@ -102,7 +102,7 @@ class GesturePattern(QWidget):
             font.setBold(True)
             painter.setFont(font)
             value_text = str(self.value)
-            painter.drawText(QRectF(0, 0, width, height), Qt.AlignCenter, value_text)
+            painter.drawText(QRectF(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, value_text)
             
             return  # 显示值时不显示图案
             
@@ -126,7 +126,7 @@ class GesturePattern(QWidget):
             radial.setColorAt(0.5, QColor(int(self.primary_color[0]), int(self.primary_color[1]), int(self.primary_color[2]), 100))
             radial.setColorAt(1, QColor(0, 0, 0, 0))
             painter.setBrush(QBrush(radial))
-            painter.setPen(Qt.NoPen)
+            painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(QRectF(x - self.dot_radius*2, y - self.dot_radius*2, 
                                      self.dot_radius*4, self.dot_radius*4))
             
@@ -141,7 +141,7 @@ class GesturePattern(QWidget):
                                  self.dot_radius*3, self.dot_radius*3))
         
         # 绘制连接线
-        pen.setStyle(Qt.DashLine)
+        pen.setStyle(Qt.PenStyle.DashLine)
         pen.setWidth(1)
         pen.setColor(QColor(int(self.secondary_color[0]), int(self.secondary_color[1]), int(self.secondary_color[2]), 120))
         painter.setPen(pen)
@@ -160,7 +160,7 @@ class GesturePattern(QWidget):
         painter.drawLine(points[2], points[0])
         
         # 连接到中心
-        pen.setStyle(Qt.SolidLine)
+        pen.setStyle(Qt.PenStyle.SolidLine)
         pen.setColor(QColor(int(self.highlight_color[0]), int(self.highlight_color[1]), int(self.highlight_color[2]), 100))
         painter.setPen(pen)
         for point in points:
@@ -169,7 +169,7 @@ class GesturePattern(QWidget):
 class SliderTrack(QWidget):
     """滑块轨道组件，绘制背景和进度"""
     
-    def __init__(self, parent=None, orientation=Qt.Horizontal, color=None):
+    def __init__(self, parent=None, orientation=Qt.Orientation.Horizontal, color=None):
         super().__init__(parent)
         
         # 基本属性
@@ -184,8 +184,8 @@ class SliderTrack(QWidget):
         # 配置尺寸
         self.setMinimumSize(100, 6)
         self.setSizePolicy(
-            QSizePolicy.Expanding if orientation == Qt.Horizontal else QSizePolicy.Fixed,
-            QSizePolicy.Fixed if orientation == Qt.Horizontal else QSizePolicy.Expanding
+            QSizePolicy.Policy.Expanding if orientation == Qt.Orientation.Horizontal else QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed if orientation == Qt.Orientation.Horizontal else QSizePolicy.Policy.Expanding
         )
         
         # 启用鼠标追踪以接收悬停事件
@@ -194,7 +194,7 @@ class SliderTrack(QWidget):
         # 设置悬停动画
         self._hover_animation = QPropertyAnimation(self, b"hover_factor")
         self._hover_animation.setDuration(350) # 动画持续时间350毫秒
-        self._hover_animation.setEasingCurve(QEasingCurve.OutCubic) # 使用缓出曲线
+        self._hover_animation.setEasingCurve(QEasingCurve.Type.OutCubic) # 使用缓出曲线
     
     # 定义hover_factor属性
     @pyqtProperty(float)
@@ -245,14 +245,14 @@ class SliderTrack(QWidget):
     def paintEvent(self, event):
         """绘制轨道和进度"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 获取尺寸
         width = self.width()
         height = self.height()
         
         # 计算轨道区域
-        if self._orientation == Qt.Horizontal:
+        if self._orientation == Qt.Orientation.Horizontal:
             track_height = 6
             track_rect = QRectF(0, (height - track_height) / 2, width, track_height)
         else:
@@ -260,7 +260,7 @@ class SliderTrack(QWidget):
             track_rect = QRectF((width - track_width) / 2, 0, track_width, height)
         
         # 计算进度区域
-        if self._orientation == Qt.Horizontal:
+        if self._orientation == Qt.Orientation.Horizontal:
             progress_width = width * self._progress
             progress_rect = QRectF(0, (height - track_height) / 2, progress_width, track_height)
         else:
@@ -280,7 +280,7 @@ class SliderTrack(QWidget):
         # 绘制轨道背景
         track_color = QColor(*self._track_color, int(current_opacity * 80))
         painter.setBrush(QBrush(track_color))
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(track_rect, 3, 3)
         
         # 绘制进度
@@ -299,7 +299,7 @@ class SliderTrack(QWidget):
                 )
                 
                 painter.setPen(QPen(glow_color, i + 1))
-                painter.setBrush(Qt.NoBrush)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.drawRoundedRect(glow_rect, 3 + blur_radius, 3 + blur_radius)
                 
             # 为进度条添加更强的发光效果
@@ -307,7 +307,7 @@ class SliderTrack(QWidget):
             for i in range(2):
                 blur_radius = 3 + i * 2
                 
-                if self._orientation == Qt.Horizontal:
+                if self._orientation == Qt.Orientation.Horizontal:
                     progress_glow_rect = progress_rect.adjusted(
                         -blur_radius, -blur_radius, blur_radius, blur_radius
                     )
@@ -317,7 +317,7 @@ class SliderTrack(QWidget):
                     )
                 
                 painter.setPen(QPen(progress_glow_color, i + 1))
-                painter.setBrush(Qt.NoBrush)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.drawRoundedRect(progress_glow_rect, 3 + blur_radius, 3 + blur_radius)
         
         painter.end()
@@ -340,7 +340,7 @@ class AnimatedSlider(QWidget):
     sliderReleased = pyqtSignal()
     sliderMoved = pyqtSignal(int)
     
-    def __init__(self, orientation=Qt.Horizontal, parent=None):
+    def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None):
         super().__init__(parent)
         self.logger = get_logger("AnimatedSlider")
         
@@ -359,12 +359,12 @@ class AnimatedSlider(QWidget):
         self._handle_size = 24
         
         # 设置适当的尺寸策略
-        if orientation == Qt.Horizontal:
-            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        if orientation == Qt.Orientation.Horizontal:
+            self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             self.setMinimumHeight(self._handle_size + 8)
             self.setMinimumWidth(100)
         else:
-            self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+            self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
             self.setMinimumWidth(self._handle_size + 8)
             self.setMinimumHeight(100)
         
@@ -383,7 +383,7 @@ class AnimatedSlider(QWidget):
     def _create_components(self):
         """创建滑块组件"""
         # 创建布局
-        if self._orientation == Qt.Horizontal:
+        if self._orientation == Qt.Orientation.Horizontal:
             self._layout = QVBoxLayout(self)
         else:
             self._layout = QHBoxLayout(self)
@@ -416,24 +416,24 @@ class AnimatedSlider(QWidget):
         """设置动画效果"""
         # 手柄位置动画
         self._handle_animation = QPropertyAnimation(self, b"handle_pos")
-        self._handle_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._handle_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._handle_animation.setDuration(200)
         
         # 手柄大小动画
         self._handle_size_animation = QPropertyAnimation(self, b"handle_size")
-        self._handle_size_animation.setEasingCurve(QEasingCurve.OutBack)
+        self._handle_size_animation.setEasingCurve(QEasingCurve.Type.OutBack)
         self._handle_size_animation.setDuration(200)
         
         # 阴影动画
         self._shadow_animation = QPropertyAnimation(self._shadow, b"blurRadius")
-        self._shadow_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._shadow_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._shadow_animation.setDuration(200)
         
         # 阴影颜色动画
         self._shadow_color_animation = QPropertyAnimation(self, b"shadow_color_alpha")
-        self._shadow_color_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._shadow_color_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._shadow_color_animation.setDuration(350)
-        
+    
     # 定义阴影颜色Alpha通道属性
     @pyqtProperty(int)
     def shadow_color_alpha(self):
@@ -457,7 +457,7 @@ class AnimatedSlider(QWidget):
         self._track.set_progress(pos)
         
         # 更新手柄位置
-        if self._orientation == Qt.Horizontal:
+        if self._orientation == Qt.Orientation.Horizontal:
             x = int(pos * (self.width() - self._handle.width()))
             self._handle.move(x, (self.height() - self._handle.height()) // 2)
         else:
@@ -638,14 +638,14 @@ class AnimatedSlider(QWidget):
     
     def _pos_to_value(self, pos):
         """将位置转换为值"""
-        if self._orientation == Qt.Horizontal:
+        if self._orientation == Qt.Orientation.Horizontal:
             return self._minimum + (self._maximum - self._minimum) * (pos / float(self.width()))
         else:
             return self._minimum + (self._maximum - self._minimum) * (1.0 - (pos / float(self.height())))
     
     def _bound_pos_to_range(self, pos):
         """将位置限制在组件范围内"""
-        if self._orientation == Qt.Horizontal:
+        if self._orientation == Qt.Orientation.Horizontal:
             return min(max(pos, 0), self.width())
         else:
             return min(max(pos, 0), self.height())
@@ -661,14 +661,14 @@ class AnimatedSlider(QWidget):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._pressed = True
             
             # 更新位置
-            if self._orientation == Qt.Horizontal:
-                pos = self._bound_pos_to_range(event.x())
+            if self._orientation == Qt.Orientation.Horizontal:
+                pos = self._bound_pos_to_range(int(event.position().x()))
             else:
-                pos = self._bound_pos_to_range(event.y())
+                pos = self._bound_pos_to_range(int(event.position().y()))
             
             # 转换到值
             value = int(round(self._pos_to_value(pos)))
@@ -688,10 +688,10 @@ class AnimatedSlider(QWidget):
         """鼠标移动事件"""
         if self._pressed:
             # 更新位置
-            if self._orientation == Qt.Horizontal:
-                pos = self._bound_pos_to_range(event.x())
+            if self._orientation == Qt.Orientation.Horizontal:
+                pos = self._bound_pos_to_range(int(event.position().x()))
             else:
-                pos = self._bound_pos_to_range(event.y())
+                pos = self._bound_pos_to_range(int(event.position().y()))
             
             # 转换到值，但不进行吸附
             raw_value = self._pos_to_value(pos)
@@ -707,7 +707,7 @@ class AnimatedSlider(QWidget):
         else:
             # 检查是否悬停在手柄上
             handle_rect = self._handle.geometry()
-            is_over_handle = handle_rect.contains(event.pos())
+            is_over_handle = handle_rect.contains(event.position().toPoint())
             
             # 如果悬停状态改变，触发动画
             if is_over_handle != self._handle_hovered:
@@ -717,7 +717,7 @@ class AnimatedSlider(QWidget):
     
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
-        if event.button() == Qt.LeftButton and self._pressed:
+        if event.button() == Qt.MouseButton.LeftButton and self._pressed:
             self._pressed = False
             
             # 动画效果
@@ -781,7 +781,7 @@ if __name__ == "__main__":
     
     # 添加标题
     title = QLabel("GestroKey 精美滑块组件")
-    title.setAlignment(Qt.AlignCenter)
+    title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title.setStyleSheet("font-size: 18pt; font-weight: bold; color: #333;")
     layout.addWidget(title)
     
@@ -790,7 +790,7 @@ if __name__ == "__main__":
     h_slider_label.setStyleSheet("font-size: 12pt; color: #555;")
     layout.addWidget(h_slider_label)
     
-    h_slider = AnimatedSlider(Qt.Horizontal)
+    h_slider = AnimatedSlider(Qt.Orientation.Horizontal)
     h_slider.setMinimumWidth(500)
     h_slider.setRange(0, 100)
     h_slider.setValue(30)
@@ -801,7 +801,7 @@ if __name__ == "__main__":
     custom_label.setStyleSheet("font-size: 12pt; color: #555;")
     layout.addWidget(custom_label)
     
-    custom_slider = AnimatedSlider(Qt.Horizontal)
+    custom_slider = AnimatedSlider(Qt.Orientation.Horizontal)
     custom_slider.setMinimumWidth(500)
     custom_slider.setRange(0, 100)
     custom_slider.setValue(70)
@@ -814,7 +814,7 @@ if __name__ == "__main__":
     step10_label.setStyleSheet("font-size: 12pt; color: #555;")
     layout.addWidget(step10_label)
     
-    step10_slider = AnimatedSlider(Qt.Horizontal)
+    step10_slider = AnimatedSlider(Qt.Orientation.Horizontal)
     step10_slider.setMinimumWidth(500)
     step10_slider.setRange(0, 100)
     step10_slider.setValue(50)
@@ -829,14 +829,14 @@ if __name__ == "__main__":
     v_slider_label.setStyleSheet("font-size: 12pt; color: #555;")
     slider_row.addWidget(v_slider_label)
     
-    v_slider = AnimatedSlider(Qt.Vertical)
+    v_slider = AnimatedSlider(Qt.Orientation.Vertical)
     v_slider.setMinimumHeight(200)
     v_slider.setRange(0, 100)
     v_slider.setValue(60)
     slider_row.addWidget(v_slider)
     
     # 添加另一个自定义颜色的垂直滑块（步长为5）
-    v_slider2 = AnimatedSlider(Qt.Vertical)
+    v_slider2 = AnimatedSlider(Qt.Orientation.Vertical)
     v_slider2.setMinimumHeight(200)
     v_slider2.setRange(0, 100)
     v_slider2.setValue(40)
@@ -845,7 +845,7 @@ if __name__ == "__main__":
     slider_row.addWidget(v_slider2)
     
     # 添加步长为20的垂直滑块
-    v_slider3 = AnimatedSlider(Qt.Vertical)
+    v_slider3 = AnimatedSlider(Qt.Orientation.Vertical)
     v_slider3.setMinimumHeight(200)
     v_slider3.setRange(0, 100)
     v_slider3.setValue(60)
@@ -859,7 +859,7 @@ if __name__ == "__main__":
     # 添加操作说明
     info_label = QLabel("使用说明：拖动滑块时可以任意位置拖动，松开后会自动吸附到最近的步长刻度")
     info_label.setStyleSheet("font-size: 11pt; color: #555; font-style: italic;")
-    info_label.setAlignment(Qt.AlignCenter)
+    info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(info_label)
     
     # 添加弹性空间
@@ -869,4 +869,4 @@ if __name__ == "__main__":
     window.setLayout(layout)
     window.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

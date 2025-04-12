@@ -1,9 +1,9 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, 
                             QLabel, QMainWindow, QHBoxLayout, QSizePolicy)
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QIcon
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon
 
 from core.drawer import DrawingManager
 from core.logger import get_logger
@@ -104,7 +104,7 @@ class GestroKeyApp(QMainWindow):
         # 创建左侧选项卡小部件
         self.logger.debug("创建左侧选项卡组件")
         self.tab_widget = SideTabWidget()
-        self.tab_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # 创建选项卡图标
         # 尝试使用存在的图标文件，而不是依赖系统主题
@@ -142,19 +142,19 @@ class GestroKeyApp(QMainWindow):
         
         # 添加底部状态栏
         status_widget = QWidget()
-        status_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        status_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         status_layout = QHBoxLayout(status_widget)
         status_layout.setContentsMargins(10, 5, 10, 5)  # 设置适当的边距
         
         # 使用自定义动画按钮替换标准按钮
         self.exit_button = AnimatedButton("退出程序", primary_color=[220, 53, 69])  # 红色按钮
         self.exit_button.setMinimumSize(120, 36)  # 设置最小尺寸，而不是固定尺寸
-        self.exit_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.exit_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.exit_button.clicked.connect(self.close)
         
         self.version_label = QLabel(get_version_string())
-        self.version_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.version_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.version_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.version_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         status_layout.addWidget(self.exit_button)
         status_layout.addStretch(1)
@@ -223,13 +223,13 @@ class GestroKeyApp(QMainWindow):
             is_saved = False
             
             # 这里我们还是需要使用确认对话框，因为需要用户做选择
-            from PyQt5.QtWidgets import QMessageBox
+            from PyQt6.QtWidgets import QMessageBox
             reply = QMessageBox.question(self, '保存更改',
                                          '检测到未保存的更改，是否保存后退出？',
-                                         QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
-                                         QMessageBox.Save)
+                                         QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
+                                         QMessageBox.StandardButton.Save)
             
-            if reply == QMessageBox.Save:
+            if reply == QMessageBox.StandardButton.Save:
                 try:
                     # 保存设置
                     if unsaved_settings:
@@ -266,7 +266,7 @@ class GestroKeyApp(QMainWindow):
                     event.ignore()
                     return
                 
-            elif reply == QMessageBox.Discard:
+            elif reply == QMessageBox.StandardButton.Discard:
                 self.logger.info("放弃未保存的更改")
                 # 用户选择放弃更改，不需要做任何事情
             else:
@@ -282,12 +282,9 @@ class GestroKeyApp(QMainWindow):
 
 
 if __name__ == "__main__":
-    # 设置高DPI缩放
-    if hasattr(Qt, 'AA_EnableHighDpiScaling'):
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-    
+    # 设置高DPI缩放 - PyQt6中处理方式不同
     app = QApplication(sys.argv)
+    # 在PyQt6中，高DPI缩放是自动处理的，不再需要显式设置这些属性
+    
     window = GestroKeyApp()
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

@@ -3,12 +3,12 @@ import sys
 import time
 import psutil
 from datetime import datetime, timedelta
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer
+from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 
 try:
     from core.logger import get_logger
 except ImportError:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
     from core.logger import get_logger
 
 class SystemMonitor(QObject):

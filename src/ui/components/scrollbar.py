@@ -1,11 +1,11 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QWidget, QScrollBar, QScrollArea, QApplication, QVBoxLayout, 
+from PyQt6.QtWidgets import (QWidget, QScrollBar, QScrollArea, QApplication, QVBoxLayout, 
                             QLabel, QFrame, QSizePolicy, QHBoxLayout)
-from PyQt5.QtCore import (Qt, QPropertyAnimation, QEasingCurve, QEvent, QRect, pyqtProperty, 
+from PyQt6.QtCore import (Qt, QPropertyAnimation, QEasingCurve, QEvent, QRect, pyqtProperty, 
                          QPoint, QTimer, QSequentialAnimationGroup, QParallelAnimationGroup, 
                          QAbstractAnimation)
-from PyQt5.QtGui import QPainter, QColor, QPalette, QPainterPath, QBrush
+from PyQt6.QtGui import QPainter, QColor, QPalette, QPainterPath, QBrush
 
 try:
     from core.logger import get_logger
@@ -17,7 +17,7 @@ except ImportError:
 class AnimatedScrollBar(QScrollBar):
     """自定义动画滚动条，提供平滑动画效果和美观界面"""
     
-    def __init__(self, orientation=Qt.Vertical, parent=None):
+    def __init__(self, orientation=Qt.Orientation.Vertical, parent=None):
         super().__init__(orientation, parent)
         self.logger = get_logger("AnimatedScrollBar")
         
@@ -43,7 +43,7 @@ class AnimatedScrollBar(QScrollBar):
         self._collapse_delay = 800            # 收缩延迟时间（毫秒）
         
         # 设置滚动条初始大小
-        if orientation == Qt.Vertical:
+        if orientation == Qt.Orientation.Vertical:
             self.setFixedWidth(self._collapsed_width)  # 使用收缩宽度
         else:
             self.setFixedHeight(self._collapsed_width)  # 使用收缩宽度
@@ -63,7 +63,7 @@ class AnimatedScrollBar(QScrollBar):
         self._collapse_timer.timeout.connect(self._startCollapseAnimation)
         
         # 记录初始化完成
-        self.logger.debug(f"{'垂直' if orientation == Qt.Vertical else '水平'}滚动条初始化完成（折叠状态）")
+        self.logger.debug(f"{'垂直' if orientation == Qt.Orientation.Vertical else '水平'}滚动条初始化完成（折叠状态）")
     
     def _updateStyle(self):
         """更新滚动条样式"""
@@ -74,7 +74,7 @@ class AnimatedScrollBar(QScrollBar):
         # 根据当前宽度设置样式表
         width = int(self._current_width)  # 确保宽度是整数
         
-        if self._orientation == Qt.Vertical:
+        if self._orientation == Qt.Orientation.Vertical:
             self.setStyleSheet(f"""
                 QScrollBar:vertical {{
                     border: none;
@@ -126,17 +126,17 @@ class AnimatedScrollBar(QScrollBar):
         # 悬停动画 - 透明度动画
         self._hover_animation = QPropertyAnimation(self, b"color_alpha")
         self._hover_animation.setDuration(self._animation_duration)
-        self._hover_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._hover_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 按下动画
         self._press_animation = QPropertyAnimation(self, b"handle_position")
         self._press_animation.setDuration(self._animation_duration)
-        self._press_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._press_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 折叠/展开动画 - 宽度动画
         self._width_animation = QPropertyAnimation(self, b"current_width")
         self._width_animation.setDuration(int(self._animation_duration * 1.5))  # 将浮点数转换为整数
-        self._width_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self._width_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
     
     def enterEvent(self, event):
         """鼠标进入事件"""
@@ -204,7 +204,7 @@ class AnimatedScrollBar(QScrollBar):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._is_pressed = True
             self._press_animation.stop()
             self._collapse_timer.stop()  # 停止收缩定时器
@@ -219,7 +219,7 @@ class AnimatedScrollBar(QScrollBar):
     
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._is_pressed = False
             self._press_animation.stop()
             
@@ -289,26 +289,26 @@ class AnimatedScrollArea(QScrollArea):
         self.logger = get_logger("AnimatedScrollArea")
         
         # 设置框架样式
-        self.setFrameShape(QScrollArea.NoFrame)
+        self.setFrameShape(QFrame.Shape.NoFrame)
         
         # 创建并设置自定义滚动条
-        self.vertical_scrollbar = AnimatedScrollBar(Qt.Vertical, self)
-        self.horizontal_scrollbar = AnimatedScrollBar(Qt.Horizontal, self)
+        self.vertical_scrollbar = AnimatedScrollBar(Qt.Orientation.Vertical, self)
+        self.horizontal_scrollbar = AnimatedScrollBar(Qt.Orientation.Horizontal, self)
         
         # 替换默认滚动条
         self.setVerticalScrollBar(self.vertical_scrollbar)
         self.setHorizontalScrollBar(self.horizontal_scrollbar)
         
         # 设置滚动条策略 - 默认按需显示
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
         # 设置窗口部件可调整大小
         self.setWidgetResizable(True)
         
         # 平滑滚动相关
         self._smooth_scroll_animation = QPropertyAnimation(self.verticalScrollBar(), b"value")
-        self._smooth_scroll_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._smooth_scroll_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._smooth_scroll_animation.setDuration(300)  # 300毫秒的平滑滚动
         
         # 安装事件过滤器，以拦截滚动事件
@@ -319,7 +319,7 @@ class AnimatedScrollArea(QScrollArea):
     
     def eventFilter(self, obj, event):
         """事件过滤器，用于拦截滚轮事件以实现平滑滚动"""
-        if obj is self.viewport() and event.type() == QEvent.Wheel:
+        if obj is self.viewport() and event.type() == QEvent.Type.Wheel:
             # 阻止默认的瞬移行为
             if self._handleWheelEvent(event):
                 return True
@@ -328,7 +328,7 @@ class AnimatedScrollArea(QScrollArea):
     def _handleWheelEvent(self, event):
         """处理滚轮事件，实现平滑滚动"""
         # 如果动画正在进行，停止它
-        if self._smooth_scroll_animation.state() == QAbstractAnimation.Running:
+        if self._smooth_scroll_animation.state() == QAbstractAnimation.State.Running:
             self._smooth_scroll_animation.stop()
         
         # 获取垂直滚动条
@@ -359,9 +359,9 @@ class AnimatedScrollArea(QScrollArea):
     def setVerticalScrollBarPolicy(self, policy):
         """设置垂直滚动条策略"""
         super().setVerticalScrollBarPolicy(policy)
-        if policy == Qt.ScrollBarAlwaysOff:
+        if policy == Qt.ScrollBarPolicy.ScrollBarAlwaysOff:
             self.logger.debug("垂直滚动条已禁用")
-        elif policy == Qt.ScrollBarAlwaysOn:
+        elif policy == Qt.ScrollBarPolicy.ScrollBarAlwaysOn:
             self.logger.debug("垂直滚动条始终显示")
         else:
             self.logger.debug("垂直滚动条按需显示")
@@ -369,9 +369,9 @@ class AnimatedScrollArea(QScrollArea):
     def setHorizontalScrollBarPolicy(self, policy):
         """设置水平滚动条策略"""
         super().setHorizontalScrollBarPolicy(policy)
-        if policy == Qt.ScrollBarAlwaysOff:
+        if policy == Qt.ScrollBarPolicy.ScrollBarAlwaysOff:
             self.logger.debug("水平滚动条已禁用")
-        elif policy == Qt.ScrollBarAlwaysOn:
+        elif policy == Qt.ScrollBarPolicy.ScrollBarAlwaysOn:
             self.logger.debug("水平滚动条始终显示")
         else:
             self.logger.debug("水平滚动条按需显示")
@@ -392,13 +392,13 @@ if __name__ == "__main__":
     # 添加标题
     title = QLabel("增强版动画滚动条演示")
     title.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 10px;")
-    title.setAlignment(Qt.AlignCenter)
+    title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(title)
     
     # 添加功能说明
     features = QLabel("特性：1. 鼠标离开时自动折叠为细线  2. 平滑滚动效果")
     features.setStyleSheet("font-size: 10pt; margin-bottom: 15px;")
-    features.setAlignment(Qt.AlignCenter)
+    features.setAlignment(Qt.AlignmentFlag.AlignCenter)
     layout.addWidget(features)
     
     # 创建使用自定义滚动区域的测试部分
@@ -426,4 +426,4 @@ if __name__ == "__main__":
     # 显示窗口
     window.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 

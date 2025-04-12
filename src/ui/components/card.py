@@ -1,9 +1,9 @@
 import sys
 import os
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QApplication, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QApplication, 
                             QGraphicsDropShadowEffect, QLabel)
-from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, pyqtProperty, QPoint, QRectF, QParallelAnimationGroup, pyqtSignal
-from PyQt5.QtGui import QColor, QPainter, QFont, QPainterPath, QBrush, QPen
+from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QSize, pyqtProperty, QPoint, QRectF, QParallelAnimationGroup, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QFont, QPainterPath, QBrush, QPen
 
 try:
     from core.logger import get_logger
@@ -91,7 +91,7 @@ class CardWidget(QWidget):
         self._elevation = 4.0  # 初始阴影高度
         
         # 设置样式
-        self.setCursor(Qt.PointingHandCursor)  # 设置鼠标样式为手型
+        self.setCursor(Qt.CursorShape.PointingHandCursor)  # 设置鼠标样式为手型
         
         # 创建动画
         self._setup_animations()
@@ -133,7 +133,7 @@ class CardWidget(QWidget):
         if self._title:
             title_label = QLabel(self._title)
             title_label.setStyleSheet(f"color: {self._text_color.name()}; font-weight: bold;")
-            title_label.setAlignment(Qt.AlignCenter)
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._layout.addWidget(title_label)
         
         self.setLayout(self._layout)
@@ -143,17 +143,17 @@ class CardWidget(QWidget):
         # 卡片缩放动画 - 用于点击效果
         self._scale_animation = QPropertyAnimation(self, b"scale_factor")
         self._scale_animation.setDuration(150)  # 150毫秒
-        self._scale_animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._scale_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         
         # 颜色过渡动画 - 用于悬停效果
         self._color_animation = QPropertyAnimation(self, b"opacity")
         self._color_animation.setDuration(300)  # 增加持续时间到300毫秒
-        self._color_animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self._color_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
         
         # 阴影高度动画 - 用于悬停效果
         self._elevation_animation = QPropertyAnimation(self, b"elevation")
         self._elevation_animation.setDuration(300)  # 与颜色动画保持一致
-        self._elevation_animation.setEasingCurve(QEasingCurve.OutQuad)
+        self._elevation_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         
         # 悬停动画组
         self._hover_animation_group = QParallelAnimationGroup()
@@ -220,7 +220,7 @@ class CardWidget(QWidget):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._pressed = True
             
             # 卡片缩放动画
@@ -233,7 +233,7 @@ class CardWidget(QWidget):
     
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
-        if event.button() == Qt.LeftButton and self._pressed:
+        if event.button() == Qt.MouseButton.LeftButton and self._pressed:
             self._pressed = False
             
             # 卡片回弹动画
@@ -256,7 +256,7 @@ class CardWidget(QWidget):
     def paintEvent(self, event):
         """绘制事件"""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # 计算当前使用的颜色
         if self._selected:
@@ -357,7 +357,7 @@ class CardWidget(QWidget):
         elif title:
             title_label = QLabel(title)
             title_label.setStyleSheet(f"color: {self._text_color.name()}; font-weight: bold;")
-            title_label.setAlignment(Qt.AlignCenter)
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._layout.insertWidget(0, title_label)
         
         self._title = title
@@ -450,7 +450,7 @@ if __name__ == "__main__":
     # 创建卡片示例
     card1 = CardWidget(title="基本卡片")
     label1 = QLabel("这是一个基本的卡片示例，\n包含标题和内容。")
-    label1.setAlignment(Qt.AlignCenter)
+    label1.setAlignment(Qt.AlignmentFlag.AlignCenter)
     label1.setContentsMargins(5, 5, 5, 5)  # 为标签添加内边距
     card1.add_widget(label1)
     
@@ -463,13 +463,13 @@ if __name__ == "__main__":
         text_color=[70, 70, 120]
     )
     label2 = QLabel("这是一个自定义颜色的卡片，\n悬停和选中状态有不同颜色。")
-    label2.setAlignment(Qt.AlignCenter)
+    label2.setAlignment(Qt.AlignmentFlag.AlignCenter)
     card2.add_widget(label2)
     
     # 无标题卡片
     card3 = CardWidget(primary_color=[255, 240, 240])
     label3 = QLabel("这是一个没有标题的卡片。")
-    label3.setAlignment(Qt.AlignCenter)
+    label3.setAlignment(Qt.AlignmentFlag.AlignCenter)
     card3.add_widget(label3)
     
     # 添加卡片到窗口
@@ -488,4 +488,4 @@ if __name__ == "__main__":
     window.setLayout(layout)
     window.show()
     
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec()) 
