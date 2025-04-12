@@ -1,6 +1,6 @@
 # GestroKey 源代码目录说明
 
-GestroKey是一款功能强大的手势控制工具，允许用户通过鼠标绘制简单手势来执行各种操作（如快捷键、启动程序等）。本工具的核心特性包括全局鼠标手势识别、智能方向分析、手势库管理以及自定义UI组件，适用于日常办公、创意设计和编程开发等场景，显著提升工作效率。
+GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来执行各种操作（如快捷键、启动程序等）。本工具的核心特性包括全局鼠标手势识别、方向分析、手势库管理以及自定义UI组件，适用于日常办公、创意设计和编程开发等场景。
 
 本文档详细介绍了GestroKey项目`src`目录下各文件和文件夹的功能及使用方法。
 
@@ -112,12 +112,12 @@ python src/main.py
 
 # 或从其他Python代码中导入并创建实例
 from main import GestroKeyApp
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 import sys
 
 app = QApplication(sys.argv)
 window = GestroKeyApp()
-sys.exit(app.exec_())
+sys.exit(app.exec())
 ```
 
 **GUI选项卡**：
@@ -217,64 +217,68 @@ version_info = get_full_version_info()  # 返回包含所有版本信息的字�
 ```python
 # 创建并运行应用程序
 import sys
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 from ui.main_window import GestroKeyApp
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     # 设置高DPI支持
-    app.setAttribute(Qt.AA_EnableHighDpiScaling)
-    app.setAttribute(Qt.AA_UseHighDpiPixmaps)
+    app.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
+    app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
     
     # 创建并显示主窗口
     window = GestroKeyApp()
     window.show()
     
     # 进入应用程序主循环
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 ```
 
 ##### 2.1.2 控制台选项卡 (ui/console.py)
 
 **功能说明**：
-控制台界面，应用程序的主要交互界面，提供启动/停止绘制功能，显示操作日志。
+控制台界面，应用程序的主要交互界面，提供启动/停止绘制功能，显示系统资源监控信息。
 
 **主要类和方法**：
+- `AnimatedProgressBar`：动画进度条类
+  - `__init__(self, parent=None)`：初始化动画进度条
+  - `_update_style(self, value)`：根据值更新进度条样式和颜色
+  - `set_animated_value(self, value)`：设置进度条值，带动画效果
+  - `set_color_theme(self, base_color, mid_color, high_color)`：设置进度条的颜色主题
+
 - `ConsoleTab`：控制台选项卡类
   - `__init__(self, parent=None)`：初始化控制台选项卡
   - `initUI(self)`：初始化UI组件和布局
-  - `setup_log_viewer(self)`：设置日志查看器
-  - `setup_control_buttons(self)`：设置控制按钮
-  - `on_start_drawing(self)`：处理开始绘制按钮点击事件
-  - `on_stop_drawing(self)`：处理停止绘制按钮点击事件
-  - `add_log_entry(self, message, level="info")`：添加日志条目
-  - `clear_log(self)`：清空日志查看器
+  - `_create_system_info_card(self, title, value, color)`：创建系统信息卡片
+  - `toggle_drawing(self)`：切换绘制状态
+  - `start_drawing(self)`：开始绘制功能
+  - `stop_drawing(self)`：停止绘制功能
+  - `update_system_info(self, data)`：更新系统信息显示
 
 **组件布局**：
-- 顶部：控制按钮区域，包含开始/停止绘制按钮
-- 中部：日志查看器，显示操作日志
-- 底部：清除日志按钮和占位区域
+- 顶部：标题和状态标签
+- 中部：控制按钮区域，包含开始/停止绘制按钮
+- 底部：系统信息卡片区域，显示CPU使用率、内存使用率、运行时间和进程资源信息
 
 **交互信号**：
 - `drawing_started`：开始绘制时发出
 - `drawing_stopped`：停止绘制时发出
-- `log_cleared`：清除日志时发出
 
-**日志级别**：
-- `info`：一般信息，使用默认颜色
-- `success`：成功信息，显示为绿色
-- `warning`：警告信息，显示为黄色
-- `error`：错误信息，显示为红色
-- `debug`：调试信息，显示为灰色
+**系统信息卡片**：
+- CPU使用率卡片：显示当前CPU使用率，带颜色渐变进度条
+- 内存使用率卡片：显示当前内存使用率，带颜色渐变进度条
+- 运行时间卡片：显示应用程序运行时间
+- 进程资源卡片：显示当前进程的CPU和内存使用情况
 
 **特性说明**：
-- 直观控制：提供明确的开始/停止绘制按钮
-- 实时日志：显示实时操作和系统日志
-- 色彩区分：不同级别的日志使用不同颜色
-- 状态反馈：按钮状态反映当前绘制状态
-- 自动滚动：日志超出视图时自动滚动
-- 交互反馈：操作时提供视觉和文本反馈
+- 直观控制：提供明确的开始/停止绘制按钮，根据状态切换文本和颜色
+- 实时系统监控：显示CPU、内存使用率和运行时间
+- 动画效果：资源使用率变化时有平滑的动画过渡
+- 颜色反馈：根据资源使用率变化颜色，低(绿)→中(黄)→高(红)
+- 卡片式布局：使用现代化卡片组件展示系统信息
+- 定时更新：自动定期更新系统资源信息
+- 响应式设计：适应窗口大小变化
 
 **使用方法**：
 ```python
@@ -293,13 +297,6 @@ side_tab.add_tab("控制台", console_tab, QIcon(":/icons/console.png"))
 console_tab.drawing_started.connect(lambda: print("开始绘制"))
 console_tab.drawing_stopped.connect(lambda: print("停止绘制"))
 
-# 添加不同级别的日志
-console_tab.add_log_entry("应用程序已启动", "info")
-console_tab.add_log_entry("成功连接到系统", "success")
-console_tab.add_log_entry("配置文件缺失，使用默认设置", "warning")
-console_tab.add_log_entry("无法访问资源文件", "error")
-console_tab.add_log_entry("调试信息：初始化完成", "debug")
-
 # 设置主窗口
 main_window.setCentralWidget(side_tab)
 main_window.show()
@@ -314,43 +311,36 @@ main_window.show()
 
 **主要类和方法**：
 - `GestureLibrary`：手势库类
-  - `__init__(self, gestures_file=None)`：初始化手势库
-    - `gestures_file`：手势库文件路径，默认为None，会使用默认路径
-  - `load_gestures(self)`：从配置文件加载手势库
-  - `save_gestures(self)`：保存手势库到配置文件
-  - `add_gesture(self, name, direction, action_type, action_value)`：添加新手势
-    - `name`：手势名称
-    - `direction`：方向序列字符串
-    - `action_type`：动作类型，如"shortcut"
-    - `action_value`：动作值，如"ctrl+c"
-    - 返回值：新手势的ID
-  - `delete_gesture(self, gesture_id)`：删除指定ID的手势
-    - `gesture_id`：要删除的手势ID
-    - 返回值：操作是否成功
-  - `update_gesture(self, gesture_id, name=None, direction=None, action_type=None, action_value=None)`：更新手势信息
-    - `gesture_id`：要更新的手势ID
-    - 其他参数：要更新的手势属性，不提供则保持原值
-    - 返回值：更新后的手势信息
-  - `get_gesture(self, gesture_id)`：获取指定ID的手势信息
-    - `gesture_id`：手势ID
-    - 返回值：手势信息字典
-  - `get_all_gestures(self)`：获取所有手势信息
-    - 返回值：手势字典，键为ID，值为手势信息
-  - `find_gesture_by_direction(self, direction)`：通过方向序列查找匹配的手势
-    - `direction`：方向序列字符串
-    - 返回值：匹配的手势信息，未找到则返回None
-  - `reset_gesture_library(self)`：重置手势库为默认设置
-    - 返回值：重置后的手势库
+  - `__init__(self)`：初始化手势库
+  - `_load_default_gestures(self)`：从JSON文件加载默认手势库
+  - `_ensure_valid_ids(self, gestures)`：确保所有手势都有有效的整数ID，并且ID是连续的
+  - `_get_next_id(self)`：获取下一个可用的ID
+  - `_get_gestures_file_path(self)`：获取手势库文件路径
+  - `load(self)`：从文件加载手势库
+  - `save(self)`：保存手势库到文件
+  - `get_gesture(self, name)`：获取指定名称的手势
+  - `get_gesture_by_id(self, gesture_id)`：根据ID获取手势
+  - `get_all_gestures(self, use_saved=False)`：获取所有手势
+  - `get_all_gestures_sorted(self, use_saved=False)`：获取按ID排序的所有手势
+  - `get_gesture_by_direction(self, direction)`：根据方向序列获取匹配的手势
+  - `add_gesture(self, name, direction, action_type, action_value, gesture_id=None)`：添加新手势
+  - `update_gesture_name(self, old_name, new_name)`：更新手势名称
+  - `remove_gesture(self, name)`：删除指定名称的手势
+  - `reset_to_default(self)`：重置手势库为默认设置
+  - `has_changes(self)`：检查是否有未保存的更改
+
+- `get_gesture_library()`：单例函数，获取手势库实例
 
 **手势数据结构**：
 ```json
 {
-  "id": 1,
-  "name": "复制",
-  "direction": "右-下",
-  "action": {
-    "type": "shortcut",
-    "value": "ctrl+c"
+  "复制": {
+    "id": 1,
+    "direction": "右-下",
+    "action": {
+      "type": "shortcut",
+      "value": "ctrl+c"
+    }
   }
 }
 ```
@@ -366,46 +356,47 @@ main_window.show()
 
 **使用方法**：
 ```python
-# 创建手势库实例
-gesture_library = GestureLibrary()
+# 获取手势库实例
+from ui.gestures.gestures import get_gesture_library
+gesture_library = get_gesture_library()
 
 # 获取所有手势
 all_gestures = gesture_library.get_all_gestures()
 print(f"当前有 {len(all_gestures)} 个手势")
 
 # 添加新手势
-new_id = gesture_library.add_gesture(
+gesture_library.add_gesture(
     name="截图",
     direction="右-下-左",
     action_type="shortcut",
     action_value="win+shift+s"
 )
-print(f"添加了新手势，ID: {new_id}")
+print(f"添加了新手势：截图")
 
-# 更新手势
-updated_gesture = gesture_library.update_gesture(
-    gesture_id=new_id,
-    name="屏幕截图",
-    action_value="win+shift+s"
-)
-print(f"更新后的手势: {updated_gesture}")
+# 更新手势名称
+gesture_library.update_gesture_name("截图", "屏幕截图")
+print(f"更新了手势名称")
 
 # 查找匹配手势
 direction = "右-下"
-matched_gesture = gesture_library.find_gesture_by_direction(direction)
-if matched_gesture:
-    print(f"匹配到手势: {matched_gesture['name']}")
-    print(f"执行动作: {matched_gesture['action']['type']} - {matched_gesture['action']['value']}")
+name, gesture = gesture_library.get_gesture_by_direction(direction)
+if name:
+    print(f"匹配到手势: {name}")
+    print(f"执行动作: {gesture['action']['type']} - {gesture['action']['value']}")
 else:
     print(f"未找到匹配的手势: {direction}")
 
 # 删除手势
-result = gesture_library.delete_gesture(new_id)
+result = gesture_library.remove_gesture("屏幕截图")
 print(f"删除结果: {'成功' if result else '失败'}")
 
 # 重置手势库
-gesture_library.reset_gesture_library()
+gesture_library.reset_to_default()
 print("手势库已重置为默认设置")
+
+# 保存手势库
+gesture_library.save()
+print("手势库已保存")
 ```
 
 ###### 2.1.3.2 手势选项卡 (ui/gestures/gestures_tab.py)
@@ -490,7 +481,7 @@ main_window.show()
 ```python
 # 手势方向选择界面示例
 from ui.gestures.gestures_tab import GesturesTab
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 from ui.components.input_field import AnimatedInputField
 
 # 创建手势管理选项卡
@@ -527,7 +518,7 @@ print(f"动作值: {action_value_input.text()}")
 
 # 显示并运行应用程序
 gestures_tab.show()
-app.exec_()
+app.exec()
 ```
 
 ##### 2.1.4 设置模块
@@ -654,62 +645,66 @@ main_window.show()
 
 ##### 2.2.1 ui/components/button.py
 
-**功能说明**：自定义动画按钮组件，提供美观的、带有动画效果的按钮，可以轻松集成到任何界面。
+**功能说明**：自定义动画按钮组件，提供带有动画效果的按钮，可以集成到任何界面。
 
 **主要类和方法**：
 - `AnimatedButton`：动画按钮类，继承自`QPushButton`
-  - `__init__(text, parent=None, icon=None, primary_color=None, hover_color=None, text_color=None, border_radius=None, min_width=None, min_height=None)`：初始化按钮，支持多种自定义参数
+  - `__init__(text, parent=None, icon=None, primary_color=None, hover_color=None, text_color=None, border_radius=None, icon_size=None, min_width=None, min_height=None, border_color=None, shadow_color=None)`：初始化按钮，支持多种自定义参数
     - `text`：按钮文本
     - `parent`：父窗口组件
     - `icon`：按钮图标，可以是QIcon对象或图标文件路径
-    - `primary_color`：按钮主色调，RGB格式的数组，如[41, 128, 185]
-    - `hover_color`：按钮悬停色调，RGB格式的数组，如[52, 152, 219]
-    - `text_color`：按钮文本颜色，RGB格式的数组，如[255, 255, 255]
+    - `primary_color`：按钮主色调，RGB格式的数组，如[41, 128, 185]或十六进制颜色字符串"#2980b9"
+    - `hover_color`：按钮悬停色调，RGB格式的数组或十六进制颜色字符串
+    - `text_color`：按钮文本颜色，RGB格式的数组或十六进制颜色字符串
     - `border_radius`：按钮边框圆角半径，整数值（像素）
+    - `icon_size`：图标大小，整数值（像素）
     - `min_width`：按钮最小宽度，整数值（像素）
     - `min_height`：按钮最小高度，整数值（像素）
+    - `border_color`：边框颜色，RGB格式的数组或十六进制颜色字符串
+    - `shadow_color`：阴影颜色，RGB格式的数组或十六进制颜色字符串
   - `set_primary_color(color)`：设置按钮主色调
-    - `color`：RGB格式的数组，如[41, 128, 185]
+    - `color`：RGB格式的数组，如[41, 128, 185]或十六进制颜色字符串
   - `set_hover_color(color)`：设置按钮悬停色调
-    - `color`：RGB格式的数组，如[52, 152, 219]
+    - `color`：RGB格式的数组，如[52, 152, 219]或十六进制颜色字符串
   - `set_text_color(color)`：设置按钮文本颜色
-    - `color`：RGB格式的数组，如[255, 255, 255]
+    - `color`：RGB格式的数组，如[255, 255, 255]或十六进制颜色字符串
   - `set_border_radius(radius)`：设置按钮边框圆角半径
     - `radius`：整数值（像素）
   - `setEnabled(enabled)`：重写的设置按钮可用状态方法，提供禁用状态的视觉反馈
     - `enabled`：布尔值，True表示启用，False表示禁用
-  - `enterEvent(event)`：处理鼠标进入事件，触发悬停动画效果
-  - `leaveEvent(event)`：处理鼠标离开事件，触发恢复动画效果
-  - `mousePressEvent(event)`：处理鼠标按下事件，触发按下动画效果
-  - `mouseReleaseEvent(event)`：处理鼠标释放事件，触发释放动画效果
-  - `_start_hover_animation(is_hover)`：内部方法，启动悬停/离开动画
-  - `_start_press_animation(is_pressed)`：内部方法，启动按下/释放动画
-  - `_update_colors()`：内部方法，根据主色调计算悬停色调和禁用色调
 
 **特性说明**：
-- 精美的扁平化设计，主题色为蓝色系，符合现代UI设计趋势
-- 鼠标悬停时文字轻微上浮和放大的动画效果，提升交互体验
-- 按下时文字下沉和缩小的动画效果，与按钮主体动画保持一致，提供立体感反馈
-- 平滑的鼠标离开过渡动画，避免视觉上的生硬跳变
-- 支持自定义颜色、图标、文本颜色和圆角半径，可适应各种界面风格
-- 自动计算悬停色调，如未指定则基于主色调生成更亮的颜色，保持色彩统一性
-- 当主色调通过set_primary_color方法变更时，悬停色调会自动更新以保持一致的视觉效果
-- 完美支持动态颜色切换，如控制台的"开始绘制"(蓝色)和"停止绘制"(红色)按钮
-- 阴影和高光效果，提供现代感视觉体验，增强按钮立体感
-- 支持禁用状态，灰色外观设计，禁用时无动画效果，鼠标指针变为普通箭头
-- 可直接运行文件查看示例效果，便于单独调试
-- 已应用于整个应用程序的界面按钮，提供统一的视觉风格
+- 扁平化设计，主题色为蓝色系
+- 动画效果：
+  - 鼠标悬停时文字轻微上浮和放大的动画效果
+  - 按下时文字下沉和缩小的动画效果
+  - 按钮整体的缩放动画，按下时缩小至96%
+  - 颜色过渡动画
+- 可定制：
+  - 支持自定义颜色、图标、图标大小、文本颜色和圆角半径
+  - 支持边框颜色和阴影颜色的单独设置
+- 自动颜色计算：
+  - 自动计算悬停色调，如未指定则基于主色调生成更亮的颜色
+  - 当主色调通过set_primary_color方法变更时，悬停色调会自动更新
+- 支持动态颜色切换
+- 视觉细节：
+  - 阴影和高光效果
+  - 按下状态时的内阴影
+  - 禁用状态时的灰色外观
+- 状态管理：
+  - 支持禁用状态，禁用时无动画效果，鼠标指针变为普通箭头
+  - 状态切换时平滑过渡
 
 **应用场景**：
 - 主窗口的退出按钮
-- 控制台选项卡的开始和停止绘制按钮，均使用主题蓝色保持统一风格
+- 控制台选项卡的开始和停止绘制按钮
 - 设置选项卡的保存和重置设置按钮
 - 手势管理选项卡的添加、删除和保存手势按钮
 
 **使用方法**：
 ```python
 from ui.components.button import AnimatedButton
-from PyQt5.QtWidgets import QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 # 创建基本按钮（使用默认样式）
 button = AnimatedButton("按钮文本")
@@ -721,9 +716,12 @@ custom_button = AnimatedButton(
     hover_color=[52, 152, 219],    # 悬停时的颜色（可选，不提供时会自动基于主色计算）
     text_color=[255, 255, 255],    # 白色文本
     icon="path/to/icon.png",       # 设置图标
+    icon_size=24,                  # 设置图标大小
     border_radius=12,              # 设置圆角半径
     min_width=120,                 # 最小宽度
-    min_height=40                  # 最小高度
+    min_height=40,                 # 最小高度
+    border_color=[30, 100, 160],   # 边框颜色
+    shadow_color=[0, 0, 0, 60]     # 阴影颜色，带透明度
 )
 
 # 创建具有特定功能的按钮
@@ -749,7 +747,7 @@ button.set_text_color([240, 240, 240])   # 修改文本颜色为浅灰色
 button.setEnabled(False)  # 按钮变为灰色，不再响应鼠标事件和显示动画效果
 
 # 创建包含图标的按钮
-from PyQt5.QtGui import QIcon
+from PyQt6.QtGui import QIcon
 icon = QIcon("path/to/icon.png")
 icon_button = AnimatedButton("图标按钮", icon=icon)
 ```
@@ -788,16 +786,17 @@ high_contrast_button = AnimatedButton(
 
 **主要类和方法**：
 - `CardWidget`：卡片组件类，继承自`QWidget`
-  - `__init__(parent=None, primary_color=None, hover_color=None, selected_color=None, text_color=None, border_radius=None, min_width=None, min_height=None, title=None)`：初始化卡片，支持多种自定义参数
+  - `__init__(parent=None, primary_color=None, hover_color=None, selected_color=None, text_color=None, border_radius=None, min_width=None, min_height=None, title=None, shadow_color=None)`：初始化卡片，支持多种自定义参数
     - `parent`：父窗口组件
-    - `primary_color`：卡片主色调，RGB格式的数组，默认为淡蓝色[240, 248, 255]
-    - `hover_color`：卡片悬停色调，RGB格式的数组，默认自动基于主色调生成
-    - `selected_color`：卡片选中状态颜色，RGB格式的数组，默认为更淡的主题蓝色[85, 170, 225]
-    - `text_color`：卡片文本颜色，RGB格式的数组，默认为深灰色[70, 70, 70]
-    - `border_radius`：卡片边框圆角半径，整数值（像素），默认为8
-    - `min_width`：卡片最小宽度，整数值（像素），默认为150
-    - `min_height`：卡片最小高度，整数值（像素），默认为100
-    - `title`：卡片标题，字符串
+    - `primary_color`：卡片主色调，RGB格式的数组或十六进制颜色字符串，默认为淡蓝色[248, 253, 255]
+    - `hover_color`：卡片悬停色调，RGB格式的数组或十六进制颜色字符串，默认自动基于主色调生成
+    - `selected_color`：卡片选中状态颜色，RGB格式的数组或十六进制颜色字符串，默认为更淡的主题蓝色[180, 220, 250]
+    - `text_color`：卡片文本颜色，RGB格式的数组或十六进制颜色字符串，默认为深灰色[50, 50, 50]
+    - `border_radius`：卡片边框圆角半径，整数值（像素），默认为12
+    - `min_width`：卡片最小宽度，整数值（像素），默认为180
+    - `min_height`：卡片最小高度，整数值（像素），默认为120
+    - `title`：卡片标题，字符串，如果提供将在卡片顶部显示标题
+    - `shadow_color`：卡片阴影颜色，RGB格式的数组或十六进制颜色字符串，默认为半透明黑色[0, 0, 0, 30]
   - `add_widget(widget)`：向卡片内添加组件
     - `widget`：任何QWidget子类的实例，将被添加到卡片内容区域
   - `set_selected(selected)`：设置卡片的选中状态
@@ -809,45 +808,55 @@ high_contrast_button = AnimatedButton(
   - `get_title()`：获取卡片标题
     - 返回值：字符串，当前卡片标题
   - `set_primary_color(color)`：设置卡片主色调
-    - `color`：RGB格式的数组，如[240, 248, 255]
+    - `color`：RGB格式的数组或十六进制颜色字符串
   - `set_hover_color(color)`：设置卡片悬停色调
-    - `color`：RGB格式的数组，如[220, 240, 250]
+    - `color`：RGB格式的数组或十六进制颜色字符串
   - `set_selected_color(color)`：设置卡片选中状态的颜色
-    - `color`：RGB格式的数组，如[85, 170, 225]
+    - `color`：RGB格式的数组或十六进制颜色字符串
   - `set_text_color(color)`：设置卡片文本颜色
-    - `color`：RGB格式的数组，如[70, 70, 70]
+    - `color`：RGB格式的数组或十六进制颜色字符串
   - `set_border_radius(radius)`：设置卡片边框圆角半径
     - `radius`：整数值（像素）
-  - `enterEvent(event)`：处理鼠标进入事件，触发悬停效果
-  - `leaveEvent(event)`：处理鼠标离开事件，恢复正常效果
-  - `mousePressEvent(event)`：处理鼠标按下事件，更新样式和触发点击信号
-  - `mouseReleaseEvent(event)`：处理鼠标释放事件，恢复样式
 
 **特性说明**：
 - 精美的扁平化设计，默认使用淡蓝色系主题，视觉效果柔和
-- 支持鼠标悬停、点击的动画效果，增强用户交互体验
-- 具有选中状态，默认使用更淡的主题蓝色作为选中状态颜色，视觉效果更柔和
-- 动态阴影效果，悬停时阴影增强，增加立体感，鼠标离开时平滑过渡回原始状态
-- 适当的内边距设计，确保内容不会覆盖卡片边框，保持美观
-- 内容随卡片一起应用动画效果，提供更连贯的交互体验
-- 支持添加标题和内容组件，适合展示结构化信息
-- 完全可定制的外观，包括颜色、圆角、阴影等，可适应各种界面风格
-- 发射点击信号，便于处理用户交互，可以连接到自定义槽函数
-- 可直接运行文件查看示例效果，便于单独调试
-- 适合用于展示列表项、信息卡片、设置面板等场景
+- 丰富的动画效果：
+  - 鼠标悬停时的背景颜色平滑过渡动画
+  - 鼠标按下时的缩放动画，缩小到97%提供明确的视觉反馈
+  - 阴影高度动画，悬停时阴影增强，离开时平滑过渡回原始状态
+  - 动态阴影效果，悬停和按下状态有不同的阴影表现
+- 选中状态管理：
+  - 支持设置卡片选中状态，选中时使用特定颜色（默认为更淡的蓝色）
+  - 选中时可显示加粗边框，增强视觉区分度
+- 视觉细节优化：
+  - 微妙的高光效果，增强立体感
+  - 按下状态时的内阴影效果，提供更真实的按压感
+  - 颜色智能计算，自动基于主色调生成悬停色和选中色
+- 内容管理：
+  - 支持添加标题，自动在卡片顶部显示
+  - 内容随卡片一起应用动画效果，提供更连贯的交互体验
+  - 适当的内边距设计，确保内容不会覆盖卡片边框，保持美观
+- 完全可定制的外观：
+  - 颜色、圆角、最小尺寸和阴影等参数可自定义
+  - 动态更新外观，支持运行时更改属性
+- 信号支持：
+  - 提供`clicked`信号，便于处理用户交互
+- 其他功能：
+  - 可直接运行文件查看示例效果，便于单独调试
+  - 详细的日志记录，便于开发调试
 
 **使用方法**：
 ```python
 from ui.components.card import CardWidget
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
-from PyQt5.QtCore import Qt
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PyQt6.QtCore import Qt
 
 # 创建基本卡片
 card = CardWidget(title="卡片标题")
 
 # 添加内容
 content_label = QLabel("这是卡片内容")
-content_label.setAlignment(Qt.AlignCenter)
+content_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 card.add_widget(content_label)
 
 # 创建自定义颜色的卡片
@@ -859,7 +868,8 @@ custom_card = CardWidget(
     text_color=[70, 70, 120],       # 文本颜色
     border_radius=12,               # 边框圆角
     min_width=200,                  # 最小宽度
-    min_height=150                  # 最小高度
+    min_height=150,                 # 最小高度
+    shadow_color=[0, 0, 0, 40]      # 阴影颜色（带透明度）
 )
 
 # 创建多个卡片并添加到布局
@@ -921,23 +931,28 @@ for name, gesture in gestures.items():
 
 **主要类和方法**：
 - `AnimatedScrollBar`：自定义滚动条类，继承自`QScrollBar`
-  - `__init__(orientation=Qt.Vertical, parent=None)`：初始化滚动条
-    - `orientation`：滚动条方向，可以是Qt.Vertical（垂直）或Qt.Horizontal（水平）
+  - `__init__(orientation=Qt.Orientation.Vertical, parent=None)`：初始化滚动条
+    - `orientation`：滚动条方向，可以是Qt.Orientation.Vertical（垂直）或Qt.Orientation.Horizontal（水平）
     - `parent`：父窗口组件
   - `enterEvent(event)`：处理鼠标进入事件，触发透明度增加动画和展开动画
   - `leaveEvent(event)`：处理鼠标离开事件，触发透明度减少动画和延迟收缩
   - `_startCollapseAnimation()`：开始收缩动画，将滚动条收缩为细线
   - `_startExpandAnimation()`：开始展开动画，将滚动条恢复为正常宽度
-  - `_cancelCollapseTimer()`：取消收缩延时计时器
+  - `_onCollapseFinished()`：收缩动画完成后的回调函数
+  - `_onExpandFinished()`：展开动画完成后的回调函数
   - `mousePressEvent(event)`：处理鼠标按下事件，更新滚动条样式并取消收缩
   - `mouseReleaseEvent(event)`：处理鼠标释放事件，恢复滚动条样式并启动收缩延时
-  - `wheelEvent(event)`：实现平滑滚动效果，优化滚轮体验并重置收缩计时器
+  - `wheelEvent(event)`：处理鼠标滚轮事件，重置收缩计时器并调整滚动值
+  - `get_color_alpha()`：获取颜色透明度值
   - `set_color_alpha(alpha)`：设置滚动条颜色的透明度，用于动画效果
     - `alpha`：透明度值，范围0-255
+  - `get_handle_position()`：获取滑块位置
+  - `set_handle_position(position)`：设置滑块位置，用于动画效果
+  - `get_current_width()`：获取当前宽度
   - `set_current_width(width)`：设置滚动条当前宽度，用于折叠/展开动画
     - `width`：宽度值，单位像素
-  - `update_style()`：更新滚动条样式表，应用当前设置的颜色和宽度
-  - `resizeEvent(event)`：处理尺寸变化事件，更新滚动条样式
+  - `_updateStyle()`：更新滚动条样式表，应用当前设置的颜色和宽度
+  - `_setupAnimations()`：设置动画对象和参数
 
 - `AnimatedScrollArea`：自定义滚动区域类，继承自`QScrollArea`
   - `__init__(parent=None)`：初始化滚动区域，集成自定义滚动条
@@ -945,29 +960,24 @@ for name, gesture in gestures.items():
   - `eventFilter(obj, event)`：事件过滤器，拦截滚轮事件以实现平滑滚动
   - `_handleWheelEvent(event)`：处理滚轮事件，实现丝滑的动画滚动效果
   - `setVerticalScrollBarPolicy(policy)`：设置并记录垂直滚动条显示策略
-    - `policy`：滚动条策略，如Qt.ScrollBarAsNeeded
+    - `policy`：滚动条策略，如Qt.ScrollBarPolicy.ScrollBarAsNeeded
   - `setHorizontalScrollBarPolicy(policy)`：设置并记录水平滚动条显示策略
-    - `policy`：滚动条策略，如Qt.ScrollBarAsNeeded
-  - `resizeEvent(event)`：处理尺寸变化事件，更新滚动区域内容和滚动条
-  - `set_animation_duration(duration)`：设置滚动动画持续时间
-    - `duration`：动画持续时间，单位毫秒
-  - `set_animation_curve(curve)`：设置滚动动画曲线
-    - `curve`：QEasingCurve对象，如QEasingCurve.OutCubic
+    - `policy`：滚动条策略，如Qt.ScrollBarPolicy.ScrollBarAsNeeded
 
 **特性说明**：
 - 精美的扁平化设计，使用应用程序主题蓝色保持风格一致
 - **默认以折叠状态显示**：滚动条初始化时即以折叠状态（细线）显示，最大程度节省界面空间
 - **自动折叠功能**：鼠标离开滚动条区域后，滚动条会在短暂延迟后平滑收缩为细小的线条，节省界面空间
-- **高效滚动响应**：优化的滚动参数，提供更大的滚动步长，便于快速浏览长内容
-- **丝滑平滑滚动**：滚动内容时实现平滑渐变过渡，而非传统的瞬间跳转，提供更好的视觉体验
-- 滚动条宽度自适应，收缩和展开时有平滑过渡动画，视觉效果流畅
+- **适当的滚动速度**：通过调整滚轮事件的角度增量值，提供合适的滚动步长
+- **平滑动画滚动**：使用QPropertyAnimation实现内容滚动的平滑过渡，而非传统的瞬间跳转
+- 滚动条宽度自适应，收缩(2px)和展开(10px)时有平滑过渡动画，视觉效果流畅
 - 圆角滑块设计，现代感强，视觉效果优雅，符合扁平化设计风格
-- 透明度动画效果，鼠标悬停时变为完全不透明，离开时恢复半透明，提高视觉体验
+- 透明度动画效果，鼠标悬停时变为完全不透明(255)，离开时恢复半透明(180)
 - 无边框设计，隐藏了传统滚动条的箭头和槽轨道，界面更为简洁美观
 - 自动适应垂直和水平方向，提供一致的视觉体验，代码复用率高
 - 动画使用缓出曲线(OutCubic)，提供自然的减速效果，模拟物理世界的惯性
-- 滑块最小长度限制，确保在内容较多时仍能轻松操作，提高可用性
-- 智能延迟系统，防止频繁使用时的折叠/展开抖动，体验更为流畅
+- 滑块最小长度限制(30px)，确保在内容较多时仍能轻松操作
+- 智能延迟系统(800ms)，防止频繁使用时的折叠/展开抖动，体验更为流畅
 - 交互优化，滚动或点击时自动展开，使用完毕后自动收缩，用户体验佳
 - 滚动区域无缝集成自定义滚动条，使用方式与标准QScrollArea一致，降低学习成本
 - 可直接运行文件查看示例效果，便于单独调试和演示
@@ -976,14 +986,14 @@ for name, gesture in gestures.items():
 **使用方法**：
 ```python
 from ui.components.scrollbar import AnimatedScrollBar, AnimatedScrollArea
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt5.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt6.QtCore import Qt
 
 # 方法1：使用AnimatedScrollArea（推荐，提供完整功能）
 scroll_area = AnimatedScrollArea()
-scroll_area.setFrameShape(AnimatedScrollArea.NoFrame)  # 移除边框
-scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+scroll_area.setFrameShape(QFrame.Shape.NoFrame)  # 移除边框
+scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
 # 创建内容窗口
 content_widget = QWidget()
@@ -998,10 +1008,6 @@ for i in range(30):
 # 设置内容到滚动区域
 scroll_area.setWidget(content_widget)
 
-# 自定义滚动动画（可选）
-scroll_area.set_animation_duration(300)  # 设置动画持续时间为300毫秒
-scroll_area.set_animation_curve(QEasingCurve.OutQuint)  # 设置动画曲线为OutQuint
-
 # 添加到界面布局
 layout = QVBoxLayout()
 layout.addWidget(scroll_area)
@@ -1009,13 +1015,13 @@ main_widget.setLayout(layout)
 
 # 方法2：单独使用AnimatedScrollBar（高级用法，需手动设置）
 standard_scroll_area = QScrollArea()
-custom_scroll_bar = AnimatedScrollBar(Qt.Vertical)
+custom_scroll_bar = AnimatedScrollBar(Qt.Orientation.Vertical)
 
 # 设置自定义滚动条到标准滚动区域
 standard_scroll_area.setVerticalScrollBar(custom_scroll_bar)
 
 # 可以同时设置垂直和水平滚动条
-horizontal_scroll_bar = AnimatedScrollBar(Qt.Horizontal)
+horizontal_scroll_bar = AnimatedScrollBar(Qt.Orientation.Horizontal)
 standard_scroll_area.setHorizontalScrollBar(horizontal_scroll_bar)
 
 # 添加到界面布局
@@ -1024,8 +1030,8 @@ another_layout.addWidget(standard_scroll_area)
 
 **高级用法**：
 ```python
-# 创建具有特定颜色主题的滚动区域
-from PyQt5.QtGui import QColor
+# 访问AnimatedScrollArea中的内部滚动条
+from PyQt6.QtWidgets import QSizePolicy
 
 # 创建滚动区域
 custom_scroll_area = AnimatedScrollArea()
@@ -1033,13 +1039,11 @@ custom_scroll_area = AnimatedScrollArea()
 # 获取内部的滚动条对象（垂直）
 vertical_bar = custom_scroll_area.verticalScrollBar()
 if isinstance(vertical_bar, AnimatedScrollBar):
-    # 自定义滚动条样式
-    vertical_bar._base_color = QColor(52, 152, 219)  # 设置基础颜色（蓝色）
-    vertical_bar._handle_color = QColor(41, 128, 185)  # 设置滑块颜色（深蓝色）
-    vertical_bar._collapsed_width = 2  # 设置折叠状态宽度
-    vertical_bar._expanded_width = 10  # 设置展开状态宽度
-    vertical_bar._collapse_delay = 1000  # 设置折叠延迟时间（毫秒）
-    vertical_bar.update_style()  # 应用更新的样式
+    # 自定义滚动条颜色透明度
+    vertical_bar.set_color_alpha(200)  # 设置不透明度为200
+    
+    # 注意：其他内部参数如_primary_color, _collapsed_width等
+    # 虽然可以直接访问，但建议通过公共接口方法操作
 
 # 设置滚动区域内容后需要调整内容大小策略
 content = QWidget()
@@ -1047,7 +1051,7 @@ content_layout = QVBoxLayout(content)
 # ... 添加内容 ...
 content.setLayout(content_layout)
 custom_scroll_area.setWidget(content)
-content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 ```
 
 **实际应用场景**：
@@ -1058,9 +1062,9 @@ from ui.components.card import CardWidget
 
 # 创建滚动区域
 gestures_scroll_area = AnimatedScrollArea()
-gestures_scroll_area.setFrameShape(AnimatedScrollArea.NoFrame)
-gestures_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-gestures_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+gestures_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+gestures_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+gestures_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
 # 创建内容容器
 gestures_container = QWidget()
@@ -1084,7 +1088,7 @@ main_layout.addWidget(gestures_scroll_area)
 
 ##### 2.2.4 ui/components/side_tab.py
 
-**功能说明**：左侧选项卡组件，提供美观的垂直选项卡界面，包含切换动画效果，符合应用主题风格。
+**功能说明**：左侧选项卡组件，提供垂直选项卡界面，包含切换动画效果，符合应用主题风格。
 
 **主要类和方法**：
 - `AnimatedTabButton`：动画选项卡按钮类，用于显示单个选项卡
@@ -1154,8 +1158,8 @@ main_layout.addWidget(gestures_scroll_area)
 **使用方法**：
 ```python
 from ui.components.side_tab import SideTabWidget
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
-from PyQt5.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
+from PyQt6.QtGui import QIcon
 
 # 创建左侧选项卡组件
 tab_widget = SideTabWidget()
@@ -1228,6 +1232,10 @@ content = tab_widget.widget(0)
 tab_count = tab_widget.count()
 print(f"选项卡总数: {tab_count}")
 
+# 启用或禁用动画效果
+tab_widget.setAnimationsEnabled(False)  # 禁用动画效果
+tab_widget.setAnimationsEnabled(True)   # 重新启用动画效果
+
 # 添加到主窗口布局
 main_layout = QVBoxLayout()
 main_layout.addWidget(tab_widget)
@@ -1291,42 +1299,78 @@ class MainWindow(QMainWindow):
 
 ##### 2.2.5 ui/components/combobox
 
-**功能说明**：动画下拉菜单组件，提供精美的、带有展开/收起动画效果的下拉菜单。
-
-**主要特性**：
-- 精美的扁平化设计，使用与应用程序主题一致的颜色
-- **平滑展开动画**：下拉列表展开时平滑展开动画，而非传统的瞬间显示
-- **平滑收起动画**：下拉列表收起时平滑收起动画，增强用户体验
-- **自定义占位文本**：支持设置占位文本，在未选择项目时显示
+**功能说明**：下拉菜单组件，提供带有动画效果的下拉选择界面。
 
 ###### 2.2.5.1 ui/components/combobox/qcustomcombobox.py
 
-**功能说明**：自定义下拉菜单组件，提供美观的、带有动画效果的下拉选择界面，可以轻松集成到任何界面。
+**功能说明**：自定义下拉菜单组件，提供带有动画效果的下拉选择界面，可以集成到任何界面。
 
 **主要类和方法**：
 - `QCustomComboBox`：自定义下拉菜单类，继承自`QComboBox`
-  - `__init__(parent=None)`：初始化下拉菜单，支持多种自定义参数
+  - `__init__(parent=None)`：初始化下拉菜单
     - `parent`：父窗口组件
   - `setBackgroundColor(color)`：设置下拉菜单背景颜色
     - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串（如"#ffffff"）
-  - `setTextColor(color)`：设置下拉菜单文本颜色
+  - `setBackgroundHoverColor(color)`：设置鼠标悬停时的背景颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setBackgroundPressColor(color)`：设置鼠标按下时的背景颜色
     - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
   - `setBorderColor(color)`：设置下拉菜单边框颜色
     - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setTextColor(color)`：设置下拉菜单文本颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setTextHoverColor(color)`：设置鼠标悬停时的文本颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
   - `setBorderRadius(radius)`：设置下拉菜单边框圆角半径
     - `radius`：整数值（像素）
+  - `setBorderWidth(width)`：设置下拉菜单边框宽度
+    - `width`：整数值（像素）
+  - `setHoverBorderColor(color)`：设置鼠标悬停时的边框颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setPressBorderColor(color)`：设置鼠标按下时的边框颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setDropdownBorderRadius(radius)`：设置下拉列表边框圆角半径
+    - `radius`：整数值（像素）
+  - `setArrowColor(color)`：设置下拉箭头颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setArrowHoverColor(color)`：设置鼠标悬停时的箭头颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setArrowPressColor(color)`：设置鼠标按下时的箭头颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setDropShadowColor(color)`：设置下拉阴影颜色
+    - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
+  - `setDropShadowRadius(radius)`：设置下拉阴影半径
+    - `radius`：整数值（像素）
+  - `setArrowIcons(normal_icon, focus_icon)`：设置自定义箭头图标
+    - `normal_icon`：正常状态的图标路径
+    - `focus_icon`：焦点状态的图标路径
+  - `setAnimationDuration(hover_duration=200, press_duration=100, arrow_duration=300, popup_duration=250)`：设置各种动画的持续时间
+    - `hover_duration`：悬停动画持续时间（毫秒）
+    - `press_duration`：按下动画持续时间（毫秒）
+    - `arrow_duration`：箭头旋转动画持续时间（毫秒）
+    - `popup_duration`：弹出动画持续时间（毫秒）
+  - `setAnimationEasingCurve(hover_curve=QEasingCurve.Type.OutCubic, press_curve=QEasingCurve.Type.OutCubic, arrow_curve=QEasingCurve.Type.OutBack, popup_curve=QEasingCurve.Type.OutCubic)`：设置各种动画的缓动曲线
+    - `hover_curve`：悬停动画缓动曲线
+    - `press_curve`：按下动画缓动曲线
+    - `arrow_curve`：箭头旋转动画缓动曲线
+    - `popup_curve`：弹出动画缓动曲线
   - `customizeQCustomComboBox(**customValues)`：批量设置多个样式属性
     - `customValues`：关键字参数，可包含backgroundColor、backgroundHoverColor、textColor等
   - `showPopup()`：重写的显示下拉列表方法，添加了平滑展开动画
   - `hidePopup()`：重写的隐藏下拉列表方法，添加了平滑收起动画
-  - `setPlaceholderText(text)`：设置下拉菜单的占位文本，在未选择项目时显示
-    - `text`：占位文本字符串
-  - `getPlaceholderText()`：获取当前设置的占位文本
-    - 返回值：占位文本字符串
+  - `eventFilter(obj, event)`：事件过滤器，处理鼠标悬停、点击等事件
 
 - `ComboBoxDelegate`：下拉菜单项的自定义渲染代理类，继承自`QStyledItemDelegate`
+  - `__init__(parent=None)`：初始化代理类
+    - `parent`：父组件
   - `paint(painter, option, index)`：自定义绘制下拉菜单项的方法
+    - `painter`：QPainter对象，用于绘制
+    - `option`：QStyleOptionViewItem对象，包含绘制选项
+    - `index`：QModelIndex对象，表示要绘制的项目
   - `sizeHint(option, index)`：返回项目的理想大小
+    - `option`：QStyleOptionViewItem对象，包含绘制选项
+    - `index`：QModelIndex对象，表示项目
+    - 返回值：QSize对象，表示项目的理想大小
 
 **特性说明**：
 - 精美的扁平化设计，默认使用白色背景，浅灰色边框
@@ -1334,16 +1378,19 @@ class MainWindow(QMainWindow):
 - 箭头旋转动画效果，打开下拉菜单时箭头旋转180度
 - 下拉菜单展开和收起的动画效果，使用平滑的高度变化动画
 - 下拉菜单项有圆角背景，悬停和选中时有颜色变化
+- 悬停时的阴影效果，增强立体感和视觉反馈
 - 支持SVG图标，附带默认的箭头图标
 - 完全可定制的外观，包括颜色、圆角、边框样式等
 - 提供完善的事件处理，响应鼠标悬停、点击等事件
 - 支持长文本省略显示，避免界面溢出
 - 自动适配不同大小的显示区域
+- 通过代理类实现下拉项的自定义绘制，统一风格
+- 支持通过batch操作一次性设置多个样式属性
 
 **使用方法**：
 ```python
 from ui.components.combobox.qcustomcombobox import QCustomComboBox
-from PyQt5.QtWidgets import QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 # 创建基本下拉菜单
 combo = QCustomComboBox()
@@ -1370,58 +1417,110 @@ combo.customizeQCustomComboBox(
 
 # 单独设置样式属性
 combo.setBorderRadius(10)
-combo.setTextColor("#222222")
+combo.setTextColor("#444444")
+combo.setDropShadowRadius(15)
 
-# 设置占位文本
-combo.setPlaceholderText("请选择一个选项...")
+# 设置动画参数
+combo.setAnimationDuration(
+    hover_duration=250,    # 悬停动画持续时间
+    press_duration=150,    # 按下动画持续时间
+    arrow_duration=350,    # 箭头旋转动画持续时间
+    popup_duration=300     # 弹出动画持续时间
+)
 
-# 监听选项变化
-def on_selection_changed(index):
-    print(f"选中项: {combo.currentText()}, 索引: {index}")
-    
-combo.currentIndexChanged.connect(on_selection_changed)
+# 监听选择变化
+combo.currentIndexChanged.connect(lambda index: print(f"选择了: {combo.itemText(index)}"))
 ```
 
-**实际应用案例**：
+**高级用法**：
 ```python
-# 手势管理界面中使用自定义下拉菜单
+# 使用自定义图标
+from PyQt6.QtCore import QSize
+
+# 创建下拉菜单
+custom_combo = QCustomComboBox()
+
+# 添加带图标的项目
+from PyQt6.QtGui import QIcon
+custom_combo.addItem(QIcon("path/to/icon1.png"), "选项1")
+custom_combo.addItem(QIcon("path/to/icon2.png"), "选项2")
+
+# 设置自定义下拉箭头图标
+custom_combo.setArrowIcons(
+    normal_icon="path/to/arrow_normal.svg",
+    focus_icon="path/to/arrow_focus.svg"
+)
+
+# 设置动画曲线
+from PyQt6.QtCore import QEasingCurve
+custom_combo.setAnimationEasingCurve(
+    hover_curve=QEasingCurve.Type.OutQuad,
+    press_curve=QEasingCurve.Type.OutQuad,
+    arrow_curve=QEasingCurve.Type.OutBack,
+    popup_curve=QEasingCurve.Type.OutExpo
+)
+
+# 应用自定义样式
+custom_combo.customizeQCustomComboBox(
+    backgroundColor="#f0f0f0",
+    backgroundHoverColor="#e0e0e0",
+    backgroundPressColor="#d0d0d0",
+    borderColor="#c0c0c0",
+    hoverBorderColor="#3498db",
+    pressBorderColor="#2980b9",
+    textColor="#444444",
+    textHoverColor="#222222",
+    borderRadius=10,
+    borderWidth=1,
+    dropdownBorderRadius=8,
+    arrowColor="#888888",
+    arrowHoverColor="#3498db",
+    arrowPressColor="#2980b9",
+    dropShadowColor="#00000040",  # 带40%透明度的黑色
+    dropShadowRadius=12
+)
+```
+
+**实际应用示例**：
+```python
+# 在设置页面中使用下拉菜单选择主题
 from ui.components.combobox.qcustomcombobox import QCustomComboBox
-from PyQt5.QtGui import QColor
 
-# 创建自定义下拉菜单
-direction_combo = QCustomComboBox()
-direction_combo.addItems(["上", "下", "左", "右", "上-下", "右-左"])
-direction_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-# 自定义样式
-combo_style = {
-    "backgroundColor": "#ffffff",
-    "backgroundHoverColor": "#f5f5f5",
-    "backgroundPressColor": "#e5e5e5",
-    "borderColor": "#dddddd",
-    "hoverBorderColor": "#3498db",
-    "pressBorderColor": "#2980b9",
-    "textColor": "#333333",
-    "textHoverColor": "#000000",
-    "borderRadius": 4,
-    "borderWidth": 1,
-    "dropdownBorderRadius": 4,
-    "arrowColor": "#888888",
-    "arrowHoverColor": "#3498db",
-    "arrowPressColor": "#2980b9",
-    "dropShadowColor": QColor(0, 0, 0, 80),
-    "dropShadowRadius": 15
-}
-direction_combo.customizeQCustomComboBox(**combo_style)
-
-# 添加到布局
-direction_layout = QHBoxLayout()
-direction_layout.addWidget(QLabel("方向:"))
-direction_layout.addWidget(direction_combo)
-main_layout.addLayout(direction_layout)
-
-# 设置选中项
-direction_combo.setCurrentText("上-下")
+class SettingsTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.layout = QVBoxLayout(self)
+        
+        # 创建主题选择下拉菜单
+        self.theme_label = QLabel("选择主题:")
+        self.theme_combo = QCustomComboBox()
+        
+        # 添加主题选项
+        self.theme_combo.addItem("浅色主题")
+        self.theme_combo.addItem("深色主题")
+        self.theme_combo.addItem("蓝色主题")
+        self.theme_combo.addItem("绿色主题")
+        
+        # 自定义样式
+        self.theme_combo.customizeQCustomComboBox(
+            backgroundColor="#ffffff",
+            borderColor="#dddddd",
+            textColor="#333333",
+            borderRadius=8
+        )
+        
+        # 连接信号
+        self.theme_combo.currentIndexChanged.connect(self.on_theme_changed)
+        
+        # 添加到布局
+        self.layout.addWidget(self.theme_label)
+        self.layout.addWidget(self.theme_combo)
+        self.layout.addStretch()
+    
+    def on_theme_changed(self, index):
+        theme_name = self.theme_combo.itemText(index)
+        print(f"主题已更改为: {theme_name}")
+        # 在这里实现主题切换逻辑
 ```
 
 ##### 2.2.6 ui/components/animated_stacked_widget.py
@@ -1452,7 +1551,7 @@ direction_combo.setCurrentText("上-下")
 **特性说明**：
 - 支持多种动画效果：滑动（左右/上下）和淡入淡出
 - 可自定义动画持续时间和动画曲线
-- 无缝集成到PyQt5应用程序
+- 无缝集成到PyQt6应用程序
 - 兼容所有QWidget子类作为内容部件
 - 平滑过渡效果，提升用户体验
 - 内部使用QPropertyAnimation进行动画处理，保证流畅性能
@@ -1464,7 +1563,7 @@ direction_combo.setCurrentText("上-下")
 **使用方法**：
 ```python
 from ui.components.animated_stacked_widget import AnimatedStackedWidget
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 
 # 创建动画堆栈组件
 stacked_widget = AnimatedStackedWidget()
@@ -1566,7 +1665,7 @@ class GesturesTab(QWidget):
 **使用方法**：
 ```python
 from ui.components.input_field import AnimatedInputField
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
 # 创建Widget
 widget = QWidget()
@@ -1612,7 +1711,7 @@ input_field1.textChanged.connect(lambda text: print(f"文本变化: {text}"))
 ##### 2.2.8 ui/components/slider.py
 
 **功能说明**：
-自定义滑块组件，提供美观的动画滑块，支持水平和垂直方向，包含交互反馈和视觉特效。
+自定义滑块组件，提供带有动画效果的滑块，支持水平和垂直方向，包含交互反馈和视觉特效。
 
 **主要类**：
 - `GesturePattern`：自定义SVG样式手势图案，用于滑块的滑块部分
@@ -1624,7 +1723,7 @@ input_field1.textChanged.connect(lambda text: print(f"文本变化: {text}"))
   - `paintEvent(self, event)`：绘制自定义SVG样式手势图案
 
 - `SliderTrack`：滑块轨道组件，绘制背景和进度
-  - `__init__(self, parent=None, orientation=Qt.Horizontal, color=None)`：初始化滑块轨道
+  - `__init__(self, parent=None, orientation=Qt.Orientation.Horizontal, color=None)`：初始化滑块轨道
   - `set_track_color(self, color)`：设置轨道颜色
   - `set_progress(self, progress)`：设置进度值 (0.0 到 1.0)
   - `get_progress(self)`：获取当前进度值
@@ -1633,7 +1732,7 @@ input_field1.textChanged.connect(lambda text: print(f"文本变化: {text}"))
   - `paintEvent(self, event)`：绘制轨道和进度，动态调整透明度和发光效果
 
 - `AnimatedSlider`：动画滑块组件，整合手势图案和轨道组件
-  - `__init__(self, orientation=Qt.Horizontal, parent=None)`：初始化动画滑块
+  - `__init__(self, orientation=Qt.Orientation.Horizontal, parent=None)`：初始化动画滑块
   - `setValue(self, value)`：设置滑块值
   - `value(self)`：获取当前值
   - `setMinimum(self, min_value)`：设置最小值
@@ -1663,10 +1762,10 @@ input_field1.textChanged.connect(lambda text: print(f"文本变化: {text}"))
 **使用方法**：
 ```python
 from ui.components.slider import AnimatedSlider
-from PyQt5.QtCore import Qt
+from PyQt6.QtCore import Qt
 
 # 创建水平滑块
-slider = AnimatedSlider(Qt.Horizontal)
+slider = AnimatedSlider(Qt.Orientation.Horizontal)
 slider.setRange(0, 100)  # 设置范围
 slider.setValue(50)      # 设置初始值
 slider.setStep(5)        # 设置步长为5
@@ -1681,7 +1780,7 @@ slider.sliderReleased.connect(lambda: print("滑块被释放"))
 layout.addWidget(slider)
 
 # 创建垂直滑块
-v_slider = AnimatedSlider(Qt.Vertical)
+v_slider = AnimatedSlider(Qt.Orientation.Vertical)
 v_slider.setRange(0, 255)
 v_slider.setValue(128)
 v_slider.setPrimaryColor([231, 76, 60])  # 设置红色主题
@@ -1760,7 +1859,7 @@ current_color = color_picker.get_color()  # 返回[r, g, b]列表
 ##### 2.2.10 ui/components/number_spinner.py
 
 **功能说明**：
-数字选择器组件，提供美观的数字输入和调整界面，支持直接输入和按钮/滚轮调整数值。
+数字选择器组件，提供带有动画效果的数字输入和调整界面，支持直接输入和按钮/滚轮调整数值。
 
 **主要类**：
 - `SpinnerButton`：数字选择器按钮类
@@ -1801,7 +1900,7 @@ current_color = color_picker.get_color()  # 返回[r, g, b]列表
 **使用方法**：
 ```python
 from ui.components.number_spinner import AnimatedNumberSpinner
-from PyQt5.QtWidgets import QVBoxLayout, QWidget, QLabel
+from PyQt6.QtWidgets import QVBoxLayout, QWidget, QLabel
 
 # 创建布局和标签
 layout = QVBoxLayout()
@@ -1837,12 +1936,12 @@ current_value = float_spinner.value()
 
 ##### 2.2.11 ui/components/toast_notification.py
 
-**功能说明**：优雅的消息提示组件，在窗口右上角（或其他角落）显示带有平滑动画的通知提示，支持自动消失、鼠标悬停暂停计时、滚动长文本等功能，用于替代传统的弹出对话框，提供更现代的用户体验。
+**功能说明**：消息提示组件，在窗口角落显示带有动画的通知提示，支持自动消失、鼠标悬停暂停计时、滚动长文本等功能，用于替代传统的弹出对话框。全局通知不会随页面切换而消失，确保重要信息始终可见。
 
 **主要类和方法**：
 - `ElegantToast`：高级消息提示类
   - `__init__(parent=None, message="", toast_type=INFO, duration=3000, icon=None, position='top-right', text_mode=TEXT_TRUNCATE)`：初始化提示组件
-    - `parent`：父窗口
+    - `parent`：父窗口（会被自动替换为主窗口，确保全局可见）
     - `message`：消息文本
     - `toast_type`：提示类型（INFO、SUCCESS、WARNING、ERROR）
     - `duration`：显示持续时间（毫秒）
@@ -1853,9 +1952,11 @@ current_value = float_spinner.value()
   - `paintEvent(event)`：绘制通知提示效果
 
 - `ToastManager`：管理多个通知提示的类
-  - `show_toast(parent, message, toast_type, duration, ...)`：显示提示
-  - `arrange_toasts(parent, position)`：排列多个提示，防止重叠
+  - `show_toast(parent, message, toast_type, duration, ...)`：显示提示（会自动使用主窗口作为父级）
+  - `arrange_toasts(position)`：排列多个提示，防止重叠
+  - `get_parent_window(widget=None)`：获取主窗口作为Toast的父窗口，确保全局可见
   - `close_all()`：关闭所有活动提示
+  - `update_positions_on_resize()`：窗口大小变化时更新通知位置
 
 - 全局辅助函数
   - `show_info(parent, message, ...)`：显示信息类型提示
@@ -1864,6 +1965,7 @@ current_value = float_spinner.value()
   - `show_error(parent, message, ...)`：显示错误类型提示
 
 **特性说明**：
+- **全局通知**：通知提示不会随页面切换而消失，始终显示在应用程序的最上层
 - **优雅的动画效果**：平滑的淡入淡出、位置调整、错误提示晃动等动画
 - **4种预设类型**：信息（蓝色）、成功（绿色）、警告（黄色）、错误（红色）
 - **自定义外观**：可设置持续时间、位置、文本模式等
@@ -1903,6 +2005,7 @@ get_toast_manager().close_all()
 - 对于需要用户选择的场景（如确认删除），仍然使用标准的QMessageBox.question
 - 长文本消息建议使用TEXT_SCROLL或TEXT_WRAP模式
 - 重要的错误信息使用ERROR类型，会自动添加晃动动画提高用户注意度
+- 即使传入的parent参数是当前页面，通知也会自动附加到主窗口，确保在页面切换时不会消失
 
 ### 3. 核心功能模块
 
@@ -2318,7 +2421,7 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 6. 用户切换回控制台选项卡，点击"开始绘制"
 7. 用户按住鼠标右键绘制手势，轨迹显示为粗红色线条
 
-##### 4.3.3 工作流程优化场景
+##### 4.3.3 工作流程示例
 
 **场景7: 设计师工作流程**
 1. 设计师配置以下手势：
@@ -2327,9 +2430,9 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
    - "上-右"手势 → 切换图层 (Ctrl+])
    - "上-左"手势 → 切换图层 (Ctrl+[)
 2. 设计师在Photoshop中工作时启动GestroKey
-3. 使用预定义的手势快速执行常用操作，无需频繁切换键盘和鼠标
+3. 使用预定义的手势执行常用操作
 
-**场景8: 程序员编码助手**
+**场景8: 程序员编码流程**
 1. 程序员配置以下手势：
    - "右-下"手势 → Ctrl+C (复制)
    - "下-右"手势 → Ctrl+V (粘贴)
@@ -2337,7 +2440,7 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
    - "右-左"手势 → Ctrl+Tab (切换文件)
    - "上-下"手势 → F5 (运行/调试)
 2. 程序员在IDE中编码时启动GestroKey
-3. 使用手势快速执行常用操作，提高编码效率
+3. 使用手势执行常用操作
 
 #### 4.4 扩展开发指南
 
@@ -2345,215 +2448,64 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 
 要添加新的手势动作类型（如启动程序、执行脚本等），需要修改以下文件：
 
-1. **core/gesture_executor.py**：
-```python
-# 添加新的执行方法
-def _execute_program(self, program_path):
-    """执行指定的程序"""
-    try:
-        import subprocess
-        subprocess.Popen(program_path)
-        return True
-except Exception as e:
-        self.logger.error(f"执行程序失败: {e}")
-        return False
+1. **ui/gestures/gestures_tab.py**
+   - 在`initUI`方法中的`self.action_type_combo`添加新的动作类型选项
+   - 在`onFormChanged`方法中为新动作类型添加适当的表单验证逻辑
 
-# 在execute_gesture方法中添加对新动作类型的处理
-def execute_gesture(self, direction):
-    # ... 现有代码 ...
-    
-    action_type = gesture_info["action"]["type"]
-    action_value = gesture_info["action"]["value"]
-    
-    if action_type == "shortcut":
-        return self._execute_shortcut(action_value)
-    elif action_type == "program":  # 新增动作类型
-        return self._execute_program(action_value)
-    else:
-        self.logger.warning(f"不支持的动作类型: {action_type}")
-        return False
-```
+2. **core/gesture_executor.py**
+   - 修改`execute_gesture`方法，添加对新动作类型的处理
+   - 为新动作类型创建专用的执行方法（如`_execute_program`）
 
-2. **ui/gestures/gestures_tab.py**：
-```python
-# 在初始化方法中扩展动作类型下拉菜单
-def initUI(self):
-    # ... 现有代码 ...
-    
-    # 动作类型下拉菜单
-    self.action_type_combo = QComboBox()
-    self.action_type_combo.addItem("执行快捷键", "shortcut")
-    self.action_type_combo.addItem("启动程序", "program")  # 新增动作类型
-    
-    # ... 现有代码 ...
-```
+3. **ui/gestures/default_gestures.json**
+   - 可以添加使用新动作类型的默认手势示例
 
-3. **ui/gestures/gestures.py**：
-```python
-# 在文档字符串中添加新动作类型的说明
-"""
-手势库管理模块，负责保存和加载用户手势库。
+##### 4.4.2 修改手势识别算法
 
-支持的动作类型:
-- shortcut: 执行键盘快捷键，如"ctrl+c"
-- program: 启动指定程序，值为程序路径
-"""
-```
+要修改手势识别算法以支持更复杂的模式，需要修改核心的笔画分析模块：
 
-##### 4.4.2 添加新的UI组件
+1. **core/stroke_analyzer.py**
+   - 修改`analyze_stroke`方法以实现新的识别逻辑
+   - 可能需要添加新的辅助方法来处理复杂的模式识别
+   - 如需支持弧形或圆形等手势，需要修改`determine_direction`方法
 
-所有自定义UI组件都位于`ui/components`目录下，遵循以下规范：
+2. **ui/gestures/gestures.py**
+   - 修改`get_gesture_by_direction`方法以适应新的方向序列格式
+   - 可能需要更新手势匹配逻辑以支持模糊匹配或概率匹配
 
-1. **组件定义**：每个组件应该继承自适当的Qt基类，实现必要的方法和信号
-```python
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import pyqtSignal
+##### 4.4.3 添加新的UI组件
 
-class MyCustomWidget(QWidget):
-    """自定义组件类"""
-    
-    # 定义信号
-    valueChanged = pyqtSignal(int)
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.initUI()
-    
-    def initUI(self):
-        # 初始化组件UI
-        pass
-    
-    def setValue(self, value):
-        # 设置组件值
-        self._value = value
-        self.update()  # 触发重绘
-        self.valueChanged.emit(value)  # 发射信号
-```
+要添加新的UI组件，遵循以下步骤：
 
-2. **组件测试**：每个组件文件末尾应包含独立测试代码，便于单独调试
-```python
-if __name__ == "__main__":
-    import sys
-    from PyQt5.QtWidgets import QApplication, QVBoxLayout, QMainWindow
-    
-    app = QApplication(sys.argv)
-    
-    window = QMainWindow()
-    widget = QWidget()
-    layout = QVBoxLayout(widget)
-    
-    # 创建并添加自定义组件
-    custom_widget = MyCustomWidget()
-    layout.addWidget(custom_widget)
-    
-    # 显示测试窗口
-    window.setCentralWidget(widget)
-    window.setGeometry(100, 100, 400, 300)
-    window.setWindowTitle("组件测试")
-    window.show()
-    
-    sys.exit(app.exec_())
-```
+1. 在`ui/components/`目录下创建新的组件文件
+2. 遵循现有组件的代码结构和命名约定
+3. 确保新组件与现有样式保持一致
+4. 在适当的模块中导入并使用新组件
+5. 更新README.md，添加对新组件的文档
 
-3. **组件文档**：每个组件应包含详细的文档说明，描述其功能、参数和使用方法
-```python
-class ColorPicker(QWidget):
-    """颜色选择器组件
-    
-    提供色相、饱和度和亮度调节，实时预览选中的颜色。
-    
-    Args:
-        parent (QWidget, optional): 父窗口组件
-        initial_color (list, optional): 初始颜色，RGB格式的数组，默认为[255, 0, 0]
-        
-    Signals:
-        colorChanged(list): 当颜色变化时发出，传递RGB格式的颜色数组
-    """
-```
+##### 4.4.4 添加设置选项
 
-##### 4.4.3 调试技巧
+要添加新的设置选项，需要修改以下文件：
 
-1. **使用日志系统**：
-```python
-from core.logger import get_logger
+1. **ui/settings/default_settings.json**
+   - 添加新设置的默认值
 
-# 创建日志记录器
-logger = get_logger("MyModule")
+2. **ui/settings/settings.py**
+   - 确保`Settings`类能够正确处理新的设置项
 
-# 跟踪代码执行
-logger.debug("函数开始执行")
-
-# 记录重要信息
-logger.info(f"处理完成，结果: {result}")
-
-# 异常情况
-try:
-    # 可能出错的代码
-    result = process_data(data)
-except Exception as e:
-    logger.exception(f"处理数据时出错: {e}")
-    # 处理异常...
-```
-
-2. **查看日志文件**：
-- 日志文件位于`%USERPROFILE%\.gestrokey\log\`目录
-- 按照日期命名，如`2023-01-01.log`
-- 包含详细的时间戳、级别和模块信息
-
-3. **调试绘制功能**：
-```python
-# 创建监听绘制事件的对象
-class DrawingDebugger:
-    def __init__(self):
-        self.drawer = DrawingManager()
-        
-        # 连接信号
-        self.drawer.overlay.signals.stroke_completed.connect(self.on_stroke_completed)
-        self.drawer.start()
-    
-    def on_stroke_completed(self, stroke_id, direction):
-        print(f"笔画ID: {stroke_id}")
-        print(f"方向序列: {direction}")
-        
-        # 获取笔画点数据
-        stroke_data = self.drawer.overlay.strokes.get(stroke_id, [])
-        print(f"笔画点数: {len(stroke_data)}")
-        
-        # 输出前5个点的坐标
-        for i, point in enumerate(stroke_data[:5]):
-            print(f"点{i}: ({point[0]}, {point[1]})")
-
-# 创建调试器
-debugger = DrawingDebugger()
-```
+3. **ui/settings/settings_tab.py**
+   - 在UI中添加新设置的控件
+   - 添加适当的验证和保存逻辑
 
 ### 5. 总结
 
-GestroKey是一个功能完善的手势控制工具，通过简单的鼠标绘制实现各种复杂操作。系统采用模块化设计，各个组件之间通过清晰的接口进行交互，确保代码的可维护性和可扩展性。
+本文档详细介绍了GestroKey项目的源代码结构和功能模块，包括：
 
-**核心功能亮点**：
-- 全局绘制功能，可在任何应用上方进行手势绘制
-- 智能方向识别，准确分析用户的绘制意图
-- 丰富的手势库管理，支持自定义手势和动作
-- 精美的用户界面，包含多个定制组件，提供直观的用户体验
-- 完善的设置系统，支持个性化配置和即时应用
-- 详细的日志记录，便于调试和问题排查
-- 优秀的性能优化，确保流畅的用户体验
+1. **主程序模块**：提供应用程序入口点和主窗口界面
+2. **用户界面模块**：实现控制台、设置和手势管理选项卡
+3. **UI组件模块**：提供按钮、卡片、滚动条等自定义组件
+4. **核心功能模块**：实现手势绘制、分析和执行的核心功能
+5. **应用程序集成**：描述架构设计、程序流程和使用场景
 
-**开发优势**：
-- 清晰的代码组织，便于理解和扩展
-- 详细的文档说明，包括类、方法和示例
-- 组件化设计，鼓励代码复用
-- 事件驱动架构，降低模块间的耦合度
-- 优秀的错误处理，提高程序的稳定性
-- 全面的日志系统，便于问题诊断和解决
+通过合理的模块化设计和松耦合架构，GestroKey实现了易用的手势控制功能，为用户提供了提高工作效率的工具。
 
-**未来发展方向**：
-- 支持更多的动作类型，如执行程序、脚本和宏
-- 增强手势识别算法，支持更复杂的手势模式
-- 添加用户手势训练功能，提高识别准确率
-- 实现手势录制和回放功能，便于创建复杂手势
-- 提供云同步功能，在多设备间共享手势库
-- 开发插件系统，支持第三方扩展
-
-GestroKey为用户提供了一种全新的人机交互方式，通过简单的手势绘制即可执行各种操作，大大提高了工作效率。无论是日常办公、创意设计还是编程开发，GestroKey都能为用户带来全新的便捷体验。
+如需更详细的开发和使用信息，请参考各模块的代码注释和类文档。

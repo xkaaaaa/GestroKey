@@ -1167,7 +1167,7 @@ class ToastManager(QObject):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent = parent
+        self.parent = parent  # 这通常是主窗口
         self.toasts = []
         self.toast_spacing = 10  # 通知之间的垂直间距
         self.start_y = 10  # 第一个通知的起始y坐标
@@ -1183,6 +1183,35 @@ class ToastManager(QObject):
         self.parent = main_window
         self.logger.debug(f"设置主窗口引用: {main_window}")
     
+    def get_parent_window(self, widget=None):
+        """
+        获取主窗口作为Toast的父窗口
+        
+        即使提供了widget参数，也总是返回主窗口来确保Toast是全局的
+        """
+        if self.parent:
+            return self.parent
+        
+        # 如果没有设置主窗口，尝试查找应用程序的主窗口
+        app = QApplication.instance()
+        if app:
+            # 尝试查找主窗口
+            for widget in app.topLevelWidgets():
+                if isinstance(widget, QMainWindow):
+                    self.parent = widget  # 缓存找到的主窗口
+                    self.logger.debug(f"自动查找到主窗口: {widget}")
+                    return widget
+                
+            # 如果找不到QMainWindow，使用任何顶级窗口
+            if app.activeWindow():
+                self.parent = app.activeWindow()  # 缓存找到的活动窗口
+                self.logger.debug(f"使用活动窗口作为父窗口: {app.activeWindow()}")
+                return app.activeWindow()
+        
+        # 如果无法找到任何父窗口，返回原始部件或None
+        self.logger.warning("无法找到主窗口，提示框将不会自动跟随应用程序")
+        return widget
+    
     def show_toast(self, parent, message, toast_type=ElegantToast.INFO, 
                   duration=5000, icon=None, position='top-right',
                   text_mode=ElegantToast.TEXT_WRAP):
@@ -1190,7 +1219,7 @@ class ToastManager(QObject):
         添加并显示新通知
         
         参数:
-            parent: 父窗口
+            parent: 父窗口 (将被忽略，总是使用主窗口作为父级)
             message: 消息文本
             toast_type: 提示类型 (info, success, warning, error)
             duration: 显示持续时间（毫秒）
@@ -1201,13 +1230,12 @@ class ToastManager(QObject):
         返回:
             添加的通知对象
         """
-        # 使用当前管理器的父窗口，如果未指定父窗口
-        if parent is None:
-            parent = self.parent
+        # 总是使用主窗口作为父窗口，确保Toast是全局的
+        actual_parent = self.get_parent_window(parent)
             
         # 创建新通知
         toast = ElegantToast(
-            parent, message, toast_type, duration, 
+            actual_parent, message, toast_type, duration, 
             icon, position, text_mode
         )
         
@@ -1218,7 +1246,7 @@ class ToastManager(QObject):
         self.toasts.append(toast)
         
         # 计算初始位置
-        x = parent.width() - toast.width() - 10
+        x = actual_parent.width() - toast.width() - 10
         y = self.calculate_toast_position(toast)
         toast.move(x, y)
         
@@ -1247,7 +1275,7 @@ class ToastManager(QObject):
         
         return y
     
-    def arrange_toasts(self, parent, position='top-right'):
+    def arrange_toasts(self, position='top-right'):
         """重新计算所有可见通知的位置并应用动画"""
         if position != 'top-right':
             # 目前仅实现top-right位置的布局
@@ -1274,7 +1302,7 @@ class ToastManager(QObject):
             self.logger.debug(f"移除通知: 剩余 {len(self.toasts)}")
             
             # 重新计算其余通知的位置
-            self.arrange_toasts(self.parent)
+            self.arrange_toasts()
     
     def close_all(self):
         """关闭所有通知"""
@@ -1285,7 +1313,11 @@ class ToastManager(QObject):
     
     def update_positions_on_resize(self):
         """窗口大小改变时更新所有通知的水平位置"""
-        x = self.parent.width() - ElegantToast.FIXED_WIDTH - 10
+        parent = self.get_parent_window()
+        if not parent:
+            return
+            
+        x = parent.width() - ElegantToast.FIXED_WIDTH - 10
         
         for i, toast in enumerate(self.toasts):
             if toast.isVisible():
@@ -1311,7 +1343,7 @@ def show_toast(parent, message, toast_type=ElegantToast.INFO,
     显示通知提示
     
     参数:
-        parent: 父窗口
+        parent: 父窗口（会被ToastManager替换为主窗口）
         message: 消息内容
         toast_type: 提示类型 (info, success, warning, error)
         duration: 显示持续时间（毫秒）
@@ -1325,8 +1357,11 @@ def show_toast(parent, message, toast_type=ElegantToast.INFO,
     global _preloaded_toast, _preloading_in_progress, _preload_complete
     manager = get_toast_manager()
     
+    # 获取主窗口作为父窗口
+    actual_parent = manager.get_parent_window(parent)
+    
     # 检查是否有预加载的通知且父窗口匹配且预加载已完成
-    if _preloaded_toast and _preloaded_toast.parent() == parent and _preload_complete:
+    if _preloaded_toast and _preloaded_toast.parent() == actual_parent and _preload_complete:
         toast = _preloaded_toast
         _preloaded_toast = None  # 清空预加载引用
         _preload_complete = False  # 重置预加载完成标志
@@ -1336,7 +1371,7 @@ def show_toast(parent, message, toast_type=ElegantToast.INFO,
         manager.toasts.append(toast)
         
         # 计算初始位置
-        x = parent.width() - toast.width() - 10
+        x = actual_parent.width() - toast.width() - 10
         y = manager.calculate_toast_position(toast)
         toast.move(x, y)
         
@@ -1349,7 +1384,7 @@ def show_toast(parent, message, toast_type=ElegantToast.INFO,
         return toast
     else:
         # 未使用预加载实例，直接创建
-        toast = manager.show_toast(parent, message, toast_type, duration, icon, position, text_mode)
+        toast = manager.show_toast(actual_parent, message, toast_type, duration, icon, position, text_mode)
         
         # 立即安排下一次预加载
         QTimer.singleShot(0, schedule_preload)

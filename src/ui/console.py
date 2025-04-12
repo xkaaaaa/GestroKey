@@ -103,12 +103,14 @@ class AnimatedProgressBar(QProgressBar):
         self._update_style(self.value())
 
 
-class ConsoleTab(QWidget):
-    """控制台选项卡，提供基本的绘制控制功能"""
+class ConsolePage(QWidget):
+    """控制台页面
+    用于显示应用程序的运行日志和状态信息。
+    """
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.logger = get_logger("ConsoleTab")
+        self.logger = get_logger("ConsolePage")
         
         # 状态变量
         self.drawing_manager = None
@@ -118,7 +120,7 @@ class ConsoleTab(QWidget):
         self.system_monitor = SystemMonitor(update_interval=1500)  # 1.5秒更新一次
         
         # 初始化UI
-        self.initUI()
+        self._setup_ui()
         
         # 连接系统监测器的信号
         self.system_monitor.dataUpdated.connect(self.update_system_info)
@@ -126,10 +128,12 @@ class ConsoleTab(QWidget):
         # 启动系统监测
         self.system_monitor.start()
         
-        self.logger.debug("控制台选项卡初始化完成")
+        self.logger.debug("控制台页面初始化完成")
     
-    def initUI(self):
-        """初始化用户界面"""
+    def _setup_ui(self):
+        """初始化控制台页面UI"""
+        self.logger.debug("初始化控制台页面UI")
+        
         # 创建布局
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # 改为顶部对齐，与其他选项卡一致
@@ -275,7 +279,7 @@ class ConsoleTab(QWidget):
         super().resizeEvent(event)
         
         # 可以在这里添加特定的尺寸调整逻辑
-        self.logger.debug(f"控制台选项卡大小已调整: {self.width()}x{self.height()}")
+        self.logger.debug(f"控制台页面大小已调整: {self.width()}x{self.height()}")
     
     def toggle_drawing(self):
         """切换绘制状态"""
@@ -342,6 +346,6 @@ class ConsoleTab(QWidget):
 if __name__ == "__main__":
     # 独立运行测试
     app = QApplication(sys.argv)
-    widget = ConsoleTab()
+    widget = ConsolePage()
     widget.show()
     sys.exit(app.exec()) 

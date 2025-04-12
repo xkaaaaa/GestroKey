@@ -16,11 +16,11 @@ except ImportError:
     from core.logger import get_logger
     from ui.components.animated_stacked_widget import AnimatedStackedWidget
 
-class AnimatedTabButton(QWidget):
+class AnimatedNavigationButton(QWidget):
     """
-    动画选项卡按钮
+    动画导航按钮
     
-    带有动画效果的选项卡按钮，用于SideTabWidget组件。
+    带有动画效果的导航按钮，用于SideNavigationMenu组件。
     采用扁平化设计，提供悬停和选中状态的动画效果。
     """
     
@@ -28,7 +28,7 @@ class AnimatedTabButton(QWidget):
     
     def __init__(self, text="", icon=None, parent=None):
         super().__init__(parent)
-        self.logger = get_logger("AnimatedTabButton")
+        self.logger = get_logger("AnimatedNavigationButton")
         
         self._text = text
         self._icon = icon
@@ -253,29 +253,26 @@ class AnimatedTabButton(QWidget):
     indicator_opacity = pyqtProperty(float, _get_indicator_opacity, _set_indicator_opacity)
 
 
-class SideTabWidget(QWidget):
-    """
-    左侧选项卡组件
-    
-    一个位于左侧的垂直选项卡组件，带有平滑的动画效果和现代的扁平化设计风格。
-    支持图标和文本，有选中状态和悬停效果。
+class SideNavigationMenu(QWidget):
+    """侧边栏导航菜单组件
+    一个位于左侧的垂直导航菜单组件，带有平滑的动画效果和现代的扁平化设计风格。
     """
     
     currentChanged = pyqtSignal(int)
     
-    # 选项卡位置常量
-    POSITION_TOP = 0      # 顶部位置
-    POSITION_BOTTOM = 1   # 底部位置
+    # 导航菜单位置常量
+    POSITION_TOP = 0    # 顶部位置
+    POSITION_BOTTOM = 1 # 底部位置
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.logger = get_logger("SideTabWidget")
+        self.logger = get_logger("SideNavigationMenu")
         
-        # 选项卡数据结构
-        self._buttons = []         # 按钮列表
-        self._widgets = []         # 内容窗口列表
-        self._positions = []       # 选项卡位置列表
-        self._current_index = -1   # 当前选中的选项卡索引
+        # 导航菜单数据结构
+        self._buttons = []      # 导航按钮列表
+        self._widgets = []      # 内容窗口列表
+        self._positions = []    # 导航按钮位置列表
+        self._current_index = -1   # 当前选中的导航按钮索引
         self._animations_enabled = True  # 是否启用动画
         
         # 设置UI
@@ -288,16 +285,16 @@ class SideTabWidget(QWidget):
         self._main_layout.setContentsMargins(0, 0, 0, 0)
         self._main_layout.setSpacing(0)
         
-        # 左侧选项卡区域
-        self._tab_area = QWidget()
-        self._tab_area.setObjectName("tabArea")
-        self._tab_area.setMinimumWidth(180)
-        self._tab_area.setMaximumWidth(250)
+        # 左侧导航菜单区域
+        self._nav_area = QWidget()
+        self._nav_area.setObjectName("navArea")
+        self._nav_area.setMinimumWidth(180)
+        self._nav_area.setMaximumWidth(250)
         
-        # 选项卡布局
-        self._tab_layout = QVBoxLayout(self._tab_area)
-        self._tab_layout.setContentsMargins(0, 10, 0, 10)
-        self._tab_layout.setSpacing(5)
+        # 导航菜单布局
+        self._nav_layout = QVBoxLayout(self._nav_area)
+        self._nav_layout.setContentsMargins(0, 10, 0, 10)
+        self._nav_layout.setSpacing(5)
         
         # 创建位置容器
         self._top_container = QWidget()
@@ -310,10 +307,10 @@ class SideTabWidget(QWidget):
         self._bottom_layout.setContentsMargins(0, 0, 0, 0)
         self._bottom_layout.setSpacing(5)
         
-        # 添加位置容器到主选项卡布局
-        self._tab_layout.addWidget(self._top_container)
-        self._tab_layout.addStretch(1)  # 底部区域固定在底部
-        self._tab_layout.addWidget(self._bottom_container)
+        # 添加位置容器到主导航菜单布局
+        self._nav_layout.addWidget(self._top_container)
+        self._nav_layout.addStretch(1)  # 底部区域固定在底部
+        self._nav_layout.addWidget(self._bottom_container)
         
         # 内容窗口容器 - 使用动画堆栈组件替代普通堆栈组件
         self._stack = AnimatedStackedWidget()
@@ -322,7 +319,7 @@ class SideTabWidget(QWidget):
         self._stack.setAnimationCurve(QEasingCurve.Type.OutCubic)
         
         # 添加到主布局
-        self._main_layout.addWidget(self._tab_area, 0)  # 固定宽度
+        self._main_layout.addWidget(self._nav_area, 0)  # 固定宽度
         self._main_layout.addWidget(self._stack, 1)     # 自动扩展
         
         # 设置样式
@@ -333,23 +330,20 @@ class SideTabWidget(QWidget):
         # 可以在这里设置QSS样式
         pass
     
-    def addTab(self, widget, text, icon=None, position=POSITION_TOP):
-        """
-        添加新的选项卡
+    def addPage(self, widget, text, icon=None, position=POSITION_TOP):
+        """添加新的导航页面
         
-        参数:
-            widget: 选项卡内容窗口
-            text: 选项卡文本
-            icon: 选项卡图标（可选）
-            position: 选项卡位置
-                      POSITION_TOP - 顶部位置（默认）
-                      POSITION_BOTTOM - 底部位置
-        
-        返回:
-            int: 新选项卡的索引
+        Args:
+            widget: 页面内容窗口
+            text: 页面文本
+            icon: 页面图标（可选）
+            position: 页面位置
+            
+        Returns:
+            int: 新页面的索引
         """
-        # 创建选项卡按钮
-        button = AnimatedTabButton(text, icon)
+        # 创建导航按钮
+        button = AnimatedNavigationButton(text, icon)
         
         # 根据位置添加按钮
         if position == self.POSITION_TOP:
@@ -358,12 +352,12 @@ class SideTabWidget(QWidget):
             self._bottom_layout.addWidget(button)
         else:
             # 如果位置无效，默认添加到顶部
-            self.logger.warning(f"无效的选项卡位置: {position}，使用顶部位置代替")
+            self.logger.warning(f"无效的页面位置: {position}，使用顶部位置代替")
             position = self.POSITION_TOP
             self._top_layout.addWidget(button)
         
         # 连接点击事件
-        button.clicked.connect(lambda: self.setCurrentIndex(self._buttons.index(button)))
+        button.clicked.connect(lambda: self.setCurrentPage(self._buttons.index(button)))
         
         # 将内容窗口添加到堆栈
         self._stack.addWidget(widget)
@@ -373,24 +367,23 @@ class SideTabWidget(QWidget):
         self._widgets.append(widget)
         self._positions.append(position)
         
-        # 如果是第一个选项卡，设为当前选项卡
+        # 如果是第一个页面，设为当前页面
         if len(self._buttons) == 1:
-            self.setCurrentIndex(0)
+            self.setCurrentPage(0)
         
-        self.logger.debug(f"添加选项卡: {text}, 位置: {position}, 索引: {len(self._buttons) - 1}")
+        self.logger.debug(f"添加页面: {text}, 位置: {position}, 索引: {len(self._buttons) - 1}")
         
-        # 返回新选项卡的索引
+        # 返回新页面的索引
         return len(self._buttons) - 1
     
-    def setCurrentIndex(self, index):
-        """
-        设置当前选项卡
+    def setCurrentPage(self, index):
+        """设置当前页面
         
-        参数:
-            index: 选项卡索引
+        Args:
+            index: 页面索引
         """
         if index < 0 or index >= len(self._buttons):
-            self.logger.warning(f"尝试设置无效的选项卡索引: {index}")
+            self.logger.warning(f"尝试设置无效的页面索引: {index}")
             return
         
         # 如果相同，不做任何事
@@ -401,7 +394,7 @@ class SideTabWidget(QWidget):
         old_index = self._current_index
         self._current_index = index
         
-        self.logger.debug(f"切换选项卡: {old_index} -> {index}")
+        self.logger.debug(f"切换页面: {old_index} -> {index}")
         
         # 更新按钮状态
         for i, button in enumerate(self._buttons):
@@ -420,12 +413,12 @@ class SideTabWidget(QWidget):
         # 发射信号
         self.currentChanged.emit(index)
     
-    def currentIndex(self):
-        """返回当前选项卡索引"""
+    def currentPageIndex(self):
+        """返回当前页面索引"""
         return self._current_index
     
-    def count(self):
-        """返回选项卡数量"""
+    def pageCount(self):
+        """返回页面数量"""
         return len(self._buttons)
     
     def widget(self, index):
@@ -434,14 +427,14 @@ class SideTabWidget(QWidget):
             return None
         return self._widgets[index]
     
-    def setTabText(self, index, text):
-        """设置选项卡文本"""
+    def setPageText(self, index, text):
+        """设置页面文本"""
         if index < 0 or index >= len(self._buttons):
             return
         self._buttons[index].setText(text)
     
-    def setTabIcon(self, index, icon):
-        """设置选项卡图标"""
+    def setPageIcon(self, index, icon):
+        """设置页面图标"""
         if index < 0 or index >= len(self._buttons):
             return
         self._buttons[index].setIcon(icon)
@@ -450,21 +443,20 @@ class SideTabWidget(QWidget):
         """设置是否启用动画效果"""
         self._animations_enabled = enabled
         
-    def setTabPosition(self, index, position):
-        """
-        更改已有选项卡的位置
+    def setPagePosition(self, index, position):
+        """更改已有页面的位置
         
-        参数:
-            index: 选项卡索引
-            position: 新位置 (POSITION_TOP 或 POSITION_BOTTOM)
+        Args:
+            index: 页面索引
+            position: 新位置
         """
         if index < 0 or index >= len(self._buttons):
-            self.logger.warning(f"尝试设置无效的选项卡索引位置: {index}")
+            self.logger.warning(f"尝试设置无效的页面索引位置: {index}")
             return
         
         # 检查位置值是否有效
         if position not in [self.POSITION_TOP, self.POSITION_BOTTOM]:
-            self.logger.warning(f"无效的选项卡位置值: {position}，使用顶部位置")
+            self.logger.warning(f"无效的页面位置值: {position}，使用顶部位置")
             position = self.POSITION_TOP
         
         # 如果位置没变，不做任何事
@@ -490,17 +482,16 @@ class SideTabWidget(QWidget):
         # 更新位置记录
         self._positions[index] = position
         
-        self.logger.debug(f"选项卡 {index} 位置变更: {old_position} -> {position}")
+        self.logger.debug(f"页面 {index} 位置变更: {old_position} -> {position}")
     
-    def tabPosition(self, index):
-        """
-        获取选项卡的位置
+    def pagePosition(self, index):
+        """获取页面的位置
         
-        参数:
-            index: 选项卡索引
-        
-        返回:
-            int: 选项卡位置 (POSITION_TOP 或 POSITION_BOTTOM)
+        Args:
+            index: 页面索引
+            
+        Returns:
+            int: 页面位置 (POSITION_TOP 或 POSITION_BOTTOM)
         """
         if index < 0 or index >= len(self._positions):
             return self.POSITION_TOP  # 默认返回顶部位置
@@ -520,26 +511,26 @@ if __name__ == "__main__":
         from ui.components.button import AnimatedButton
     
     window = QWidget()
-    window.setWindowTitle("SideTabWidget 示例")
+    window.setWindowTitle("SideNavigationMenu 示例")
     window.setMinimumSize(800, 600)
     
     layout = QVBoxLayout(window)
     
-    # 创建SideTabWidget
-    tab_widget = SideTabWidget()
+    # 创建SideNavigationMenu
+    nav_menu = SideNavigationMenu()
     
     # 创建测试内容
-    tab1 = QWidget()
-    tab1_layout = QVBoxLayout(tab1)
-    tab1_layout.addWidget(QLabel("控制台选项卡内容"))
+    page1 = QWidget()
+    page1_layout = QVBoxLayout(page1)
+    page1_layout.addWidget(QLabel("控制台页面内容"))
     
-    tab2 = QWidget()
-    tab2_layout = QVBoxLayout(tab2)
-    tab2_layout.addWidget(QLabel("设置选项卡内容"))
+    page2 = QWidget()
+    page2_layout = QVBoxLayout(page2)
+    page2_layout.addWidget(QLabel("设置页面内容"))
     
-    tab3 = QWidget()
-    tab3_layout = QVBoxLayout(tab3)
-    tab3_layout.addWidget(QLabel("手势管理选项卡内容"))
+    page3 = QWidget()
+    page3_layout = QVBoxLayout(page3)
+    page3_layout.addWidget(QLabel("手势管理页面内容"))
     
     # 创建图标（使用本地图标文件）
     icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../assets/images')
@@ -552,27 +543,27 @@ if __name__ == "__main__":
     settings_icon = QIcon(settings_icon_path) if os.path.exists(settings_icon_path) else QIcon()
     gestures_icon = QIcon(gestures_icon_path) if os.path.exists(gestures_icon_path) else QIcon()
     
-    # 添加选项卡 - 使用位置参数
-    # 控制台选项卡放在顶部
-    tab_widget.addTab(tab1, "控制台", console_icon, tab_widget.POSITION_TOP)
-    # 手势管理选项卡放在底部
-    tab_widget.addTab(tab3, "手势管理", gestures_icon, tab_widget.POSITION_BOTTOM)
-    # 设置选项卡放在底部
-    tab_widget.addTab(tab2, "设置", settings_icon, tab_widget.POSITION_BOTTOM)
+    # 添加页面 - 使用位置参数
+    # 控制台页面放在顶部
+    nav_menu.addPage(page1, "控制台", console_icon, nav_menu.POSITION_TOP)
+    # 手势管理页面放在底部
+    nav_menu.addPage(page3, "手势管理", gestures_icon, nav_menu.POSITION_BOTTOM)
+    # 设置页面放在底部
+    nav_menu.addPage(page2, "设置", settings_icon, nav_menu.POSITION_BOTTOM)
     
-    layout.addWidget(tab_widget)
+    layout.addWidget(nav_menu)
     
     # 信息标签
     info = QLabel("""
     <html>
     <p style='text-align:center; margin-top:20px;'>
-    SideTabWidget 是一个左侧垂直选项卡组件，具有以下特点：<br/>
+    SideNavigationMenu 是一个左侧垂直导航菜单组件，具有以下特点：<br/>
     - 精美的扁平化设计<br/>
     - 流畅的切换动画效果<br/>
-    - 选项卡的选中状态和悬停效果<br/>
+    - 页面的选中状态和悬停效果<br/>
     - 支持图标和文本<br/>
     - 符合应用主题风格<br/>
-    - <b>支持选项卡位置设置</b>：可将选项卡放置在顶部或底部<br/>
+    - <b>支持页面位置设置</b>：可将页面放置在顶部或底部<br/>
     </p>
     </html>
     """)
@@ -586,9 +577,9 @@ if __name__ == "__main__":
     move_to_bottom = AnimatedButton("移至底部", primary_color=[41, 128, 185])
     
     # 连接按钮事件
-    current_tab_index = 0
-    move_to_top.clicked.connect(lambda: tab_widget.setTabPosition(current_tab_index, tab_widget.POSITION_TOP))
-    move_to_bottom.clicked.connect(lambda: tab_widget.setTabPosition(current_tab_index, tab_widget.POSITION_BOTTOM))
+    current_page_index = 0
+    move_to_top.clicked.connect(lambda: nav_menu.setPagePosition(current_page_index, nav_menu.POSITION_TOP))
+    move_to_bottom.clicked.connect(lambda: nav_menu.setPagePosition(current_page_index, nav_menu.POSITION_BOTTOM))
     
     buttons_layout.addWidget(move_to_top)
     buttons_layout.addWidget(move_to_bottom)

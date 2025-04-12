@@ -9,25 +9,25 @@ from core.drawer import DrawingManager
 from core.logger import get_logger
 from version import get_version_string, APP_NAME  # 导入版本信息
 
-# 导入选项卡模块
+# 导入页面模块
 try:
-    from ui.console import ConsoleTab
+    from ui.console import ConsolePage
     from ui.settings.settings import get_settings
-    from ui.settings.settings_tab import SettingsTab
+    from ui.settings.settings_tab import SettingsPage
     from ui.gestures.gestures import get_gesture_library  # 导入手势库
-    from ui.gestures.gestures_tab import GesturesTab  # 导入手势管理选项卡
+    from ui.gestures.gestures_tab import GesturesPage  # 导入手势管理页面
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
-    from ui.components.side_tab import SideTabWidget  # 导入左侧选项卡组件
+    from ui.components.side_tab import SideNavigationMenu  # 导入侧边栏导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
 except ImportError:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from ui.console import ConsoleTab
+    from ui.console import ConsolePage
     from ui.settings.settings import get_settings
-    from ui.settings.settings_tab import SettingsTab
+    from ui.settings.settings_tab import SettingsPage
     from ui.gestures.gestures import get_gesture_library  # 导入手势库
-    from ui.gestures.gestures_tab import GesturesTab  # 导入手势管理选项卡
+    from ui.gestures.gestures_tab import GesturesPage  # 导入手势管理页面
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
-    from ui.components.side_tab import SideTabWidget  # 导入左侧选项卡组件
+    from ui.components.side_tab import SideNavigationMenu  # 导入侧边栏导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
 
 class GestroKeyApp(QMainWindow):
@@ -91,22 +91,22 @@ class GestroKeyApp(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)  # 去除边距以获得更好的视觉效果
         main_layout.setSpacing(0)  # 减少布局间距
         
-        # 创建选项卡内容
-        self.logger.debug("创建控制台选项卡")
-        self.console_tab = ConsoleTab()
+        # 创建页面内容
+        self.logger.debug("创建控制台页面")
+        self.console_page = ConsolePage()
         
-        self.logger.debug("创建设置选项卡")
-        self.settings_tab = SettingsTab()
+        self.logger.debug("创建设置页面")
+        self.settings_page = SettingsPage()
         
-        self.logger.debug("创建手势管理选项卡")
-        self.gestures_tab = GesturesTab()
+        self.logger.debug("创建手势管理页面")
+        self.gestures_page = GesturesPage()
         
-        # 创建左侧选项卡小部件
-        self.logger.debug("创建左侧选项卡组件")
-        self.tab_widget = SideTabWidget()
-        self.tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # 创建侧边栏导航菜单
+        self.logger.debug("创建侧边栏导航菜单")
+        self.navigation_menu = SideNavigationMenu()
+        self.navigation_menu.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
-        # 创建选项卡图标
+        # 创建页面图标
         # 尝试使用存在的图标文件，而不是依赖系统主题
         icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets', 'images')
         console_icon_path = os.path.join(icons_dir, 'console.svg')
@@ -118,27 +118,27 @@ class GestroKeyApp(QMainWindow):
         settings_icon = QIcon(settings_icon_path) if os.path.exists(settings_icon_path) else QIcon()
         gestures_icon = QIcon(gestures_icon_path) if os.path.exists(gestures_icon_path) else QIcon()
         
-        # 添加选项卡到左侧选项卡组件
-        self.logger.debug("添加选项卡到左侧选项卡组件")
-        # 控制台选项卡放在顶部
-        console_index = self.tab_widget.addTab(self.console_tab, "控制台", console_icon, 
-                                             self.tab_widget.POSITION_TOP)
-        # 手势管理选项卡也放在顶部
-        gestures_index = self.tab_widget.addTab(self.gestures_tab, "手势管理", gestures_icon, 
-                                              self.tab_widget.POSITION_TOP)
-        # 设置选项卡放在底部
-        settings_index = self.tab_widget.addTab(self.settings_tab, "设置", settings_icon, 
-                                              self.tab_widget.POSITION_BOTTOM)
+        # 添加页面到侧边栏导航菜单
+        self.logger.debug("添加页面到侧边栏导航菜单")
+        # 控制台页面放在顶部
+        console_index = self.navigation_menu.addPage(self.console_page, "控制台", console_icon, 
+                                             self.navigation_menu.POSITION_TOP)
+        # 手势管理页面也放在顶部
+        gestures_index = self.navigation_menu.addPage(self.gestures_page, "手势管理", gestures_icon, 
+                                              self.navigation_menu.POSITION_TOP)
+        # 设置页面放在底部
+        settings_index = self.navigation_menu.addPage(self.settings_page, "设置", settings_icon, 
+                                              self.navigation_menu.POSITION_BOTTOM)
 
-        # 记录初始添加的选项卡索引
+        # 记录初始添加的页面索引
         self.logger.debug(f"控制台索引: {console_index}, 设置索引: {settings_index}, 手势索引: {gestures_index}")
         
-        # 选项卡切换事件连接
-        self.tab_widget.currentChanged.connect(self.onTabChanged)
+        # 页面切换事件连接
+        self.navigation_menu.currentChanged.connect(self.onPageChanged)
         
-        # 将选项卡添加到主布局
-        self.logger.debug("将选项卡添加到主布局")
-        main_layout.addWidget(self.tab_widget, 1)  # 设置1的拉伸系数，让选项卡占据大部分空间
+        # 将导航菜单添加到主布局
+        self.logger.debug("将导航菜单添加到主布局")
+        main_layout.addWidget(self.navigation_menu, 1)  # 设置1的拉伸系数，让导航菜单占据大部分空间
         
         # 添加底部状态栏
         status_widget = QWidget()
@@ -167,53 +167,55 @@ class GestroKeyApp(QMainWindow):
         # 显示窗口
         self.show()
         
-        # 初始化后确保选择控制台选项卡
-        self.logger.debug("设置初始选项卡为控制台")
+        # 初始化后确保选择控制台页面
+        self.logger.debug("设置初始页面为控制台")
         QApplication.processEvents()  # 处理待处理的事件
         
-        # 使用单次计时器延迟设置初始选项卡，确保UI完全准备好
-        QTimer.singleShot(100, lambda: self._select_initial_tab())
+        # 使用单次计时器延迟设置初始页面，确保UI完全准备好
+        QTimer.singleShot(100, lambda: self._select_initial_page())
     
-    def _select_initial_tab(self):
-        """选择初始选项卡（延迟执行）"""
+    def _select_initial_page(self):
+        """选择初始页面（延迟执行）"""
         try:
-            if hasattr(self, 'tab_widget') and self.tab_widget:
-                self.logger.debug("设置初始选项卡索引为0（控制台）")
-                self.tab_widget.setCurrentIndex(0)  # 确保控制台选项卡被选中
+            if hasattr(self, 'navigation_menu') and self.navigation_menu:
+                self.logger.debug("设置初始页面索引为0（控制台）")
+                self.navigation_menu.setCurrentPage(0)  # 确保控制台页面被选中
                 QApplication.processEvents()  # 再次处理事件，确保UI更新
         except Exception as e:
-            self.logger.error(f"设置初始选项卡时出错: {e}")
+            self.logger.error(f"设置初始页面时出错: {e}")
     
-    def onTabChanged(self, index):
-        """选项卡切换事件处理"""
-        tab_name = "控制台" if index == 0 else "设置" if index == 1 else "手势管理" if index == 2 else f"未知({index})"
-        self.logger.debug(f"切换到选项卡: {index} ({tab_name})")
+    def onPageChanged(self, index):
+        """页面切换事件处理"""
+        page_name = "控制台" if index == 0 else "设置" if index == 1 else "手势管理" if index == 2 else f"未知({index})"
+        self.logger.debug(f"切换到页面: {index} ({page_name})")
     
     def resizeEvent(self, event):
         """窗口尺寸变化事件处理"""
         super().resizeEvent(event)
         self.logger.debug(f"主窗口大小已调整: {self.width()}x{self.height()}")
         
-        # 可以在这里添加特定尺寸变化的处理逻辑
+        # 更新全局通知的位置
+        toast_manager = get_toast_manager()
+        toast_manager.update_positions_on_resize()
     
     def closeEvent(self, event):
         """关闭窗口事件处理"""
         self.logger.info("程序准备关闭")
         
-        # 如果控制台标签页存在，停止绘制
-        if hasattr(self, 'console_tab'):
-            self.console_tab.stop_drawing()
+        # 如果控制台页面存在，停止绘制
+        if hasattr(self, 'console_page'):
+            self.console_page.stop_drawing()
             
         # 检查是否有未保存的更改
         unsaved_settings = False
         unsaved_gestures = False
         
         # 检查设置是否有未保存的更改
-        if hasattr(self, 'settings_tab') and self.settings_tab.has_unsaved_changes():
+        if hasattr(self, 'settings_page') and self.settings_page.has_unsaved_changes():
             unsaved_settings = True
         
         # 检查手势库是否有未保存的更改
-        if hasattr(self, 'gestures_tab') and self.gestures_tab.has_unsaved_changes():
+        if hasattr(self, 'gestures_page') and self.gestures_page.has_unsaved_changes():
             unsaved_gestures = True
         
         # 如果存在未保存的更改，询问用户
@@ -234,7 +236,7 @@ class GestroKeyApp(QMainWindow):
                     # 保存设置
                     if unsaved_settings:
                         self.logger.info("正在保存设置...")
-                        if self.settings_tab.save_settings():
+                        if self.settings_page.save_settings():
                             self.logger.info("设置已保存")
                             is_saved = True
                         else:
@@ -252,7 +254,7 @@ class GestroKeyApp(QMainWindow):
                     # 保存手势库
                     if unsaved_gestures:
                         self.logger.info("正在保存手势库...")
-                        if self.gestures_tab.save_gestures():
+                        if self.gestures_page.save_gestures():
                             self.logger.info("手势库已保存")
                             is_saved = True
                         else:

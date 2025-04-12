@@ -30,12 +30,13 @@ def _set_label_position(self, pos):
 
 def _get_label_size(self):
     """获取标签大小"""
-    return self._label_widget.font().pointSizeF()
+    size = self._label_widget.font().pointSizeF()
+    return max(size, 10.0)  # 确保返回值大于0
 
 def _set_label_size(self, size):
     """设置标签大小"""
     # 确保字体大小大于0，防止出现负值或0导致错误
-    size = max(size, 10.0)
+    size = max(size, 10.0)  # 设置最小字体大小为10
     font = self._label_widget.font()
     font.setPointSizeF(size)
     self._label_widget.setFont(font)
@@ -100,6 +101,16 @@ def _set_shadow_strength(self, strength):
                             self._current_shadow_color.green(),
                             self._current_shadow_color.blue(),
                             int(opacity)))
+
+def _update_font_size(self):
+    """更新字体大小"""
+    font = self._label_widget.font()
+    current_size = font.pointSizeF()
+    if current_size <= 0:
+        current_size = 13.0 if not (self._has_text or self._is_focused) else 11.0
+        font.setPointSizeF(current_size)
+        self._label_widget.setFont(font)
+    return font
 
 class AnimatedInputField(QWidget):
     """
@@ -379,6 +390,11 @@ class AnimatedInputField(QWidget):
         else:
             # 使用更精确的方式计算垂直居中位置
             font = self._label_widget.font()
+            # 确保字体大小有效
+            if font.pointSizeF() <= 0:
+                font.setPointSizeF(13.0)
+                self._label_widget.setFont(font)
+                
             metrics = QFontMetrics(font)
             text_height = metrics.height()
             
@@ -424,7 +440,7 @@ class AnimatedInputField(QWidget):
         
         # 设置标签样式
         font = self._label_widget.font()
-        font.setPointSizeF(13.0)  # 确保初始字体大小正确
+        font.setPointSize(13)  # 使用setPointSize而不是setPointSizeF
         self._label_widget.setFont(font)
         
         # 应用文本截断和省略号处理
@@ -435,7 +451,6 @@ class AnimatedInputField(QWidget):
             QLabel#AnimatedLabel {
                 color: #6E7781;
                 background-color: transparent;
-                font-size: 13px;
                 qproperty-alignment: AlignCenter;
                 text-align: center;
             }
@@ -544,11 +559,9 @@ class AnimatedInputField(QWidget):
             
         # 获取标签字体
         font = self._label_widget.font()
-        # 确保字体大小有效
-        if font.pointSizeF() <= 0:
-            font.setPointSizeF(13.0 if not (self._has_text or self._is_focused) else 11.0)
-            self._label_widget.setFont(font)
-            
+        font.setPointSize(13 if not (self._has_text or self._is_focused) else 11)  # 使用setPointSize而不是setPointSizeF
+        self._label_widget.setFont(font)
+        
         # 应用文本省略处理
         truncated_text = self._truncate_text_with_ellipsis(self._label, label_width, font)
         if truncated_text != self._label_widget.text():
@@ -560,7 +573,6 @@ class AnimatedInputField(QWidget):
                 QLabel#AnimatedLabel {{
                     color: {self._disabled_color.name()};
                     background-color: transparent;
-                    font-size: {11 if self._has_text or self._is_focused else 13}px;
                     qproperty-alignment: AlignCenter;
                     text-align: center;
                 }}
@@ -571,7 +583,6 @@ class AnimatedInputField(QWidget):
                 QLabel#AnimatedLabel {{
                     color: {label_color.name()};
                     background-color: transparent;
-                    font-size: {11 if self._has_text or self._is_focused else 13}px;
                     qproperty-alignment: AlignCenter;
                     text-align: center;
                 }}
@@ -641,7 +652,6 @@ class AnimatedInputField(QWidget):
                 QLabel#AnimatedLabel {{
                     color: {self._disabled_color.name()};
                     background-color: transparent;
-                    font-size: {11 if self._has_text or self._is_focused else 13}px;
                     qproperty-alignment: AlignCenter;
                     text-align: center;
                 }}
@@ -652,7 +662,6 @@ class AnimatedInputField(QWidget):
                 QLabel#AnimatedLabel {{
                     color: {label_color.name()};
                     background-color: transparent;
-                    font-size: {11 if self._has_text or self._is_focused else 13}px;
                     qproperty-alignment: AlignCenter;
                     text-align: center;
                 }}
@@ -709,7 +718,6 @@ class AnimatedInputField(QWidget):
                 QLabel#AnimatedLabel {{
                     color: {self._disabled_color.name()};
                     background-color: transparent;
-                    font-size: {12 if self._has_text or self._is_focused else 14}px;
                     qproperty-alignment: AlignCenter;
                     text-align: center;
                 }}
@@ -720,7 +728,6 @@ class AnimatedInputField(QWidget):
                 QLabel#AnimatedLabel {{
                     color: {label_color.name()};
                     background-color: transparent;
-                    font-size: {12 if self._has_text or self._is_focused else 14}px;
                     qproperty-alignment: AlignCenter;
                     text-align: center;
                 }}
@@ -763,12 +770,15 @@ class AnimatedInputField(QWidget):
         self._current_border_color = self._focus_color
         self._current_shadow_color = self._focus_color
         
-        # 立即更新标签颜色为聚焦颜色
+        # 更新字体大小
+        font = self._label_widget.font()
+        font.setPointSize(11)  # 使用setPointSize而不是setPointSizeF
+        self._label_widget.setFont(font)
+        
         self._label_widget.setStyleSheet(f"""
             QLabel#AnimatedLabel {{
                 color: {self._focus_color.name()};
                 background-color: transparent;
-                font-size: {11 if self._has_text or self._is_focused else 13}px;
                 qproperty-alignment: AlignCenter;
                 text-align: center;
             }}
@@ -802,12 +812,15 @@ class AnimatedInputField(QWidget):
             self._current_border_color = self._border_color
             self._current_shadow_color = self._focus_color
         
-        # 立即更新标签颜色为普通颜色
+        # 更新字体大小
+        font = self._label_widget.font()
+        font.setPointSize(13 if not (self._has_text or self._is_focused) else 11)  # 使用setPointSize而不是setPointSizeF
+        self._label_widget.setFont(font)
+        
         self._label_widget.setStyleSheet(f"""
             QLabel#AnimatedLabel {{
                 color: {self._label_color.name()};
                 background-color: transparent;
-                font-size: {11 if self._has_text or self._is_focused else 13}px;
                 qproperty-alignment: AlignCenter;
                 text-align: center;
             }}
@@ -902,7 +915,6 @@ class AnimatedInputField(QWidget):
             QLabel#AnimatedLabel {{
                 color: {label_color.name()};
                 background-color: transparent;
-                font-size: {self._label_widget.font().pointSizeF()}px;
                 qproperty-alignment: AlignCenter;
                 text-align: center;
             }}
@@ -980,6 +992,12 @@ class AnimatedInputField(QWidget):
         
         # 获取字体
         font = self._label_widget.font()
+        # 确保字体大小有效
+        current_size = font.pointSizeF()
+        if current_size <= 0:
+            current_size = 13.0 if not (self._has_text or self._is_focused) else 11.0
+            font.setPointSizeF(current_size)
+            self._label_widget.setFont(font)
         
         # 应用文本省略处理
         truncated_text = self._truncate_text_with_ellipsis(self._label, label_width, font)
@@ -991,7 +1009,6 @@ class AnimatedInputField(QWidget):
             QLabel#AnimatedLabel {{
                 color: {label_color.name()};
                 background-color: transparent;
-                font-size: {11 if self._has_text or self._is_focused else 13}px;
                 qproperty-alignment: AlignCenter;
                 text-align: center;
             }}
@@ -1009,12 +1026,9 @@ class AnimatedInputField(QWidget):
         self._label_pos_animation.setEndValue(QPoint(x_pos, target_y))
         
         # 设置标签大小动画
-        current_size = self._label_widget.font().pointSizeF()
-        # 确保当前大小有效（大于0）
-        if current_size <= 0:
-            current_size = 13.0
-            
         target_size = 11.0 if self._has_text or self._is_focused else 13.0
+        # 确保目标大小也有效
+        target_size = max(target_size, 10.0)
         
         self._label_size_animation.setStartValue(current_size)
         self._label_size_animation.setEndValue(target_size)
@@ -1160,7 +1174,6 @@ class AnimatedInputField(QWidget):
                 QLabel#AnimatedLabel {{
                     color: {self._disabled_color.name()};
                     background-color: transparent;
-                    font-size: {11 if self._has_text or self._is_focused else 13}px;
                     qproperty-alignment: AlignCenter;
                     text-align: center;
                 }}
@@ -1197,6 +1210,9 @@ class AnimatedInputField(QWidget):
             font.setPointSizeF(11.0)
         else:
             font.setPointSizeF(13.0)
+        # 确保字体大小有效
+        if font.pointSizeF() <= 0:
+            font.setPointSizeF(13.0 if not (self._has_text or self._is_focused) else 11.0)
         self._label_widget.setFont(font)
         
         # 获取当前位置进行记录
@@ -1399,7 +1415,6 @@ class AnimatedInputField(QWidget):
                     QLabel#AnimatedLabel {{
                         color: {label_color.name()};
                         background-color: transparent;
-                        font-size: {11 if hasattr(self, '_has_text') and (self._has_text or self._is_focused) else 13}px;
                         qproperty-alignment: AlignCenter;
                         text-align: center;
                     }}

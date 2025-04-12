@@ -69,8 +69,10 @@ class GestureContentWidget(QWidget):
         self.repaint()  # 仅需一次repaint
         return True
 
-class GesturesTab(QWidget):
-    """手势管理选项卡，提供手势库管理功能"""
+class GesturesPage(QWidget):
+    """手势管理页面
+    用于管理应用程序的手势配置和动作。
+    """
     
     # 定义方向选项
     DIRECTIONS = [
@@ -85,7 +87,7 @@ class GesturesTab(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.logger = get_logger("GesturesTab")
+        self.logger = get_logger("GesturesPage")
         self.gestures = get_gesture_library()
         self.gesture_cards = {}  # 存储手势卡片的引用
         self.current_selected_card = None  # 当前选中的卡片
@@ -95,7 +97,7 @@ class GesturesTab(QWidget):
         self.logger.debug("通知组件已预加载")
         
         self.initUI()
-        self.logger.debug("手势管理选项卡初始化完成")
+        self.logger.debug("手势管理页面初始化完成")
     
     def initUI(self):
         """初始化用户界面"""
@@ -139,7 +141,7 @@ class GesturesTab(QWidget):
     
         # 启用响应式设计
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.logger.debug("手势管理选项卡启用了响应式设计")
+        self.logger.debug("手势管理页面启用了响应式设计")
     
     def _customize_combo_box_style(self):
         """自定义下拉菜单样式"""
@@ -445,7 +447,7 @@ class GesturesTab(QWidget):
     def resizeEvent(self, event):
         """窗口尺寸变化事件处理，用于调整UI布局"""
         super().resizeEvent(event)
-        self.logger.debug(f"手势管理选项卡大小已调整: {self.width()}x{self.height()}")
+        self.logger.debug(f"手势管理页面大小已调整: {self.width()}x{self.height()}")
     
     def updateGestureCards(self, maintain_selected=True):
         """更新手势卡片列表
@@ -544,7 +546,7 @@ class GesturesTab(QWidget):
     
     def addNewGesture(self):
         """添加新手势"""
-        self.logger.debug("添加新手势")
+        self.logger.debug("点击添加手势按钮")
         was_selected = self.current_selected_card is not None
         
         try:
@@ -1037,20 +1039,20 @@ class GesturesTab(QWidget):
             self.logger.error(f"检查手势库更改状态时出错: {e}")
             return False
 
-# 以下代码用于测试手势管理选项卡
+# 以下代码用于测试手势管理页面
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     window = QWidget()
-    window.setWindowTitle("手势管理选项卡测试")
+    window.setWindowTitle("手势管理页面测试")
     window.resize(900, 600)
     window.setStyleSheet("background-color: #f0f0f0;")
     
     layout = QVBoxLayout(window)
     
-    # 创建手势管理选项卡
-    gestures_tab = GesturesTab()
-    layout.addWidget(gestures_tab)
+    # 创建手势管理页面
+    gestures_page = GesturesPage()
+    layout.addWidget(gestures_page)
     
     window.setLayout(layout)
     window.show()

@@ -29,12 +29,14 @@ except ImportError:
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
     from version import APP_NAME  # 导入应用名称
 
-class SettingsTab(QWidget):
-    """设置选项卡，提供应用程序设置管理功能"""
+class SettingsPage(QWidget):
+    """设置页面
+    包含应用程序的各种设置选项，如主题、语言、快捷键等。
+    """
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.logger = get_logger("SettingsTab")
+        self.logger = get_logger("SettingsPage")
         self.settings = get_settings()
         
         # 预加载通知系统
@@ -42,7 +44,7 @@ class SettingsTab(QWidget):
         self.logger.debug("通知组件已预加载")
         
         self.initUI()
-        self.logger.debug("设置选项卡初始化完成")
+        self.logger.debug("设置页面初始化完成")
     
     def initUI(self):
         """初始化用户界面"""
@@ -179,7 +181,7 @@ class SettingsTab(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # 记录自适应布局启用
-        self.logger.debug("设置选项卡自适应布局已启用")
+        self.logger.debug("设置页面自适应布局已启用")
     
     def resizeEvent(self, event):
         """窗口尺寸变化事件处理，用于调整UI布局"""
@@ -187,7 +189,7 @@ class SettingsTab(QWidget):
         super().resizeEvent(event)
         
         # 记录窗口大小变化
-        self.logger.debug(f"设置选项卡大小已调整: {self.width()}x{self.height()}")
+        self.logger.debug(f"设置页面大小已调整: {self.width()}x{self.height()}")
     
     def color_changed(self, color):
         """处理颜色变化事件"""
@@ -380,6 +382,6 @@ class PenPreviewWidget(QWidget):
 if __name__ == "__main__":
     # 独立运行测试
     app = QApplication(sys.argv)
-    widget = SettingsTab()
+    widget = SettingsPage()
     widget.show()
     sys.exit(app.exec()) 
