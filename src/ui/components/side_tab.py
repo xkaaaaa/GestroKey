@@ -390,6 +390,44 @@ class SideNavigationMenu(QWidget):
         if self._current_index == index:
             return
         
+        # 获取当前页面和目标页面的位置关系，决定动画方向
+        if self._animations_enabled and self._current_index != -1:
+            # 判断当前选项卡和目标选项卡的位置
+            current_position = self._positions[self._current_index]
+            target_position = self._positions[index]
+            
+            # 获取当前选项卡在其所在容器中的索引
+            current_button = self._buttons[self._current_index]
+            current_container_layout = self._top_layout if current_position == self.POSITION_TOP else self._bottom_layout
+            current_index_in_container = current_container_layout.indexOf(current_button)
+            
+            # 获取目标选项卡在其所在容器中的索引
+            target_button = self._buttons[index]
+            target_container_layout = self._top_layout if target_position == self.POSITION_TOP else self._bottom_layout
+            target_index_in_container = target_container_layout.indexOf(target_button)
+            
+            # 确定动画方向
+            if current_position == target_position:
+                # 在同一个位置区域内的切换
+                if current_index_in_container < target_index_in_container:
+                    # 从上到下切换时，内容从下方进入
+                    self._stack.setAnimationType(AnimatedStackedWidget.ANIMATION_BOTTOM_TO_TOP)
+                    self.logger.debug(f"在{current_position}区域内从上到下切换: {self._current_index} -> {index}")
+                else:
+                    # 从下到上切换时，内容从上方进入
+                    self._stack.setAnimationType(AnimatedStackedWidget.ANIMATION_TOP_TO_BOTTOM)
+                    self.logger.debug(f"在{current_position}区域内从下到上切换: {self._current_index} -> {index}")
+            else:
+                # 跨位置区域的切换
+                if current_position == self.POSITION_TOP and target_position == self.POSITION_BOTTOM:
+                    # 从上方区域切换到下方区域，内容从下方进入
+                    self._stack.setAnimationType(AnimatedStackedWidget.ANIMATION_BOTTOM_TO_TOP)
+                    self.logger.debug(f"从顶部区域切换到底部区域: {self._current_index} -> {index}")
+                else:
+                    # 从下方区域切换到上方区域，内容从上方进入
+                    self._stack.setAnimationType(AnimatedStackedWidget.ANIMATION_TOP_TO_BOTTOM)
+                    self.logger.debug(f"从底部区域切换到顶部区域: {self._current_index} -> {index}")
+        
         # 更新当前索引
         old_index = self._current_index
         self._current_index = index
