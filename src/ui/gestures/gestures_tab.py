@@ -17,6 +17,7 @@ try:
     from ui.components.animated_stacked_widget import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
+    from ui.components.hotkey_input import HotkeyInput
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
@@ -28,6 +29,7 @@ except ImportError:
     from ui.components.animated_stacked_widget import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
+    from ui.components.hotkey_input import HotkeyInput
 
 class GestureContentWidget(QWidget):
     """自定义的手势内容显示组件，专门用于解决刷新问题"""
@@ -400,7 +402,7 @@ class GesturesPage(QWidget):
         action_value_label.setMinimumWidth(80)
         action_value_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
-        self.action_value_input = AnimatedInputField(placeholder="例如: ctrl+c")
+        self.action_value_input = HotkeyInput(placeholder="点击此处输入快捷键")
         self.action_value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         action_value_layout.addWidget(action_value_label)
@@ -489,7 +491,7 @@ class GesturesPage(QWidget):
                     self.name_input.setText(name)
                     self.direction_text.setText(direction)
                     self.action_type_combo.setCurrentText(action_type)
-                    self.action_value_input.setText(action_value)
+                    self.action_value_input.set_hotkey(action_value)
         except Exception as e:
             self.logger.error(f"更新手势卡片失败: {e}")
             import traceback
@@ -536,7 +538,7 @@ class GesturesPage(QWidget):
             action_type = gesture.get("action", {}).get("type", "")
             action_value = gesture.get("action", {}).get("value", "")
             self.action_type_combo.setCurrentText(action_type)
-            self.action_value_input.setText(action_value)
+            self.action_value_input.set_hotkey(action_value)
             
             # 这里不要设置was_selected=True，因为我们期望表单变化时自动更新
             self.is_form_ready = True
@@ -556,7 +558,7 @@ class GesturesPage(QWidget):
             action_type_display = self.action_type_combo.currentText()
             # 将UI显示的"执行快捷键"转换为内部使用的"shortcut"
             action_type = "shortcut" if action_type_display == "执行快捷键" else action_type_display
-            action_value = self.action_value_input.text().strip()
+            action_value = self.action_value_input.get_hotkey().strip()
             
             # 验证数据
             if not name:
@@ -612,7 +614,7 @@ class GesturesPage(QWidget):
         self.name_input.textChanged.connect(self.name_input_textChanged)
         self.direction_text.textChanged.connect(self.direction_text_changed)
         self.action_type_combo.currentIndexChanged.connect(self.action_type_combo_changed)
-        self.action_value_input.textChanged.connect(self.action_value_input_textChanged)
+        self.action_value_input.hotkeyChanged.connect(self.action_value_input_textChanged)
 
     def onFormChanged(self):
         """表单内容变化时自动应用更改"""
@@ -622,7 +624,7 @@ class GesturesPage(QWidget):
         action_type_display = self.action_type_combo.currentText()
         # 将UI显示的"执行快捷键"转换为内部使用的"shortcut"
         action_type = "shortcut" if action_type_display == "执行快捷键" else action_type_display
-        action_value = self.action_value_input.text().strip()
+        action_value = self.action_value_input.get_hotkey().strip()
         
         # 表单数据不完整，不处理
         if not name or not action_value:

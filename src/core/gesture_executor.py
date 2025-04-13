@@ -49,11 +49,16 @@ class GestureExecutor:
             
         # 初始化特殊键映射字典
         self.special_keys = {
+            # 修饰键
             'ctrl': Key.ctrl,
+            'control': Key.ctrl,
             'alt': Key.alt,
             'shift': Key.shift,
             'win': Key.cmd,
             'cmd': Key.cmd,
+            'meta': Key.cmd,
+            
+            # 功能键
             'tab': Key.tab,
             'esc': Key.esc,
             'escape': Key.esc,
@@ -61,16 +66,61 @@ class GestureExecutor:
             'return': Key.enter,
             'backspace': Key.backspace,
             'delete': Key.delete,
+            'del': Key.delete,
             'space': Key.space,
+            
+            # 方向键
             'up': Key.up,
             'down': Key.down,
             'left': Key.left,
             'right': Key.right,
+            '↑': Key.up,
+            '↓': Key.down,
+            '←': Key.left,
+            '→': Key.right,
+            
+            # 分页键
             'page_up': Key.page_up,
+            'pageup': Key.page_up,
+            'pgup': Key.page_up,
+            'pg_up': Key.page_up,
             'page_down': Key.page_down,
+            'pagedown': Key.page_down,
+            'pgdn': Key.page_down,
+            'pg_dn': Key.page_down,
+            
+            # 位置键
             'home': Key.home,
             'end': Key.end,
             'insert': Key.insert,
+            'ins': Key.insert,
+            
+            # 锁定键
+            'caps_lock': Key.caps_lock,
+            'capslock': Key.caps_lock,
+            'caps': Key.caps_lock,
+            'num_lock': Key.num_lock,
+            'numlock': Key.num_lock,
+            'numlk': Key.num_lock,
+            'num_lk': Key.num_lock,
+            'scroll_lock': Key.scroll_lock,
+            'scrolllock': Key.scroll_lock,
+            'scrlk': Key.scroll_lock,
+            'scr_lk': Key.scroll_lock,
+            
+            # 特殊功能键
+            'print': Key.print_screen,  # PrintScreen键
+            'print_screen': Key.print_screen,
+            'printscreen': Key.print_screen,
+            'prt_sc': Key.print_screen,
+            'prt sc': Key.print_screen,
+            'prtsc': Key.print_screen,
+            'psc': Key.print_screen,
+            'pause': Key.pause,
+            'break': Key.pause,
+            'menu': Key.menu,  # 菜单键
+            
+            # F1-F12 功能键
             'f1': Key.f1,
             'f2': Key.f2,
             'f3': Key.f3,
@@ -206,13 +256,22 @@ class GestureExecutor:
         try:
             self.logger.debug("开始按键操作...")
             
+            # 处理普通键，将字母转为小写
+            processed_keys = []
+            for key in regular_keys:
+                if isinstance(key, str) and len(key) == 1 and key.isalpha():
+                    processed_keys.append(key.lower())  # 字母统一转小写
+                    self.logger.debug(f"将字母键 {key} 转换为小写 {key.lower()}")
+                else:
+                    processed_keys.append(key)
+            
             # 按下所有修饰键
             for key in modifier_keys:
                 self.keyboard.press(key)
                 self.logger.debug(f"按下修饰键: {key}")
             
             # 按下所有普通键
-            for key in regular_keys:
+            for key in processed_keys:
                 # 如果是特殊键的实例
                 if isinstance(key, Key) or isinstance(key, KeyCode):
                     self.keyboard.press(key)
@@ -224,7 +283,7 @@ class GestureExecutor:
             time.sleep(0.1)
             
             # 释放所有按键（先普通键，后修饰键）
-            for key in reversed(regular_keys):
+            for key in reversed(processed_keys):
                 if isinstance(key, Key) or isinstance(key, KeyCode):
                     self.keyboard.release(key)
                 else:

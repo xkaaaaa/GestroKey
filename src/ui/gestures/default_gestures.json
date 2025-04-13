@@ -4,7 +4,7 @@
         "direction": "右-下",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+c"
+            "value": "Ctrl+C"
         }
     },
     "粘贴": {
@@ -12,7 +12,7 @@
         "direction": "下-右",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+v"
+            "value": "Ctrl+V"
         }
     },
     "剪切": {
@@ -20,7 +20,7 @@
         "direction": "左-下",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+x"
+            "value": "Ctrl+X"
         }
     },
     "撤销": {
@@ -28,7 +28,7 @@
         "direction": "左-上",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+z"
+            "value": "Ctrl+Z"
         }
     },
     "重做": {
@@ -36,7 +36,7 @@
         "direction": "右-上",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+y"
+            "value": "Ctrl+Y"
         }
     },
     "保存": {
@@ -44,7 +44,7 @@
         "direction": "下-左",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+s"
+            "value": "Ctrl+S"
         }
     },
     "全选": {
@@ -52,7 +52,7 @@
         "direction": "上-左",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+a"
+            "value": "Ctrl+A"
         }
     },
     "新建": {
@@ -60,7 +60,7 @@
         "direction": "上-右",
         "action": {
             "type": "shortcut",
-            "value": "ctrl+n"
+            "value": "Ctrl+N"
         }
     },
     "刷新": {
@@ -68,7 +68,7 @@
         "direction": "上-下",
         "action": {
             "type": "shortcut",
-            "value": "f5"
+            "value": "F5"
         }
     }
 } 

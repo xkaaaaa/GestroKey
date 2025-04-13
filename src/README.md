@@ -31,6 +31,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.2.9 取色器组件](#229-uicomponentscolor_pickerpy)
     - [2.2.10 数字选择器组件](#2210-uicomponentsnumber_spinnerpy)
     - [2.2.11 消息提示组件](#2211-uicomponentstoast_notificationpy)
+    - [2.2.12 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 drawer.py](#31-coredrawerpy)
   - [3.2 stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -73,6 +74,7 @@ src/
 │       ├── slider.py        # 自定义动画滑块组件
 │       ├── color_picker.py  # 自定义颜色选择器组件
 │       ├── toast_notification.py  # 现代通知提示组件
+│       ├── hotkey_input.py  # 快捷键输入组件
 │       ├── combobox/        # 下拉菜单组件
 │       │   ├── icons/       # 下拉菜单图标文件
 │       │   └── qcustomcombobox.py  # 自定义下拉菜单实现
@@ -1968,47 +1970,64 @@ current_value = float_spinner.value()
   - `show_error(parent, message, ...)`：显示错误类型提示
 
 **特性说明**：
-- **全局通知**：通知提示不会随页面切换而消失，始终显示在应用程序的最上层
-- **优雅的动画效果**：平滑的淡入淡出、位置调整、错误提示晃动等动画
-- **4种预设类型**：信息（蓝色）、成功（绿色）、警告（黄色）、错误（红色）
-- **自定义外观**：可设置持续时间、位置、文本模式等
-- **3种文本模式**：截断、滚动、自动换行，适应不同长度的消息
-- **互动功能**：鼠标悬停暂停自动消失计时器，显示关闭按钮
-- **错误提示晃动**：错误类型通知显示时自动添加左右晃动动画，增强注意度
-- **智能定位**：多个通知同时显示时自动堆叠排列，避免重叠
-- **类型图标**：每种类型都有对应的图标，增强视觉识别
-- **自适应布局**：窗口大小变化时自动重新排列通知
-- **高性能**：使用Qt的属性动画系统，低CPU占用
-- **简洁API**：提供简单易用的全局函数，替代传统的QMessageBox
+- 渐变动画：显示和隐藏时具有平滑的渐变效果
+- 自动隐藏：通知显示指定时间后自动隐藏
+- 交互暂停：鼠标悬停时暂停自动隐藏计时
+- 点击关闭：点击通知后立即关闭
+- 多种样式：支持多种通知类型，每种类型有不同的颜色和图标
+- 自适应布局：根据内容自动调整宽度和高度
+
+#### 2.2.12 ui/components/hotkey_input.py
+
+**功能说明**：
+快捷键输入组件，用于捕获和显示用户输入的键盘快捷键组合，包括虚拟键盘支持和多平台兼容性。
+
+**主要类和方法**：
+- `HotkeyInput`：快捷键输入组件类
+  - `__init__(self, parent=None, placeholder="请输入快捷键", enable_virtual_keyboard=True)`：初始化快捷键输入组件
+  - `set_hotkey(self, hotkey)`：设置快捷键值并更新显示
+  - `get_hotkey(self)`：获取当前的快捷键值
+  - `clear(self)`：清除当前输入的快捷键
+  - `_setup_ui(self)`：设置UI界面，包括输入框、虚拟键盘按钮和整体布局
+  - `_on_key_pressed(self, key, modifiers)`：处理按键按下事件，更新当前快捷键值
+  - `_show_virtual_keyboard(self)`：显示虚拟键盘对话框
+  - `_virtual_key_selected(self, key_name)`：处理从虚拟键盘选择的按键
+  - `_highlight_key_by_name(self, key_name)`：在虚拟键盘中高亮显示对应的按键
+  - `_get_key_name(self, key)`：获取按键对应的显示名称
+
+- `VirtualKeyboardDialog`：虚拟键盘对话框类
+  - `__init__(self, parent=None)`：初始化虚拟键盘对话框
+  - `setup_ui(self)`：设置虚拟键盘界面，包括各种功能键和字母数字键
+  - `update_modifier_state(self, key, state)`：更新修饰键（如Ctrl、Shift等）的状态
+  - `on_key_selected(self, key_name)`：处理按键选择事件，发出信号通知选择了某个按键
 
 **使用方法**：
 ```python
-from ui.components.toast_notification import show_info, show_success, show_warning, show_error
+# 创建快捷键输入组件
+hotkey_input = HotkeyInput(parent_widget, "请输入快捷键")
 
-# 显示信息提示
-show_info(self, "这是一条信息提示", duration=3000)
+# 设置初始快捷键值
+hotkey_input.set_hotkey("Ctrl+C")
 
-# 显示成功提示
-show_success(self, "操作已成功完成", duration=5000, position='top-right')
+# 获取当前设置的快捷键
+current_hotkey = hotkey_input.get_hotkey()
 
-# 显示警告提示，使用滚动模式显示长文本
-from ui.components.toast_notification import ElegantToast
-show_warning(self, "这是一条较长的警告提示，将会自动滚动显示...", text_mode=ElegantToast.TEXT_SCROLL)
+# 连接快捷键变更信号
+hotkey_input.hotkeyChanged.connect(on_hotkey_changed)
 
-# 显示错误提示，使用自动换行模式
-show_error(self, "发生严重错误！\n请检查日志获取详情。", text_mode=ElegantToast.TEXT_WRAP)
-
-# 获取toast管理器关闭所有通知
-from ui.components.toast_notification import get_toast_manager
-get_toast_manager().close_all()
+# 清除快捷键
+hotkey_input.clear()
 ```
 
-**注意事项**：
-- 使用toast通知替换标准的QMessageBox.information, QMessageBox.warning和QMessageBox.error
-- 对于需要用户选择的场景（如确认删除），仍然使用标准的QMessageBox.question
-- 长文本消息建议使用TEXT_SCROLL或TEXT_WRAP模式
-- 重要的错误信息使用ERROR类型，会自动添加晃动动画提高用户注意度
-- 即使传入的parent参数是当前页面，通知也会自动附加到主窗口，确保在页面切换时不会消失
+**特性说明**：
+- 实时捕获：实时捕获键盘按键，支持组合键
+- 格式化显示：将按键组合格式化为易读的形式
+- 虚拟键盘：内置虚拟键盘对话框，支持鼠标点击选择按键
+- 视觉反馈：按键按下时提供视觉高亮反馈
+- 波纹动画：点击输入框时显示水波纹动画效果
+- 焦点效果：获取/失去焦点时的动画过渡效果
+- 占位符文本：未设置快捷键时显示引导性占位符文本
+- 跨平台支持：兼容Windows、macOS和Linux系统
 
 ### 3. 核心功能模块
 

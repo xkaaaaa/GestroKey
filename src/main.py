@@ -206,6 +206,15 @@ class GestroKeyApp(QMainWindow):
         if hasattr(self, 'console_page'):
             self.console_page.stop_drawing()
             
+        # 确保释放所有可能的按键状态
+        from core.gesture_executor import get_gesture_executor
+        try:
+            executor = get_gesture_executor()
+            executor.release_all_keys()
+            self.logger.info("已释放所有可能的按键状态")
+        except Exception as e:
+            self.logger.error(f"释放按键状态时出错: {e}")
+            
         # 检查是否有未保存的更改
         unsaved_settings = False
         unsaved_gestures = False
