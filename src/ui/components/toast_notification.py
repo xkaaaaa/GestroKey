@@ -29,6 +29,9 @@ _preloading_in_progress = False
 # 添加一个表示预加载完成的标志
 _preload_complete = False
 
+# 添加一个全局变量来表示是否曾经完成过预加载
+_preload_ever_completed = False
+
 # 添加全局线程池
 _thread_pool = None
 def get_thread_pool():
@@ -95,9 +98,10 @@ class ToastPreloadWorker(QRunnable):
     def _handle_load_complete(self):
         """处理预加载完成信号"""
         # 发送完成事件
-        global _preloading_in_progress, _preload_complete
+        global _preloading_in_progress, _preload_complete, _preload_ever_completed
         _preloading_in_progress = False
         _preload_complete = True
+        _preload_ever_completed = True  # 标记已经完成过一次预加载
         
         # 报告进度：完成
         self.signals.progress_updated.emit("预加载完成", 100)
@@ -268,10 +272,15 @@ def initialize_toast_system():
     # 在应用程序事件循环开始后立即触发预加载
     app = QApplication.instance()
     if app:
-        # 如果应用实例已存在，立即触发预加载
-        QTimer.singleShot(100, schedule_preload)
-        logger = get_logger("ToastNotification")
-        logger.info("通知系统初始化完成，将立即开始后台预加载")
+        # 如果应用实例已存在且未进行过预加载，立即触发预加载
+        global _preload_ever_completed, _preloading_in_progress
+        if not _preload_ever_completed and not _preloading_in_progress:
+            QTimer.singleShot(100, schedule_preload)
+            logger = get_logger("ToastNotification")
+            logger.info("通知系统初始化完成，将立即开始后台预加载")
+        else:
+            logger = get_logger("ToastNotification")
+            logger.info("通知系统初始化完成，已有预加载过程，跳过重复预加载")
     else:
         # 应用实例不存在，稍后会通过ensure_toast_system_initialized处理
         logger = get_logger("ToastNotification")
@@ -279,8 +288,10 @@ def initialize_toast_system():
 
 def schedule_preload():
     """安排后台预加载任务"""
-    global _preloading_in_progress
-    if _preloading_in_progress:
+    global _preloading_in_progress, _preload_ever_completed
+    
+    # 如果已经完成过一次预加载或正在预加载中，就不再触发新的预加载
+    if _preloading_in_progress or _preload_ever_completed:
         return
     
     _preloading_in_progress = True
@@ -1378,16 +1389,18 @@ def show_toast(parent, message, toast_type=ElegantToast.INFO,
         # 使用现有实例显示新消息
         toast.show_notification(message, toast_type, duration, text_mode)
         
-        # 立即安排下一次预加载
-        QTimer.singleShot(0, schedule_preload)
+        # 只在使用预加载通知后且没有进行中的预加载时安排新的预加载
+        if not _preloading_in_progress:
+            QTimer.singleShot(0, schedule_preload)
         
         return toast
     else:
         # 未使用预加载实例，直接创建
         toast = manager.show_toast(actual_parent, message, toast_type, duration, icon, position, text_mode)
         
-        # 立即安排下一次预加载
-        QTimer.singleShot(0, schedule_preload)
+        # 如果从未进行过预加载，则安排第一次预加载
+        if not _preloading_in_progress and _preloaded_toast is None:
+            QTimer.singleShot(0, schedule_preload)
             
         return toast
 
@@ -1410,9 +1423,9 @@ def show_error(parent, message, duration=5000, icon=None, position='top-right', 
 # 启动时预加载要更快更积极
 def ensure_toast_system_initialized():
     """确保通知系统已初始化并触发背景预加载"""
-    # 立即触发预加载而不是延迟
-    global _preloading_in_progress
-    if not _preloading_in_progress:
+    # 只在未预加载过的情况下触发预加载
+    global _preloading_in_progress, _preload_ever_completed
+    if not _preloading_in_progress and not _preload_ever_completed:
         schedule_preload()
     return True
 
