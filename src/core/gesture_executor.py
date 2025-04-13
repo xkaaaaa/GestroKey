@@ -299,6 +299,49 @@ class GestureExecutor:
         except Exception as e:
             self.logger.error(f"按键操作失败: {e}")
             self.logger.error(traceback.format_exc())
+    
+    def release_all_keys(self):
+        """释放所有可能按下的键，用于程序退出前的清理操作"""
+        if not self.keyboard:
+            self.logger.error("键盘控制器未初始化，无法释放按键")
+            return
+            
+        self.logger.info("开始释放所有可能按下的键...")
+        
+        try:
+            # 释放所有常用修饰键
+            for key in [Key.ctrl, Key.shift, Key.alt, Key.cmd]:
+                self.keyboard.release(key)
+                self.logger.debug(f"释放修饰键: {key}")
+            
+            # 释放所有功能键
+            for key in [Key.f1, Key.f2, Key.f3, Key.f4, Key.f5, Key.f6, 
+                       Key.f7, Key.f8, Key.f9, Key.f10, Key.f11, Key.f12]:
+                self.keyboard.release(key)
+                self.logger.debug(f"释放功能键: {key}")
+            
+            # 释放常用特殊键
+            for key in [Key.space, Key.enter, Key.tab, Key.esc, Key.backspace, 
+                       Key.delete, Key.insert, Key.home, Key.end, Key.page_up, 
+                       Key.page_down, Key.up, Key.down, Key.left, Key.right]:
+                self.keyboard.release(key)
+                self.logger.debug(f"释放特殊键: {key}")
+            
+            # 释放所有字母键
+            for char in 'abcdefghijklmnopqrstuvwxyz':
+                self.keyboard.release(char)
+                self.logger.debug(f"释放字母键: {char}")
+            
+            # 释放所有数字键
+            for num in '0123456789':
+                self.keyboard.release(num)
+                self.logger.debug(f"释放数字键: {num}")
+                
+            self.logger.info("所有按键已释放")
+            
+        except Exception as e:
+            self.logger.error(f"释放按键失败: {e}")
+            self.logger.error(traceback.format_exc())
 
     def refresh_gestures(self):
         """刷新手势库，确保使用最新的已保存手势库"""

@@ -64,6 +64,9 @@ class AnimatedStackedWidget(QStackedWidget):
         
         # 启用自动填充背景
         self.setAutoFillBackground(False)
+        
+        # 添加尺寸变化处理
+        self.resizeEvent = self._handleResize
     
     # 属性访问器和修改器
     def _get_fade_value(self):
@@ -112,6 +115,111 @@ class AnimatedStackedWidget(QStackedWidget):
         """设置动画曲线"""
         self._animation_curve = curve
     
+    def setCurrentIndex(self, index):
+        """设置当前索引，带动画效果"""
+        # 检查索引是否有效
+        if self.currentIndex() == index or index < 0 or index >= self.count():
+            return
+        
+        if not self._animations_enabled:
+            # 如果动画被禁用，直接切换
+            super().setCurrentIndex(index)
+            return
+        
+        # 如果动画已经在运行，停止它
+        if self._is_animating:
+            self._animation_group.stop()
+            self._animation_group.clear()
+            self._is_animating = False
+            
+            # 如果有快照，释放它们
+            self._current_widget_snapshot = None
+            self._next_widget_snapshot = None
+        
+        # 获取当前窗口和目标窗口
+        current_widget = self.currentWidget()
+        next_widget = self.widget(index)
+        
+        if not current_widget or not next_widget:
+            # 如果窗口不存在，直接切换
+            super().setCurrentIndex(index)
+            return
+        
+        # 先将下一页面调整为当前容器的大小，避免切换后的位移调整
+        next_widget.resize(self.size())
+        
+        # 创建快照并设置可见性
+        current_widget.setVisible(True)
+        self._current_widget_snapshot = current_widget.grab()
+        
+        # 临时显示目标窗口以创建快照，然后隐藏所有窗口
+        for i in range(self.count()):
+            widget = self.widget(i)
+            widget.setVisible(i == index)
+            if i == index:
+                self._next_widget_snapshot = widget.grab()
+        
+        # 隐藏所有窗口，将通过绘制快照来展示
+        for i in range(self.count()):
+            self.widget(i).setVisible(False)
+        
+        # 保存目标索引，用于动画结束后切换
+        self._next_index = index
+        
+        # 设置动画标记
+        self._is_animating = True
+        
+        # 根据动画类型设置动画
+        self._animation_group.clear()
+        
+        if self._animation_type == self.ANIMATION_FADE:
+            # 淡入淡出效果
+            fade_anim = QPropertyAnimation(self, b"fade_value")
+            fade_anim.setDuration(self._animation_duration)
+            fade_anim.setStartValue(0.0)
+            fade_anim.setEndValue(1.0)
+            fade_anim.setEasingCurve(self._animation_curve)
+            self._animation_group.addAnimation(fade_anim)
+            
+        elif self._animation_type in [self.ANIMATION_LEFT_TO_RIGHT, self.ANIMATION_RIGHT_TO_LEFT]:
+            # 水平滑动效果
+            horz_anim = QPropertyAnimation(self, b"horizontal_offset")
+            horz_anim.setDuration(self._animation_duration)
+            
+            if self._animation_type == self.ANIMATION_LEFT_TO_RIGHT:
+                # 从左到右
+                horz_anim.setStartValue(0)
+                horz_anim.setEndValue(self.width())
+            else:
+                # 从右到左
+                horz_anim.setStartValue(0)
+                horz_anim.setEndValue(-self.width())
+            
+            horz_anim.setEasingCurve(self._animation_curve)
+            self._animation_group.addAnimation(horz_anim)
+            
+        elif self._animation_type in [self.ANIMATION_TOP_TO_BOTTOM, self.ANIMATION_BOTTOM_TO_TOP]:
+            # 垂直滑动效果
+            vert_anim = QPropertyAnimation(self, b"vertical_offset")
+            vert_anim.setDuration(self._animation_duration)
+            
+            if self._animation_type == self.ANIMATION_TOP_TO_BOTTOM:
+                # 从上到下
+                vert_anim.setStartValue(0)
+                vert_anim.setEndValue(self.height())
+            else:
+                # 从下到上
+                vert_anim.setStartValue(0)
+                vert_anim.setEndValue(-self.height())
+            
+            vert_anim.setEasingCurve(self._animation_curve)
+            self._animation_group.addAnimation(vert_anim)
+        
+        # 启动动画
+        self._animation_group.start()
+        
+        # 重要：不要在这里调用父类的setCurrentIndex，等动画结束后再调用
+
     def _onAnimationFinished(self):
         """动画完成时调用"""
         # 标记动画已完成
@@ -120,6 +228,12 @@ class AnimatedStackedWidget(QStackedWidget):
         # 通过父类方法切换到目标页面
         if self._next_index != -1:
             QStackedWidget.setCurrentIndex(self, self._next_index)
+            
+            # 确保当前窗口适应堆栈大小
+            current_widget = self.currentWidget()
+            if current_widget:
+                current_widget.resize(self.size())
+                
             self._next_index = -1
         
         # 释放快照资源
@@ -198,107 +312,19 @@ class AnimatedStackedWidget(QStackedWidget):
                 # 绘制下一页面
                 painter.drawPixmap(0, int(next_y), self._next_widget_snapshot)
     
-    def setCurrentIndex(self, index):
-        """设置当前索引，带动画效果"""
-        # 检查索引是否有效
-        if self.currentIndex() == index or index < 0 or index >= self.count():
-            return
+    def _handleResize(self, event):
+        """处理尺寸变化事件"""
+        # 调用父类的resizeEvent
+        super().resizeEvent(event)
         
-        if not self._animations_enabled:
-            # 如果动画被禁用，直接切换
-            super().setCurrentIndex(index)
-            return
+        # 如果没有在动画中，调整当前可见窗口的大小
+        if not self._is_animating:
+            current_widget = self.currentWidget()
+            if current_widget:
+                current_widget.resize(self.size())
         
-        # 如果动画已经在运行，停止它
-        if self._is_animating:
-            self._animation_group.stop()
-            self._animation_group.clear()
-            self._is_animating = False
-            
-            # 如果有快照，释放它们
-            self._current_widget_snapshot = None
-            self._next_widget_snapshot = None
-        
-        # 获取当前窗口和目标窗口
-        current_widget = self.currentWidget()
-        next_widget = self.widget(index)
-        
-        if not current_widget or not next_widget:
-            # 如果窗口不存在，直接切换
-            super().setCurrentIndex(index)
-            return
-        
-        # 创建快照并设置可见性
-        current_widget.setVisible(True)
-        self._current_widget_snapshot = current_widget.grab()
-        
-        # 临时显示目标窗口以创建快照，然后隐藏所有窗口
-        for i in range(self.count()):
-            widget = self.widget(i)
-            widget.setVisible(i == index)
-            if i == index:
-                self._next_widget_snapshot = widget.grab()
-        
-        # 隐藏所有窗口，将通过绘制快照来展示
-        for i in range(self.count()):
-            self.widget(i).setVisible(False)
-        
-        # 保存目标索引，用于动画结束后切换
-        self._next_index = index
-        
-        # 设置动画标记
-        self._is_animating = True
-        
-        # 根据动画类型设置动画
-        self._animation_group.clear()
-        
-        if self._animation_type == self.ANIMATION_FADE:
-            # 淡入淡出效果
-            fade_anim = QPropertyAnimation(self, b"fade_value")
-            fade_anim.setDuration(self._animation_duration)
-            fade_anim.setStartValue(0.0)
-            fade_anim.setEndValue(1.0)
-            fade_anim.setEasingCurve(self._animation_curve)
-            self._animation_group.addAnimation(fade_anim)
-            
-        elif self._animation_type in [self.ANIMATION_LEFT_TO_RIGHT, self.ANIMATION_RIGHT_TO_LEFT]:
-            # 水平滑动效果
-            horz_anim = QPropertyAnimation(self, b"horizontal_offset")
-            horz_anim.setDuration(self._animation_duration)
-            
-            if self._animation_type == self.ANIMATION_LEFT_TO_RIGHT:
-                # 从左到右
-                horz_anim.setStartValue(0)
-                horz_anim.setEndValue(self.width())
-            else:
-                # 从右到左
-                horz_anim.setStartValue(0)
-                horz_anim.setEndValue(-self.width())
-            
-            horz_anim.setEasingCurve(self._animation_curve)
-            self._animation_group.addAnimation(horz_anim)
-            
-        elif self._animation_type in [self.ANIMATION_TOP_TO_BOTTOM, self.ANIMATION_BOTTOM_TO_TOP]:
-            # 垂直滑动效果
-            vert_anim = QPropertyAnimation(self, b"vertical_offset")
-            vert_anim.setDuration(self._animation_duration)
-            
-            if self._animation_type == self.ANIMATION_TOP_TO_BOTTOM:
-                # 从上到下
-                vert_anim.setStartValue(0)
-                vert_anim.setEndValue(self.height())
-            else:
-                # 从下到上
-                vert_anim.setStartValue(0)
-                vert_anim.setEndValue(-self.height())
-            
-            vert_anim.setEasingCurve(self._animation_curve)
-            self._animation_group.addAnimation(vert_anim)
-        
-        # 启动动画
-        self._animation_group.start()
-        
-        # 重要：不要在这里调用父类的setCurrentIndex，等动画结束后再调用
+        # 确保所有窗口在调整大小后仍然在正确位置
+        self.update()
 
 # 如果直接运行该文件，则执行简单的测试程序
 if __name__ == "__main__":
