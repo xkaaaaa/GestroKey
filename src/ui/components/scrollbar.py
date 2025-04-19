@@ -15,7 +15,7 @@ except ImportError:
 
 
 class AnimatedScrollBar(QScrollBar):
-    """自定义动画滚动条，提供平滑动画效果和美观界面"""
+    """自定义动画滚动条，提供平滑动画效果和简洁界面"""
     
     def __init__(self, orientation=Qt.Orientation.Vertical, parent=None):
         super().__init__(orientation, parent)

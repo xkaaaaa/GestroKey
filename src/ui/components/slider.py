@@ -323,7 +323,7 @@ class SliderTrack(QWidget):
         painter.end()
 
 class AnimatedSlider(QWidget):
-    """精美的动画滑块组件，支持水平和垂直方向
+    """动画滑块组件，支持水平和垂直方向
     
     特性：
     - 流畅的动画效果
@@ -770,7 +770,7 @@ if __name__ == "__main__":
     
     # 创建主窗口
     window = QWidget()
-    window.setWindowTitle("GestroKey 精美滑块测试")
+    window.setWindowTitle("GestroKey 滑块测试")
     window.setMinimumSize(600, 400)
     window.setStyleSheet("background-color: #f5f5f5;")
     
@@ -780,7 +780,7 @@ if __name__ == "__main__":
     layout.setSpacing(30)
     
     # 添加标题
-    title = QLabel("GestroKey 精美滑块组件")
+    title = QLabel("GestroKey 滑块组件")
     title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title.setStyleSheet("font-size: 18pt; font-weight: bold; color: #333;")
     layout.addWidget(title)

@@ -254,8 +254,9 @@ class AnimatedNavigationButton(QWidget):
 
 
 class SideNavigationMenu(QWidget):
-    """侧边栏导航菜单组件
-    一个位于左侧的垂直导航菜单组件，带有平滑的动画效果和现代的扁平化设计风格。
+    """
+    一个位于左侧的垂直导航菜单组件，带有平滑的动画效果和扁平化设计风格。
+    提供方便的页面切换功能，支持顶部和底部两个区域放置选项卡。
     """
     
     currentChanged = pyqtSignal(int)
@@ -596,7 +597,7 @@ if __name__ == "__main__":
     <html>
     <p style='text-align:center; margin-top:20px;'>
     SideNavigationMenu 是一个左侧垂直导航菜单组件，具有以下特点：<br/>
-    - 精美的扁平化设计<br/>
+    - 扁平化设计<br/>
     - 流畅的切换动画效果<br/>
     - 页面的选中状态和悬停效果<br/>
     - 支持图标和文本<br/>

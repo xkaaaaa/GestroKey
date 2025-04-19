@@ -392,7 +392,7 @@ class CloseButton(QWidget):
 class ElegantToast(QWidget):
     """
     嵌入式通知窗口类
-    在窗口角落嵌入一个优雅的通知提示
+    在窗口角落嵌入一个通知提示
     """
     
     # 通知类型
@@ -644,7 +644,7 @@ class ElegantToast(QWidget):
         self.progress_animation.setEasingCurve(QEasingCurve.Type.InOutSine)  # 使用更平滑的动画曲线
         self.progress_animation.setStartValue(1.0)
         self.progress_animation.setEndValue(0.0)
-        # 设置更新步数，使动画更加丝滑
+        # 设置更新步数，使动画更加流畅
         self.progress_animation.setDuration(self.duration)
         
         # 关闭按钮透明度动画

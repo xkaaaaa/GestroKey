@@ -744,7 +744,7 @@ class ComboBoxDelegate(QStyledItemDelegate):
         :param option: 样式选项
         :param index: 模型索引
         """
-        # 使用更精美的绘制方式
+        # 使用更清晰的绘制方式
         painter.save()
         
         # 设置抗锯齿
