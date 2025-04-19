@@ -2,13 +2,12 @@ import os
 import sys
 from PyQt6.QtCore import (Qt, QPropertyAnimation, QEasingCurve, 
                          QParallelAnimationGroup, QSequentialAnimationGroup,
-                         QTimer, pyqtProperty, pyqtSignal, QPoint, QEvent, QRect)
+                         QTimer, pyqtProperty, pyqtSignal, QPoint, QEvent, QRect, QRectF)
 from PyQt6.QtGui import (QColor, QPainter, QBrush, QPen, QTransform, 
-                        QPixmap, QImage, QLinearGradient, QFont, QFontMetrics)
+                        QPixmap, QImage, QLinearGradient, QFont, QFontMetrics, QPainterPath)
 from PyQt6.QtWidgets import (QComboBox, QStyledItemDelegate, QListView, 
                             QApplication, QWidget, QGraphicsDropShadowEffect,
                             QStyleOptionComboBox, QStyle, QVBoxLayout, QGraphicsOpacityEffect)
-from PyQt6.QtSvg import QSvgRenderer
 
 try:
     from core.logger import get_logger
@@ -16,7 +15,7 @@ except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
     from core.logger import get_logger
 
-class QCustomComboBox(QComboBox):
+class CustomComboBox(QComboBox):
     # 自定义信号
     hoverEntered = pyqtSignal()
     hoverLeft = pyqtSignal()
@@ -28,35 +27,15 @@ class QCustomComboBox(QComboBox):
         初始化自定义下拉框
         :param parent: 父组件
         """
-        super(QCustomComboBox, self).__init__(parent)
+        super(CustomComboBox, self).__init__(parent)
         
         # 初始化日志
-        self.logger = get_logger("QCustomComboBox")
+        self.logger = get_logger("CustomComboBox")
         self.logger.debug("初始化自定义下拉菜单")
         
         # 设置基本属性
         self.setMinimumWidth(100)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
-        # 获取图标路径
-        self._icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
-        self._arrow_down_icon = os.path.join(self._icon_path, "arrow_down.svg")
-        self._arrow_down_focus_icon = os.path.join(self._icon_path, "arrow_down_focus.svg")
-        
-        # 确保图标文件存在
-        if not os.path.exists(self._arrow_down_icon):
-            self.logger.warning(f"警告: 图标文件不存在 - {self._arrow_down_icon}")
-        if not os.path.exists(self._arrow_down_focus_icon):
-            self.logger.warning(f"警告: 图标文件不存在 - {self._arrow_down_focus_icon}")
-        
-        # 加载SVG图标
-        self._normal_svg_renderer = QSvgRenderer()
-        self._focus_svg_renderer = QSvgRenderer()
-        
-        if os.path.exists(self._arrow_down_icon):
-            self._normal_svg_renderer.load(self._arrow_down_icon)
-        if os.path.exists(self._arrow_down_focus_icon):
-            self._focus_svg_renderer.load(self._arrow_down_focus_icon)
         
         # 自定义属性
         self._backgroundColor = QColor(255, 255, 255)
@@ -317,7 +296,7 @@ class QCustomComboBox(QComboBox):
             # 如果下拉框显示时，点击了其他位置，则隐藏下拉框
             self.hidePopup()
             
-        return super(QCustomComboBox, self).eventFilter(obj, event)
+        return super(CustomComboBox, self).eventFilter(obj, event)
     
     def showPopup(self):
         """显示下拉框"""
@@ -362,7 +341,7 @@ class QCustomComboBox(QComboBox):
             height_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
             
             # 在动画完成后调用基类的hidePopup方法
-            height_anim.finished.connect(lambda: super(QCustomComboBox, self).hidePopup())
+            height_anim.finished.connect(lambda: super(CustomComboBox, self).hidePopup())
             height_anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
             
             # 箭头旋转动画
@@ -432,97 +411,91 @@ class QCustomComboBox(QComboBox):
         self.setStyleSheet(stylesheet)
     
     def paintEvent(self, event):
-        """自定义绘制事件"""
+        """绘制自定义下拉框"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         
-        # 计算当前状态下的颜色
-        bgColor = self._interpolateColor(self._backgroundColor, self._backgroundHoverColor, self._hoverProgress)
-        bgColor = self._interpolateColor(bgColor, self._backgroundPressColor, self._pressProgress)
+        # 获取尺寸
+        width = self.width()
+        height = self.height()
         
-        borderColor = self._interpolateColor(self._borderColor, self._hoverBorderColor, self._hoverProgress)
-        borderColor = self._interpolateColor(borderColor, self._pressBorderColor, self._pressProgress)
+        # 计算当前颜色（基于动画进度）
+        bgColor = self._interpolateColor(self._backgroundColor, 
+                                         self._interpolateColor(self._backgroundHoverColor, 
+                                                               self._backgroundPressColor, 
+                                                               self._pressProgress),
+                                         self._hoverProgress)
         
-        textColor = self._interpolateColor(self._textColor, self._textHoverColor, self._hoverProgress)
+        borderColor = self._interpolateColor(self._borderColor,
+                                            self._interpolateColor(self._hoverBorderColor,
+                                                                  self._pressBorderColor,
+                                                                  self._pressProgress),
+                                            self._hoverProgress)
         
-        arrowColor = self._interpolateColor(self._arrowColor, self._arrowHoverColor, self._hoverProgress)
-        arrowColor = self._interpolateColor(arrowColor, self._arrowPressColor, self._pressProgress)
+        textColor = self._interpolateColor(self._textColor,
+                                          self._textHoverColor,
+                                          self._hoverProgress)
+        
+        arrowColor = self._interpolateColor(self._arrowColor,
+                                           self._interpolateColor(self._arrowHoverColor,
+                                                                 self._arrowPressColor,
+                                                                 self._pressProgress),
+                                           self._hoverProgress)
         
         # 绘制背景
         pen = QPen(borderColor)
         pen.setWidth(self._borderWidth)
         painter.setPen(pen)
         painter.setBrush(QBrush(bgColor))
-        
-        rect = self.rect().adjusted(1, 1, -1, -1)  # 调整一点，避免边界问题
+        rect = QRectF(
+            self._borderWidth/2, 
+            self._borderWidth/2, 
+            width - self._borderWidth, 
+            height - self._borderWidth
+        )
         painter.drawRoundedRect(rect, self._borderRadius, self._borderRadius)
         
         # 绘制文本
+        text = self.currentText()
+        font = self.font()
+        painter.setFont(font)
         painter.setPen(QPen(textColor))
-        textRect = self.rect().adjusted(10, 0, -30, 0)  # 左侧留出10px，右侧留出30px给箭头
-        currentText = self.currentText()
         
-        # 检查文本是否过长，需要省略
-        metrics = QFontMetrics(self.font())
-        elidedText = metrics.elidedText(currentText, Qt.TextElideMode.ElideRight, textRect.width())
-        
-        painter.drawText(textRect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elidedText)
+        # 计算文本绘制位置（考虑到右侧需要留出箭头的空间）
+        textRect = QRect(10, 0, width - 40, height)
+        painter.drawText(textRect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
         
         # 绘制箭头
-        arrowRect = QRect(self.width() - 25, (self.height() - 12) // 2, 16, 12)
+        arrowSize = 8  # 箭头大小
+        arrowX = width - 20  # 箭头X坐标
+        arrowY = height / 2  # 箭头Y坐标（中心点）
         
-        # 创建变换矩阵进行旋转
-        transform = QTransform()
-        transform.translate(arrowRect.center().x(), arrowRect.center().y())
-        transform.rotate(self._arrowRotation)
-        transform.translate(-arrowRect.center().x(), -arrowRect.center().y())
+        # 设置画笔绘制箭头
+        arrowPen = QPen(arrowColor)
+        arrowPen.setWidth(2)  # 调整箭头线宽，改为整数值
+        arrowPen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        arrowPen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(arrowPen)
         
-        painter.setTransform(transform)
+        # 保存当前画家状态，以便于恢复
+        painter.save()
         
-        # 绘制SVG图标
-        if self._normal_svg_renderer.isValid() and self._focus_svg_renderer.isValid():
-            # 计算SVG渲染目标区域
-            svgRect = QRect(self.width() - 25, (self.height() - 16) // 2, 16, 16)
-            
-            # 绘制普通图标和焦点图标的混合
-            normalImage = QImage(svgRect.size(), QImage.Format.Format_ARGB32_Premultiplied)
-            normalImage.fill(Qt.GlobalColor.transparent)
-            normalPainter = QPainter(normalImage)
-            self._normal_svg_renderer.render(normalPainter)
-            normalPainter.end()
-            
-            focusImage = QImage(svgRect.size(), QImage.Format.Format_ARGB32_Premultiplied)
-            focusImage.fill(Qt.GlobalColor.transparent)
-            focusPainter = QPainter(focusImage)
-            self._focus_svg_renderer.render(focusPainter)
-            focusPainter.end()
-            
-            # 根据悬停和按下进度混合两个图像
-            opacity = self._hoverProgress + self._pressProgress * 0.5
-            opacity = min(1.0, opacity)  # 确保不超过1.0
-            
-            painter.setOpacity(1.0 - opacity)
-            painter.drawImage(svgRect, normalImage)
-            
-            painter.setOpacity(opacity)
-            painter.drawImage(svgRect, focusImage)
-        else:
-            # 如果SVG不可用，手动绘制箭头
-            painter.setPen(QPen(arrowColor, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            
-            # 绘制一个简单的三角形
-            points = [
-                QPoint(arrowRect.left(), arrowRect.top()),
-                QPoint(arrowRect.left() + arrowRect.width() // 2, arrowRect.bottom()),
-                QPoint(arrowRect.right(), arrowRect.top())
-            ]
-            painter.drawPolygon(points)
+        # 移动到箭头中心点
+        painter.translate(arrowX, arrowY)
         
-        painter.resetTransform()
-        painter.end()
+        # 应用旋转变换（箭头旋转动画）
+        painter.rotate(self._arrowRotation)
+        
+        # 创建箭头路径并绘制
+        arrowPath = QPainterPath()
+        arrowPath.moveTo(-arrowSize/2, -arrowSize/4)  # 左点
+        arrowPath.lineTo(0, arrowSize/4)              # 中间点
+        arrowPath.lineTo(arrowSize/2, -arrowSize/4)   # 右点
+        
+        painter.drawPath(arrowPath)
+        
+        # 恢复画家状态
+        painter.restore()
     
     def _interpolateColor(self, color1, color2, progress):
         """在两种颜色之间进行插值"""
@@ -641,15 +614,14 @@ class QCustomComboBox(QComboBox):
         self._dropShadowRadius = radius
     
     def setArrowIcons(self, normal_icon, focus_icon):
-        """设置箭头图标"""
-        self._arrow_down_icon = normal_icon
-        self._arrow_down_focus_icon = focus_icon
-        
-        # 重新加载SVG
-        if os.path.exists(self._arrow_down_icon):
-            self._normal_svg_renderer.load(self._arrow_down_icon)
-        if os.path.exists(self._arrow_down_focus_icon):
-            self._focus_svg_renderer.load(self._arrow_down_focus_icon)
+        """
+        设置自定义箭头图标（已弃用，保留接口兼容性）
+        :param normal_icon: 常规状态图标路径
+        :param focus_icon: 焦点状态图标路径
+        """
+        # 实际不执行任何操作，因为现在使用绘制的箭头
+        self.logger.warning("setArrowIcons方法已弃用，现在使用绘制的箭头")
+        pass
     
     def setAnimationDuration(self, hover_duration=200, press_duration=100, 
                              arrow_duration=300, popup_duration=250):
@@ -670,7 +642,7 @@ class QCustomComboBox(QComboBox):
         self._popupAnimation.setEasingCurve(popup_curve)
     
     # 自定义QCustomComboBox
-    def customizeQCustomComboBox(self, **customValues):
+    def customizeCustomComboBox(self, **customValues):
         """
         自定义下拉框样式
         :param customValues: 样式属性字典
@@ -728,10 +700,6 @@ class QCustomComboBox(QComboBox):
         
         if "dropShadowRadius" in customValues:
             self.setDropShadowRadius(customValues["dropShadowRadius"])
-        
-        # 图标
-        if "arrowIcon" in customValues and "arrowIconFocus" in customValues:
-            self.setArrowIcons(customValues["arrowIcon"], customValues["arrowIconFocus"])
         
         # 动画设置
         if "hoverAnimationDuration" in customValues:
@@ -828,7 +796,7 @@ if __name__ == "__main__":
     window.setStyleSheet("background-color: #f5f5f5;")
     
     # 创建自定义下拉框
-    comboBox = QCustomComboBox(window)
+    comboBox = CustomComboBox(window)
     comboBox.setGeometry(100, 100, 200, 40)
     
     # 添加项目
@@ -839,7 +807,7 @@ if __name__ == "__main__":
     comboBox.addItem("项目5 - 最后一项")
     
     # 自定义样式
-    comboBox.customizeQCustomComboBox(
+    comboBox.customizeCustomComboBox(
         backgroundColor="#ffffff",
         backgroundHoverColor="#f5f5f5",
         backgroundPressColor="#e5e5e5",

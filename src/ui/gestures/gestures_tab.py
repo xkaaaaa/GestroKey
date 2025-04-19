@@ -13,7 +13,7 @@ try:
     from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
     from ui.components.scrollbar import AnimatedScrollArea
-    from ui.components.combobox.qcustomcombobox import QCustomComboBox
+    from ui.components.custom_combobox import CustomComboBox
     from ui.components.animated_stacked_widget import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
@@ -26,7 +26,7 @@ except ImportError:
     from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
     from ui.components.scrollbar import AnimatedScrollArea
-    from ui.components.combobox.qcustomcombobox import QCustomComboBox
+    from ui.components.custom_combobox import CustomComboBox
     from ui.components.animated_stacked_widget import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
@@ -182,7 +182,7 @@ class GesturesPage(QWidget):
             "popupAnimationDuration": 300
         }
         
-        self.action_type_combo.customizeQCustomComboBox(**combo_style)
+        self.action_type_combo.customizeCustomComboBox(**combo_style)
     
     def createGestureCardsList(self, parent_widget):
         """创建左侧手势卡片列表区域"""
@@ -400,7 +400,7 @@ class GesturesPage(QWidget):
         action_type_label.setMinimumWidth(80)
         action_type_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         
-        self.action_type_combo = QCustomComboBox()
+        self.action_type_combo = CustomComboBox()
         self.action_type_combo.addItems(self.ACTION_TYPES)
         self.action_type_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         

@@ -74,12 +74,10 @@ src/
 │       ├── input_field.py   # 自定义动画输入框组件
 │       ├── slider.py        # 自定义动画滑块组件
 │       ├── color_picker.py  # 自定义颜色选择器组件
+│       ├── custom_combobox.py # 自定义下拉菜单组件
 │       ├── toast_notification.py  # 现代通知提示组件
 │       ├── dialog.py        # 自定义对话框组件
 │       ├── hotkey_input.py  # 快捷键输入组件
-│       ├── combobox/        # 下拉菜单组件
-│       │   ├── icons/       # 下拉菜单图标文件
-│       │   └── qcustomcombobox.py  # 自定义下拉菜单实现
 │       └── animated_stacked_widget.py  # 动画堆栈组件
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
@@ -1304,16 +1302,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"当前页面: {tab_name}")
 ```
 
-##### 2.2.5 ui/components/combobox
-
-**功能说明**：下拉菜单组件，提供带有动画效果的下拉选择界面。
-
-###### 2.2.5.1 ui/components/combobox/qcustomcombobox.py
+##### 2.2.5 ui/components/custom_combobox.py
 
 **功能说明**：自定义下拉菜单组件，提供带有动画效果的下拉选择界面，可以集成到任何界面。
 
 **主要类和方法**：
-- `QCustomComboBox`：自定义下拉菜单类，继承自`QComboBox`
+- `CustomComboBox`：自定义下拉菜单类，继承自`QComboBox`
   - `__init__(parent=None)`：初始化下拉菜单
     - `parent`：父窗口组件
   - `setBackgroundColor(color)`：设置下拉菜单背景颜色
@@ -1348,7 +1342,7 @@ class MainWindow(QMainWindow):
     - `color`：颜色值，可以是QColor对象、RGB元组或CSS颜色字符串
   - `setDropShadowRadius(radius)`：设置下拉阴影半径
     - `radius`：整数值（像素）
-  - `setArrowIcons(normal_icon, focus_icon)`：设置自定义箭头图标
+  - `setArrowIcons(normal_icon, focus_icon)`：设置自定义箭头图标（此方法保留但内部已改为直接绘制箭头）
     - `normal_icon`：正常状态的图标路径
     - `focus_icon`：焦点状态的图标路径
   - `setAnimationDuration(hover_duration=200, press_duration=100, arrow_duration=300, popup_duration=250)`：设置各种动画的持续时间
@@ -1361,7 +1355,7 @@ class MainWindow(QMainWindow):
     - `press_curve`：按下动画缓动曲线
     - `arrow_curve`：箭头旋转动画缓动曲线
     - `popup_curve`：弹出动画缓动曲线
-  - `customizeQCustomComboBox(**customValues)`：批量设置多个样式属性
+  - `customizeCustomComboBox(**customValues)`：批量设置多个样式属性
     - `customValues`：关键字参数，可包含backgroundColor、backgroundHoverColor、textColor等
   - `showPopup()`：重写的显示下拉列表方法，添加了平滑展开动画
   - `hidePopup()`：重写的隐藏下拉列表方法，添加了平滑收起动画
@@ -1386,7 +1380,7 @@ class MainWindow(QMainWindow):
 - 下拉菜单展开和收起的动画效果，使用平滑的高度变化动画
 - 下拉菜单项有圆角背景，悬停和选中时有颜色变化
 - 悬停时的阴影效果，增强立体感和视觉反馈
-- 支持SVG图标，附带默认的箭头图标
+- 箭头直接通过代码绘制，不依赖外部图标文件
 - 完全可定制的外观，包括颜色、圆角、边框样式等
 - 提供完善的事件处理，响应鼠标悬停、点击等事件
 - 支持长文本省略显示，避免界面溢出
@@ -1396,11 +1390,11 @@ class MainWindow(QMainWindow):
 
 **使用方法**：
 ```python
-from ui.components.combobox.qcustomcombobox import QCustomComboBox
+from ui.components.custom_combobox import CustomComboBox
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 # 创建基本下拉菜单
-combo = QCustomComboBox()
+combo = CustomComboBox()
 combo.addItem("选项1")
 combo.addItem("选项2")
 combo.addItem("选项3")
@@ -1410,7 +1404,7 @@ layout = QVBoxLayout()
 layout.addWidget(combo)
 
 # 自定义样式
-combo.customizeQCustomComboBox(
+combo.customizeCustomComboBox(
     backgroundColor="#ffffff",        # 背景颜色
     backgroundHoverColor="#f5f5f5",   # 悬停时的背景颜色
     borderColor="#dddddd",            # 边框颜色
@@ -1445,18 +1439,12 @@ combo.currentIndexChanged.connect(lambda index: print(f"选择了: {combo.itemTe
 from PyQt6.QtCore import QSize
 
 # 创建下拉菜单
-custom_combo = QCustomComboBox()
+custom_combo = CustomComboBox()
 
 # 添加带图标的项目
 from PyQt6.QtGui import QIcon
 custom_combo.addItem(QIcon("path/to/icon1.png"), "选项1")
 custom_combo.addItem(QIcon("path/to/icon2.png"), "选项2")
-
-# 设置自定义下拉箭头图标
-custom_combo.setArrowIcons(
-    normal_icon="path/to/arrow_normal.svg",
-    focus_icon="path/to/arrow_focus.svg"
-)
 
 # 设置动画曲线
 from PyQt6.QtCore import QEasingCurve
@@ -1468,7 +1456,7 @@ custom_combo.setAnimationEasingCurve(
 )
 
 # 应用自定义样式
-custom_combo.customizeQCustomComboBox(
+custom_combo.customizeCustomComboBox(
     backgroundColor="#f0f0f0",
     backgroundHoverColor="#e0e0e0",
     backgroundPressColor="#d0d0d0",
@@ -1491,7 +1479,7 @@ custom_combo.customizeQCustomComboBox(
 **实际应用示例**：
 ```python
 # 在设置页面中使用下拉菜单选择主题
-from ui.components.combobox.qcustomcombobox import QCustomComboBox
+from ui.components.custom_combobox import CustomComboBox
 
 class SettingsTab(QWidget):
     def __init__(self, parent=None):
@@ -1500,7 +1488,7 @@ class SettingsTab(QWidget):
         
         # 创建主题选择下拉菜单
         self.theme_label = QLabel("选择主题:")
-        self.theme_combo = QCustomComboBox()
+        self.theme_combo = CustomComboBox()
         
         # 添加主题选项
         self.theme_combo.addItem("浅色主题")
@@ -1509,7 +1497,7 @@ class SettingsTab(QWidget):
         self.theme_combo.addItem("绿色主题")
         
         # 自定义样式
-        self.theme_combo.customizeQCustomComboBox(
+        self.theme_combo.customizeCustomComboBox(
             backgroundColor="#ffffff",
             borderColor="#dddddd",
             textColor="#333333",
