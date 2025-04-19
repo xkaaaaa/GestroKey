@@ -19,6 +19,7 @@ try:
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.side_tab import SideNavigationMenu  # 导入侧边栏导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
+    from ui.components.dialog import show_dialog  # 导入自定义对话框组件
 except ImportError:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from ui.console import ConsolePage
@@ -29,6 +30,7 @@ except ImportError:
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.side_tab import SideNavigationMenu  # 导入侧边栏导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
+    from ui.components.dialog import show_dialog  # 导入自定义对话框组件
 
 class GestroKeyApp(QMainWindow):
     """GestroKey应用程序主窗口"""
@@ -202,6 +204,20 @@ class GestroKeyApp(QMainWindow):
         """关闭窗口事件处理"""
         self.logger.info("程序准备关闭")
         
+        # 如果已经在关闭过程中，不再询问
+        if hasattr(self, '_closing') and self._closing:
+            self.logger.info("已在关闭过程中，直接接受关闭事件")
+            event.accept()
+            return
+        
+        # 如果有活动的对话框，先关闭它
+        if hasattr(self, 'current_dialog') and self.current_dialog:
+            try:
+                self.current_dialog.close()
+                self.current_dialog = None
+            except:
+                pass
+        
         # 如果控制台页面存在，停止绘制
         if hasattr(self, 'console_page'):
             self.console_page.stop_drawing()
@@ -230,72 +246,153 @@ class GestroKeyApp(QMainWindow):
         # 如果存在未保存的更改，询问用户
         if unsaved_settings or unsaved_gestures:
             self.logger.info("检测到未保存的更改")
-            # 使用自定义对话框而不是QMessageBox
-            is_saved = False
-            
-            # 这里我们还是需要使用确认对话框，因为需要用户做选择
-            from PyQt6.QtWidgets import QMessageBox
-            reply = QMessageBox.question(self, '保存更改',
-                                         '检测到未保存的更改，是否保存后退出？',
-                                         QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
-                                         QMessageBox.StandardButton.Save)
-            
-            if reply == QMessageBox.StandardButton.Save:
-                try:
-                    # 保存设置
-                    if unsaved_settings:
-                        self.logger.info("正在保存设置...")
-                        if self.settings_page.save_settings():
-                            self.logger.info("设置已保存")
-                            is_saved = True
-                        else:
-                            self.logger.error("保存设置失败")
-                            show_warning(self, "错误", "保存设置失败")
-                            event.ignore()
-                            return
-                except Exception as e:
-                    self.logger.error(f"保存设置时出现异常: {e}")
-                    show_warning(self, f"保存设置失败: {str(e)}")
-                    event.ignore()
-                    return
-                
-                try:
-                    # 保存手势库
-                    if unsaved_gestures:
-                        self.logger.info("正在保存手势库...")
-                        if self.gestures_page.save_gestures():
-                            self.logger.info("手势库已保存")
-                            is_saved = True
-                        else:
-                            self.logger.error("保存手势库失败")
-                            show_warning(self, f"保存手势库失败: {str(e)}")
-                            event.ignore()
-                            return
-                except Exception as e:
-                    self.logger.error(f"保存手势库时出现异常: {e}")
-                    show_warning(self, f"保存手势库失败: {str(e)}")
-                    event.ignore()
-                    return
-                
-            elif reply == QMessageBox.StandardButton.Discard:
-                self.logger.info("放弃未保存的更改")
-                # 用户选择放弃更改，不需要做任何事情
-            else:
-                # 用户选择取消关闭，取消事件
-                self.logger.info("取消关闭窗口")
-                event.ignore()
-                return
+            # 使用全局对话框方法
+            self.show_global_dialog(
+                message_type="question",
+                title_text="保存更改",
+                message="检测到未保存的更改，是否保存后退出？",
+                custom_buttons=["是", "否", "取消"],
+                callback=self._handle_save_changes_response
+            )
+            # 暂时阻止关闭窗口，等待对话框结果
+            event.ignore()
+            return
         
         # 记录日志
         self.logger.info("程序正常关闭")
         # 接受事件，关闭窗口
         event.accept()
+    
+    def _handle_save_changes_response(self, button_text):
+        """处理保存更改对话框的响应"""
+        self.logger.info(f"用户选择: {button_text}")
+        
+        # 设置关闭标志，防止重复弹出对话框
+        self._closing = True
+        
+        # 跟踪保存操作是否成功
+        save_success = True
+        
+        if button_text == "是":
+            unsaved_settings = False
+            unsaved_gestures = False
+            
+            # 检查设置是否有未保存的更改
+            if hasattr(self, 'settings_page') and self.settings_page.has_unsaved_changes():
+                unsaved_settings = True
+            
+            # 检查手势库是否有未保存的更改
+            if hasattr(self, 'gestures_page') and self.gestures_page.has_unsaved_changes():
+                unsaved_gestures = True
+            
+            try:
+                # 保存设置
+                if unsaved_settings:
+                    self.logger.info("正在保存设置...")
+                    if self.settings_page.save_settings():
+                        self.logger.info("设置已保存")
+                    else:
+                        self.logger.error("保存设置失败")
+                        save_success = False
+                        show_error(self, "保存设置失败，取消退出")
+            except Exception as e:
+                self.logger.error(f"保存设置时出现异常: {e}")
+                save_success = False
+                show_error(self, f"保存设置时出错: {str(e)}，取消退出")
+            
+            try:
+                # 保存手势库
+                if unsaved_gestures and save_success:  # 只有前面的保存成功才继续保存手势库
+                    self.logger.info("正在保存手势库...")
+                    if self.gestures_page.saveGestureLibrary():
+                        self.logger.info("手势库已保存")
+                    else:
+                        self.logger.error("保存手势库失败")
+                        save_success = False
+                        show_error(self, "保存手势库失败，取消退出")
+            except Exception as e:
+                self.logger.error(f"保存手势库时出现异常: {e}")
+                save_success = False
+                show_error(self, f"保存手势库时出错: {str(e)}，取消退出")
+            
+            # 如果保存失败，重置关闭标志
+            if not save_success:
+                self._closing = False
+                self.logger.info("保存失败，取消退出")
+                return
+        
+        # 只有选择"是"并且保存成功，或选择"否"才退出程序
+        if (button_text == "是" and save_success) or button_text == "否":
+            self.logger.info("准备退出程序")
+            # 使用sys.exit强制退出，避免使用QApplication.quit
+            import sys
+            sys.exit(0)
+        else:
+            # 用户选择取消关闭，或保存失败，重置关闭标志
+            self._closing = False
+            self.logger.info("取消关闭窗口")
 
+    def show_global_dialog(self, parent=None, message_type="warning", title_text=None, message="", 
+                          content_widget=None, custom_icon=None, custom_buttons=None, 
+                          custom_button_colors=None, callback=None):
+        """全局对话框创建方法，确保阴影覆盖整个主窗口
+        
+        Args:
+            parent: 父窗口 (会被忽略，总是使用主窗口作为父窗口)
+            message_type: 对话框类型
+            title_text: 标题文本
+            message: 消息内容
+            content_widget: 自定义内容组件
+            custom_icon: 自定义图标
+            custom_buttons: 自定义按钮列表
+            custom_button_colors: 自定义按钮颜色字典
+            callback: 按钮点击回调函数
+            
+        Returns:
+            dialog: 对话框实例
+        """
+        # 始终记录对话框的创建
+        self.logger.info(f"创建全局对话框: 类型={message_type}, 标题={title_text}")
+        
+        try:
+            # 始终使用主窗口作为父窗口，确保阴影覆盖整个应用窗口
+            dialog = show_dialog(
+                parent=self,  # 使用主窗口作为父窗口
+                message_type=message_type,
+                title_text=title_text,
+                message=message,
+                content_widget=content_widget,
+                custom_icon=custom_icon,
+                custom_buttons=custom_buttons,
+                custom_button_colors=custom_button_colors,
+                callback=callback
+            )
+            
+            # 记录对话框创建成功
+            self.logger.debug("全局对话框创建成功")
+            
+            # 将主窗口置为活动窗口以确保对话框显示在最前面
+            self.activateWindow()
+            self.raise_()
+            
+            # 保存当前对话框引用，避免被垃圾回收
+            self.current_dialog = dialog
+            
+            return dialog
+        except Exception as e:
+            self.logger.error(f"创建全局对话框时出错: {e}")
+            # 返回None表示创建失败
+            return None
+
+    def handle_dialog_close(self, dialog):
+        """处理对话框关闭事件"""
+        self.logger.debug("处理对话框关闭")
+        if hasattr(self, 'current_dialog') and self.current_dialog == dialog:
+            self.current_dialog = None
+            self.logger.debug("已清除当前对话框引用")
 
 if __name__ == "__main__":
-    # 设置高DPI缩放 - PyQt6中处理方式不同
     app = QApplication(sys.argv)
-    # 在PyQt6中，高DPI缩放是自动处理的，不再需要显式设置这些属性
     
     window = GestroKeyApp()
     sys.exit(app.exec()) 

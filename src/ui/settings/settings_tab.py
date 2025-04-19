@@ -2,9 +2,9 @@ import sys
 import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QApplication, QFileDialog, 
-                            QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton, QMessageBox,
+                            QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton,
                             QSizePolicy, QSpacerItem, QFrame)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 try:
@@ -16,6 +16,7 @@ try:
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
+    from ui.components.dialog import connect_page_to_main_window  # 使用dialog.py中的辅助方法连接到主窗口
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -27,12 +28,15 @@ except ImportError:
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
+    from ui.components.dialog import connect_page_to_main_window  # 使用dialog.py中的辅助方法连接到主窗口
     from version import APP_NAME  # 导入应用名称
 
 class SettingsPage(QWidget):
     """设置页面
     包含应用程序的各种设置选项，如主题、语言、快捷键等。
     """
+    # 添加信号用于请求显示对话框
+    request_dialog = pyqtSignal(str, str, str, object)  # message_type, title, message, callback
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -45,6 +49,11 @@ class SettingsPage(QWidget):
         
         self.initUI()
         self.logger.debug("设置页面初始化完成")
+    
+    def showEvent(self, event):
+        """窗口显示事件，确保连接到主窗口"""
+        super().showEvent(event)
+        connect_page_to_main_window(self)
     
     def initUI(self):
         """初始化用户界面"""
@@ -198,15 +207,6 @@ class SettingsPage(QWidget):
         self.preview_widget.update_color(color)
         
         # 不再立即更新绘制管理器，只在保存或重置时更新
-        # self._update_drawing_manager()
-    
-    def show_color_dialog(self):
-        """
-        废弃的方法，使用AnimatedColorPicker替代
-        保留此方法是为了兼容性，避免调用错误
-        """
-        self.logger.debug("show_color_dialog方法已废弃，使用AnimatedColorPicker替代")
-        pass
     
     def pen_width_changed(self, value):
         """笔尖粗细变化时的回调"""
@@ -218,9 +218,6 @@ class SettingsPage(QWidget):
         
         # 更新预览
         self.preview_widget.update_width(value)
-        
-        # 不再立即更新绘制管理器，只在保存或重置时更新
-        # self._update_drawing_manager()
     
     def pen_width_spinner_sync(self, value):
         """微调框值变化时同步滑块的值"""
@@ -230,16 +227,17 @@ class SettingsPage(QWidget):
     
     def reset_settings(self):
         """重置为默认设置"""
-        # 弹出确认对话框
-        reply = QMessageBox.question(
-            self, 
-            f"{APP_NAME} - 确认重置", 
-            "是否确定将所有设置重置为默认值？", 
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
-            QMessageBox.StandardButton.No
+        # 使用信号请求主窗口显示对话框
+        self.request_dialog.emit(
+            "question",
+            f"确认重置",
+            "是否确定将所有设置重置为默认值？",
+            self._on_reset_dialog_result
         )
-        
-        if reply == QMessageBox.StandardButton.Yes:
+    
+    def _on_reset_dialog_result(self, button_text):
+        """处理重置对话框的结果"""
+        if button_text == "是":
             self.logger.info("用户选择重置所有设置为默认值")
             
             # 重置设置

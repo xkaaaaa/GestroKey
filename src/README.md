@@ -31,7 +31,8 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.2.9 取色器组件](#229-uicomponentscolor_pickerpy)
     - [2.2.10 数字选择器组件](#2210-uicomponentsnumber_spinnerpy)
     - [2.2.11 消息提示组件](#2211-uicomponentstoast_notificationpy)
-    - [2.2.12 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
+    - [2.2.12 对话框组件](#2212-uicomponentsdialogpy)
+    - [2.2.13 快捷键输入组件](#2213-uicomponentshotkey_inputpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 drawer.py](#31-coredrawerpy)
   - [3.2 stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -74,6 +75,7 @@ src/
 │       ├── slider.py        # 自定义动画滑块组件
 │       ├── color_picker.py  # 自定义颜色选择器组件
 │       ├── toast_notification.py  # 现代通知提示组件
+│       ├── dialog.py        # 自定义对话框组件
 │       ├── hotkey_input.py  # 快捷键输入组件
 │       ├── combobox/        # 下拉菜单组件
 │       │   ├── icons/       # 下拉菜单图标文件
@@ -1977,7 +1979,167 @@ current_value = float_spinner.value()
 - 多种样式：支持多种通知类型，每种类型有不同的颜色和图标
 - 自适应布局：根据内容自动调整宽度和高度
 
-#### 2.2.12 ui/components/hotkey_input.py
+#### 2.2.12 ui/components/dialog.py
+
+**功能说明**：
+对话框组件，提供多种类型的交互式对话框，支持动画效果和自定义内容。对话框包含标题、内容、自定义组件和操作按钮，设计符合现代UI标准，支持多种类型的消息提示和用户交互。
+
+**主要类和方法**：
+- `MessageDialog`：对话框类，继承自`QWidget`
+  - `__init__(self, message_type="warning", content_widget=None, parent=None, show_title=True, show_buttons=True, title_text="消息提示", message="", custom_icon=None, custom_buttons=None, custom_button_colors=None, on_button_clicked=None)`：初始化对话框
+    - `message_type`：对话框类型，可选值："warning"、"question"、"retry"、"timeout"、"custom"
+    - `content_widget`：自定义内容组件
+    - `parent`：父组件
+    - `show_title`：是否显示标题栏
+    - `show_buttons`：是否显示底部按钮
+    - `title_text`：标题文本
+    - `message`：消息内容
+    - `custom_icon`：自定义图标
+    - `custom_buttons`：自定义按钮列表
+    - `custom_button_colors`：自定义按钮颜色
+    - `on_button_clicked`：按钮点击回调函数
+  - `setup_parent_blur(self)`：为父窗口设置模糊效果，使背景变暗
+  - `remove_parent_blur(self)`：移除父窗口的模糊效果
+  - `show_animated(self)`：带动画显示对话框
+  - `close_animated(self)`：带动画关闭对话框
+  - `handle_button_click(self, button_text)`：处理按钮点击事件
+- `show_dialog(parent, message_type="warning", title_text=None, message="", content_widget=None, custom_icon=None, custom_buttons=None, custom_button_colors=None, callback=None)`：显示对话框的全局函数
+- `connect_page_to_main_window(page)`：为页面提供统一的对话框连接辅助函数，确保页面可以通过信号触发主窗口显示对话框
+
+**对话框类型说明**：
+- `warning`：警告消息，提醒用户注意某些操作可能会带来的后果
+  - 图标：⚠️
+  - 默认按钮：确定、取消
+  - 主题色：黄色
+- `question`：确认消息，需要用户确认是否执行某个操作
+  - 图标：❓
+  - 默认按钮：是、否、取消
+  - 主题色：绿色
+- `retry`：重试消息，告知用户操作失败，但可以尝试再次执行
+  - 图标：❌
+  - 默认按钮：重试、取消
+  - 主题色：红色
+- `timeout`：超时消息，告知用户操作超时，需要采取措施
+  - 图标：⚠️
+  - 默认按钮：确定、取消
+  - 主题色：黄色
+- `custom`：自定义消息，开发者可以根据需要自定义消息内容、按钮和图标
+  - 图标：⚙️
+  - 默认按钮：确定、取消
+  - 主题色：蓝色
+
+**视觉和动画特性**：
+- **平滑动画效果**：对话框打开和关闭时使用缩放和透明度动画，提供流畅的用户体验
+- **背景模糊**：显示对话框时自动为父窗口应用模糊和半透明效果，使用户聚焦于对话框
+- **自适应布局**：对话框大小根据内容自动调整，保持居中显示
+- **圆角设计**：现代化的圆角设计，符合扁平化UI风格
+- **阴影效果**：适当的阴影效果增强立体感，提高视觉层次
+- **显示和关闭动画**：平滑的缩放和透明度过渡效果
+- **背景覆盖层**：显示对话框时创建半透明覆盖层，阻止用户与主界面交互
+- **等待用户操作**：对话框保持显示直到用户点击按钮或关闭图标
+
+**使用方法**：
+```python
+from ui.components.dialog import show_dialog
+
+# 显示警告对话框
+def show_warning_dialog(self):
+    show_dialog(
+        parent=self,
+        message_type="warning",
+        title_text="操作警告",
+        message="此操作可能会导致数据丢失，是否继续？",
+        callback=self.handle_warning_result
+    )
+
+# 处理对话框结果
+def handle_warning_result(self, button_text):
+    if button_text == "确定":
+        print("用户确认继续操作")
+    else:
+        print("用户取消操作")
+
+# 显示带自定义内容的对话框
+def show_custom_dialog(self):
+    # 创建自定义内容组件
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    layout.addWidget(QLabel("请选择一个选项："))
+    combo = QComboBox()
+    combo.addItems(["选项A", "选项B", "选项C"])
+    layout.addWidget(combo)
+    
+    # 显示自定义对话框
+    show_dialog(
+        parent=self,
+        message_type="custom",
+        title_text="自定义对话框",
+        message="",
+        content_widget=content,
+        custom_buttons=["确认选择", "取消"],
+        callback=lambda btn: print(f"选择了: {combo.currentText() if btn == '确认选择' else '取消'}")
+    )
+```
+
+**页面与主窗口对话框集成**：
+```python
+# 在页面类中
+from PyQt6.QtCore import pyqtSignal
+
+class MyPage(QWidget):
+    # 定义信号
+    request_dialog = pyqtSignal(str, str, str, object)  # message_type, title, message, callback
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.logger = get_logger("MyPage")
+        # ... 其他初始化代码
+    
+    def showEvent(self, event):
+        """窗口显示事件"""
+        super().showEvent(event)
+        # 使用连接辅助函数
+        from ui.components.dialog import connect_page_to_main_window
+        connect_page_to_main_window(self)
+    
+    def show_confirm_dialog(self):
+        """显示确认对话框"""
+        self.request_dialog.emit(
+            "question",
+            "操作确认",
+            "是否确定执行此操作？",
+            self.handle_dialog_result
+        )
+    
+    def handle_dialog_result(self, button_text):
+        """处理对话框结果"""
+        if button_text == "是":
+            self.logger.info("用户确认操作")
+            # 执行操作
+        else:
+            self.logger.info("用户取消操作")
+```
+
+**主窗口实现对话框处理**：
+```python
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        # ... 其他初始化代码
+    
+    def show_global_dialog(self, message_type, title_text, message, callback):
+        """显示全局对话框"""
+        from ui.components.dialog import show_dialog
+        show_dialog(
+            parent=self,
+            message_type=message_type,
+            title_text=title_text,
+            message=message,
+            callback=callback
+        )
+```
+
+#### 2.2.13 ui/components/hotkey_input.py
 
 **功能说明**：
 快捷键输入组件，用于捕获和显示用户输入的键盘快捷键组合，包括虚拟键盘支持和多平台兼容性。

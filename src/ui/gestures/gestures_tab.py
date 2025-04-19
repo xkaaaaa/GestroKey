@@ -3,9 +3,9 @@ import os
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, 
                            QLabel, QApplication, QComboBox, 
                            QPushButton, QScrollArea, QGroupBox,
-                           QSizePolicy, QSpacerItem, QFrame, QSplitter)
-from PyQt6.QtCore import Qt, QTimer, QRect, QEvent, QSize
-from PyQt6.QtGui import QIcon, QColor
+                           QSizePolicy, QSpacerItem, QFrame, QSplitter, QTabWidget)
+from PyQt6.QtCore import Qt, QTimer, QRect, QEvent, QSize, pyqtSignal
+from PyQt6.QtGui import QIcon, QColor, QFontMetrics
 
 try:
     from core.logger import get_logger
@@ -18,6 +18,7 @@ try:
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
     from ui.components.hotkey_input import HotkeyInput
+    from ui.components.dialog import show_dialog, connect_page_to_main_window  # 导入自定义对话框组件
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
@@ -30,6 +31,7 @@ except ImportError:
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
     from ui.components.hotkey_input import HotkeyInput
+    from ui.components.dialog import show_dialog, connect_page_to_main_window  # 导入自定义对话框组件
 
 class GestureContentWidget(QWidget):
     """自定义的手势内容显示组件，专门用于解决刷新问题"""
@@ -76,6 +78,9 @@ class GesturesPage(QWidget):
     用于管理应用程序的手势配置和动作。
     """
     
+    # 添加信号用于请求显示对话框
+    request_dialog = pyqtSignal(str, str, str, object)  # message_type, title, message, callback
+    
     # 定义方向选项
     DIRECTIONS = [
         "上", "下", "左", "右", 
@@ -100,6 +105,13 @@ class GesturesPage(QWidget):
         
         self.initUI()
         self.logger.debug("手势管理页面初始化完成")
+    
+    def showEvent(self, event):
+        """窗口显示事件，确保连接到主窗口"""
+        super().showEvent(event)
+        
+        # 使用dialog.py中的辅助方法连接到主窗口
+        connect_page_to_main_window(self)
     
     def initUI(self):
         """初始化用户界面"""
@@ -745,25 +757,32 @@ class GesturesPage(QWidget):
         
         name, gesture_id = self.current_selected_card
         
-        # 确认删除
-        # 这里还是需要使用确认对话框，因为需要用户做选择
-        from PyQt6.QtWidgets import QMessageBox
-        reply = QMessageBox.question(self, "确认删除", 
-                                    f"确定要删除手势 '{name}' 吗?",
-                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
-        
-        if reply == QMessageBox.StandardButton.Yes:
+        # 使用信号请求主窗口显示对话框
+        self.request_dialog.emit(
+            "question",
+            "确认删除",
+            f"确定要删除手势 '{name}' 吗?",
+            self._handle_delete_response
+        )
+    
+    def _handle_delete_response(self, button_text):
+        """处理删除对话框的响应"""
+        if button_text == "是":
             self.onDeleteGestureConfirmed()
     
     def resetGestures(self):
         """重置为默认手势库"""
-        # 这里还是需要使用确认对话框，因为需要用户做选择
-        from PyQt6.QtWidgets import QMessageBox
-        reply = QMessageBox.question(self, "确认重置", 
-                                    "确定要重置为默认手势库吗? 这将覆盖所有当前的手势设置。",
-                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
-        
-        if reply == QMessageBox.StandardButton.Yes:
+        # 使用信号请求主窗口显示对话框
+        self.request_dialog.emit(
+            "question",
+            "确认重置",
+            "确定要重置为默认手势库吗? 这将覆盖所有当前的手势设置。",
+            self._handle_reset_response
+        )
+    
+    def _handle_reset_response(self, button_text):
+        """处理重置对话框的响应"""
+        if button_text == "是":
             # 重置手势库
             self.gestures.reset_to_default()
             
@@ -793,22 +812,29 @@ class GesturesPage(QWidget):
         # 检查是否有实际变更
         if not self.gestures.has_changes():
             show_info(self, "手势库没有任何修改，无需保存。")
-            return
+            return True  # 没有变更也视为成功状态
             
-        # 保存手势库
-        self.gestures.save()
-        
-        # 刷新手势执行器，确保使用最新的已保存手势库
         try:
-            from core.gesture_executor import get_gesture_executor
-            gesture_executor = get_gesture_executor()
-            gesture_executor.refresh_gestures()
-            self.logger.info("已刷新手势执行器")
+            # 保存手势库
+            self.gestures.save()
+            
+            # 刷新手势执行器，确保使用最新的已保存手势库
+            try:
+                from core.gesture_executor import get_gesture_executor
+                gesture_executor = get_gesture_executor()
+                gesture_executor.refresh_gestures()
+                self.logger.info("已刷新手势执行器")
+            except Exception as e:
+                self.logger.error(f"刷新手势执行器失败: {e}")
+                # 刷新失败不影响保存结果
+            
+            self.logger.info("手势库保存成功")
+            show_success(self, "手势库已保存并应用成功。")
+            return True  # 明确返回成功状态
         except Exception as e:
-            self.logger.error(f"刷新手势执行器失败: {e}")
-        
-        self.logger.info("手势库保存成功")
-        show_success(self, "手势库已保存并应用成功。")
+            self.logger.error(f"保存手势库失败: {e}")
+            show_error(self, f"保存手势库时出错: {str(e)}")
+            return False  # 明确返回失败状态
     
     def name_input_textChanged(self):
         """名称输入框文本变化时的处理"""
