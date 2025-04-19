@@ -236,34 +236,30 @@ class SettingsPage(QWidget):
         )
     
     def _on_reset_dialog_result(self, button_text):
-        """处理重置对话框的结果"""
+        """对话框结果处理 - 重置确认"""
         if button_text == "是":
-            self.logger.info("用户选择重置所有设置为默认值")
-            
-            # 重置设置
-            self.settings.reset_to_default()
-            
-            # 更新UI
-            pen_width = self.settings.get("pen_width")
-            pen_color = self.settings.get("pen_color")
-            
-            # 更新笔尖粗细控件
-            self.pen_width_slider.setValue(pen_width)
-            self.pen_width_spinner.setValue(pen_width)
-            
-            # 更新笔尖颜色
-            self.color_picker.set_color(pen_color)
-            
-            # 更新预览
-            self.preview_widget.update_width(pen_width)
-            self.preview_widget.update_color(pen_color)
-            
-            # 更新绘制管理器
-            self._update_drawing_manager()
-            
-            # 显示成功消息
-            show_success(self, "已成功将所有设置重置为默认值。")
-            self.logger.info("设置已重置为默认值")
+            try:
+                self.logger.info("重置为默认设置")
+                # 重置设置
+                success = self.settings.reset_to_default()
+                
+                if success:
+                    # 更新UI显示
+                    self.update_ui_from_settings()
+                    
+                    # 应用设置到绘制管理器
+                    self.logger.debug("尝试应用默认设置到绘制管理器")
+                    self._update_drawing_manager()
+                    
+                    # 显示提示
+                    show_success(self, "已恢复默认设置并应用")
+                else:
+                    # 失败提示
+                    self.logger.error("重置设置失败")
+                    show_error(self, "恢复默认设置失败")
+            except Exception as e:
+                self.logger.error(f"重置设置时出错: {e}")
+                show_error(self, f"重置设置时出错: {str(e)}")
     
     def save_settings(self):
         """保存设置"""
@@ -308,18 +304,59 @@ class SettingsPage(QWidget):
         try:
             # 尝试获取主窗口
             main_window = self.window()
+            success = False
+            
+            # 方法1：直接通过主窗口访问console_tab
             if hasattr(main_window, 'console_tab') and main_window.console_tab:
                 console_tab = main_window.console_tab
-                
-                # 如果console_tab有drawing_manager且处于活动状态，更新参数
                 if hasattr(console_tab, 'drawing_manager') and console_tab.drawing_manager:
                     drawing_manager = console_tab.drawing_manager
                     if drawing_manager.update_settings():
-                        self.logger.debug("已更新绘制管理器参数")
-                    else:
-                        self.logger.warning("更新绘制管理器参数失败")
+                        self.logger.debug("方法1: 已通过主窗口直接访问更新绘制管理器参数")
+                        success = True
+            
+            # 方法2：尝试通过控制台选项卡访问
+            if not success:
+                from ui.console import ConsolePage
+                console_tabs = main_window.findChildren(ConsolePage)
+                if console_tabs:
+                    console_tab = console_tabs[0]
+                    if hasattr(console_tab, 'drawing_manager') and console_tab.drawing_manager:
+                        drawing_manager = console_tab.drawing_manager
+                        if drawing_manager.update_settings():
+                            self.logger.debug("方法2: 已通过findChildren更新绘制管理器参数")
+                            success = True
+            
+            # 方法3：通过中央组件的方式寻找控制台选项卡
+            if not success and hasattr(main_window, 'centralWidget'):
+                central = main_window.centralWidget()
+                if central:
+                    # 查找控制台选项卡
+                    from ui.console import ConsolePage
+                    console_tabs = central.findChildren(ConsolePage)
+                    if console_tabs:
+                        console_tab = console_tabs[0]
+                        if hasattr(console_tab, 'drawing_manager') and console_tab.drawing_manager:
+                            drawing_manager = console_tab.drawing_manager
+                            if drawing_manager.update_settings():
+                                self.logger.debug("方法3: 已通过中央组件更新绘制管理器参数")
+                                success = True
+            
+            # 尝试创建新的绘制管理器并更新设置
+            if not success:
+                self.logger.debug("尝试创建新的绘制管理器并更新设置")
+                from core.drawer import DrawingManager
+                temp_manager = DrawingManager()
+                temp_manager.update_settings()
+                self.logger.debug("已通过临时绘制管理器更新设置，下次启动绘制时将应用")
+                success = True
+                
+            if not success:
+                self.logger.warning("未能找到任何可用的绘制管理器")
+                
         except Exception as e:
             self.logger.error(f"尝试更新绘制管理器参数时发生错误: {e}")
+            self.logger.error(f"错误详情: {str(e)}")
     
     def has_unsaved_changes(self):
         """检查是否有未保存的更改"""
@@ -327,6 +364,30 @@ class SettingsPage(QWidget):
             return self.settings.has_changes()
         except Exception as e:
             self.logger.error(f"检查设置更改状态时出错: {e}")
+            return False
+    
+    def update_ui_from_settings(self):
+        """从设置更新UI控件"""
+        try:
+            # 获取设置值
+            pen_width = self.settings.get("pen_width")
+            pen_color = self.settings.get("pen_color")
+            
+            # 更新笔尖粗细控件
+            self.pen_width_slider.setValue(pen_width)
+            self.pen_width_spinner.setValue(pen_width)
+            
+            # 更新笔尖颜色
+            self.color_picker.set_color(pen_color)
+            
+            # 更新预览
+            self.preview_widget.update_width(pen_width)
+            self.preview_widget.update_color(pen_color)
+            
+            self.logger.debug(f"UI已从设置更新: 笔尖粗细={pen_width}, 笔尖颜色={pen_color}")
+            return True
+        except Exception as e:
+            self.logger.error(f"从设置更新UI时出错: {e}")
             return False
 
 
