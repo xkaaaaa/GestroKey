@@ -11,14 +11,13 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
   - [1.2 version.py](#12-versionpy)
 - [2. 用户界面模块](#2-用户界面模块-ui)
   - [2.1 界面UI模块](#21-界面ui模块)
-    - [2.1.1 主应用窗口](#211-主应用窗口-uimain_windowpy)
-    - [2.1.2 控制台选项卡](#212-控制台选项卡-uiconsolepy)
-    - [2.1.3 手势管理模块](#213-手势管理模块)
-      - [2.1.3.1 手势库](#2131-手势库-uigesturesgesturespy)
-      - [2.1.3.2 手势选项卡](#2132-手势选项卡-uigesturesgestures_tabpy)
-    - [2.1.4 设置模块](#214-设置模块)
-      - [2.1.4.1 设置管理器](#2141-设置管理器-uisettingssettingspy)
-      - [2.1.4.2 设置选项卡](#2142-设置选项卡-uisettingssettings_tabpy)
+    - [2.1.1 控制台选项卡](#211-控制台选项卡-uiconsolepy)
+    - [2.1.2 手势管理模块](#212-手势管理模块)
+      - [2.1.2.1 手势库](#2121-手势库-uigesturesgesturespy)
+      - [2.1.2.2 手势选项卡](#2122-手势选项卡-uigesturesgestures_tabpy)
+    - [2.1.3 设置模块](#213-设置模块)
+      - [2.1.3.1 设置管理器](#2131-设置管理器-uisettingssettingspy)
+      - [2.1.3.2 设置选项卡](#2132-设置选项卡-uisettingssettings_tabpy)
   - [2.2 UI组件模块](#22-ui组件模块)
     - [2.2.1 按钮组件](#221-uicomponentsbuttonpy)
     - [2.2.2 卡片组件](#222-uicomponentscardpy)
@@ -26,12 +25,12 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.2.4 导航菜单组件](#224-uicomponentsnavigation_menupy)
     - [2.2.5 下拉菜单组件](#225-uicomponentscustom_comboboxpy)
     - [2.2.6 输入框组件](#226-uicomponentsinput_fieldpy)
-    - [2.2.8 滑块组件](#227-uicomponentssliderpy)
-    - [2.2.9 取色器组件](#228-uicomponentscolor_pickerpy)
-    - [2.2.10 数字选择器组件](#229-uicomponentsnumber_spinnerpy)
-    - [2.2.11 消息提示组件](#2210-uicomponentstoast_notificationpy)
-    - [2.2.12 对话框组件](#2211-uicomponentsdialogpy)
-    - [2.2.13 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
+    - [2.2.7 滑块组件](#227-uicomponentssliderpy)
+    - [2.2.8 取色器组件](#228-uicomponentscolor_pickerpy)
+    - [2.2.9 数字选择器组件](#229-uicomponentsnumber_spinnerpy)
+    - [2.2.10 消息提示组件](#2210-uicomponentstoast_notificationpy)
+    - [2.2.11 对话框组件](#2211-uicomponentsdialogpy)
+    - [2.2.12 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 core/drawer.py](#31-coredrawerpy)
   - [3.2 core/stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -60,30 +59,28 @@ src/
 │   ├── settings/            # 设置模块
 │   │   ├── settings_tab.py  # 设置选项卡
 │   │   ├── settings.py      # 设置管理器
+│   │   ├── __init__.py      # 设置模块初始化文件
 │   │   └── default_settings.json # 默认设置定义（JSON格式）
 │   ├── gestures/            # 手势管理模块
 │   │   ├── gestures_tab.py  # 手势管理选项卡
 │   │   ├── gestures.py      # 手势库管理模块
 │   │   └── default_gestures.json # 默认手势库定义（JSON格式）
-│   └── components/          # UI组件模块
-│       ├── button.py        # 自定义动画按钮组件
-│       ├── card.py          # 自定义卡片组件
-│       ├── scrollbar.py     # 自定义滚动条和滚动区域组件
-│       ├── navigation_menu.py # 导航菜单组件
-│       ├── input_field.py   # 自定义动画输入框组件
-│       ├── slider.py        # 自定义动画滑块组件
-│       ├── color_picker.py  # 自定义颜色选择器组件
-│       ├── custom_combobox.py # 自定义下拉菜单组件
-│       ├── toast_notification.py  # 通知提示组件
-│       ├── dialog.py        # 自定义对话框组件
-│       ├── hotkey_input.py  # 快捷键输入组件
-│       └── number_spinner.py # 数字选择器组件
+│   ├── components/          # UI组件模块
+│   │   ├── button.py        # 自定义动画按钮组件
+│   │   ├── card.py          # 自定义卡片组件
+│   │   ├── scrollbar.py     # 自定义滚动条和滚动区域组件
+│   │   ├── navigation_menu.py # 导航菜单组件
+│   │   ├── input_field.py   # 自定义动画输入框组件
+│   │   ├── slider.py        # 自定义动画滑块组件
+│   │   ├── color_picker.py  # 自定义颜色选择器组件
+│   │   ├── custom_combobox.py # 自定义下拉菜单组件
+│   │   ├── toast_notification.py  # 通知提示组件
+│   │   ├── dialog.py        # 自定义对话框组件
+│   │   ├── hotkey_input.py  # 快捷键输入组件
+│   │   └── number_spinner.py # 数字选择器组件
+│   └── __init__.py          # UI模块初始化文件
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
-│       ├── icon.svg         # 应用图标
-│       ├── console.svg      # 控制台选项卡图标
-│       ├── settings.svg     # 设置选项卡图标
-│       └── gestures.svg     # 手势管理选项卡图标
 ├── version.py               # 版本信息模块
 └── main.py                  # 主程序入口
 ```
@@ -94,17 +91,20 @@ src/
 
 #### 1.1 main.py
 
-**功能说明**：程序的主入口文件，提供带有选项卡的图形用户界面，包含控制台、设置界面和手势管理界面。
+**功能说明**：程序的主入口文件，提供带有侧边导航菜单的图形用户界面，包含控制台、设置界面和手势管理界面。
 
 **主要类和方法**：
 - `GestroKeyApp`：主窗口类，继承自`QMainWindow`
   - `__init__(self)`：初始化应用程序主窗口，设置日志记录器和全局资源
   - `init_global_resources(self)`：初始化设置管理器和手势库管理器等全局资源
-  - `initUI(self)`：初始化用户界面，设置窗口属性、创建选项卡和底部状态栏
-  - `_select_initial_tab(self)`：选择初始选项卡（默认为控制台选项卡）
-  - `onTabChanged(self, index)`：处理选项卡切换事件
+  - `initUI(self)`：初始化用户界面，设置窗口属性、创建页面和底部状态栏
+  - `_select_initial_page(self)`：选择初始页面（默认为控制台页面）
+  - `onPageChanged(self, index)`：处理页面切换事件
   - `resizeEvent(self, event)`：处理窗口尺寸变化事件
   - `closeEvent(self, event)`：处理窗口关闭事件，检查未保存的设置和手势库更改
+  - `show_global_dialog(self, ...)`：显示全局对话框
+  - `_handle_save_changes_response(self, button_text)`：处理保存更改对话框的响应
+  - `handle_dialog_close(self, dialog)`：处理对话框关闭事件
 
 **使用方法**：
 ```python
@@ -121,18 +121,18 @@ window = GestroKeyApp()
 sys.exit(app.exec())
 ```
 
-**GUI选项卡**：
-- 控制台选项卡：提供绘制功能的开启和停止控制，以及系统资源监测
-- 设置选项卡：提供应用程序设置的配置，包括笔尖粗细和笔尖颜色设置
-- 手势管理选项卡：提供手势库的管理界面，可添加、编辑、删除手势
+**GUI页面**：
+- 控制台页面：提供绘制功能的开启和停止控制，以及系统资源监测
+- 设置页面：提供应用程序设置的配置，包括笔尖粗细和笔尖颜色设置
+- 手势管理页面：提供手势库的管理界面，可添加、编辑、删除手势
 
 **主窗口功能**：
-- 高DPI缩放支持，适应高分辨率屏幕
-- 自适应布局，在窗口尺寸变化时保持良好的界面结构
-- 自动加载应用图标和选项卡图标
+- 高DPI缩放支持
+- 自适应布局，在窗口尺寸变化时维持界面结构
+- 自动加载应用图标和页面图标
 - 底部状态栏显示退出按钮和版本信息
 - 窗口关闭时提示保存未保存的更改
-- 优雅的异常处理，确保用户操作不会导致程序崩溃
+- 异常处理，确保用户操作不会导致程序崩溃
 
 #### 1.2 version.py
 
@@ -175,68 +175,7 @@ version_info = get_full_version_info()  # 返回包含所有版本信息的字�
 
 #### 2.1 界面UI模块
 
-##### 2.1.1 主应用窗口 (ui/main_window.py)
-
-**功能说明**：
-应用程序的主窗口，负责整合各个UI组件和功能模块。
-
-**主要类和方法**：
-- `GestroKeyApp`：主应用窗口类
-  - `__init__(self)`：初始化主窗口
-  - `initUI(self)`：初始化UI组件和布局
-  - `setup_tabs(self)`：设置选项卡
-  - `setup_status_bar(self)`：设置状态栏
-  - `setup_exit_button(self)`：设置退出按钮
-  - `closeEvent(self, event)`：处理窗口关闭事件
-  - `update_status(self, message, timeout=0)`：更新状态栏消息
-  - `check_for_updates(self)`：检查应用更新
-
-**组件布局**：
-- 中心区域：SideTabWidget，包含以下选项卡：
-  - 控制台选项卡（ConsoleTab）
-  - 设置选项卡（SettingsTab）
-  - 手势管理选项卡（GesturesTab）
-- 底部：状态栏，显示应用状态和系统资源信息
-- 右下角：退出按钮
-
-**窗口特性**：
-- 固定尺寸：窗口大小固定，不可调整
-- 半透明样式：窗口及控件采用半透明效果
-- 圆角边框：窗口和控件采用统一的圆角设计
-- 无标题栏：自定义标题栏，集成系统图标
-- 快捷键支持：支持常用快捷键，如Esc关闭应用
-
-**特性说明**：
-- 一体化设计：将所有功能集成在单一窗口中
-- 选项卡导航：通过侧边选项卡快速切换功能模块
-- 状态反馈：底部状态栏提供操作反馈和系统信息
-- 资源监控：实时显示系统资源使用情况
-- 优雅退出：确保应用退出时释放所有资源
-- 配置保存：退出时自动保存用户配置
-
-**使用方法**：
-```python
-# 创建并运行应用程序
-import sys
-from PyQt6.QtWidgets import QApplication
-from ui.main_window import GestroKeyApp
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    
-    # 设置高DPI支持
-    app.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
-    app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
-    
-    # 创建并显示主窗口
-    window = GestroKeyApp()
-    window.show()
-    
-    # 进入应用程序主循环
-    sys.exit(app.exec())
-```
-
-##### 2.1.2 控制台选项卡 (ui/console.py)
+##### 2.1.1 控制台选项卡 (ui/console.py)
 
 **功能说明**：
 控制台界面，应用程序的主要交互界面，提供启动/停止绘制功能，显示系统资源监控信息。
@@ -248,9 +187,9 @@ if __name__ == "__main__":
   - `set_animated_value(self, value)`：设置进度条值，带动画效果
   - `set_color_theme(self, base_color, mid_color, high_color)`：设置进度条的颜色主题
 
-- `ConsoleTab`：控制台选项卡类
-  - `__init__(self, parent=None)`：初始化控制台选项卡
-  - `initUI(self)`：初始化UI组件和布局
+- `ConsolePage`：控制台页面类
+  - `__init__(self, parent=None)`：初始化控制台页面
+  - `_setup_ui(self)`：初始化UI组件和布局
   - `_create_system_info_card(self, title, value, color)`：创建系统信息卡片
   - `toggle_drawing(self)`：切换绘制状态
   - `start_drawing(self)`：开始绘制功能
@@ -262,9 +201,9 @@ if __name__ == "__main__":
 - 中部：控制按钮区域，包含开始/停止绘制按钮
 - 底部：系统信息卡片区域，显示CPU使用率、内存使用率、运行时间和进程资源信息
 
-**交互信号**：
-- `drawing_started`：开始绘制时发出
-- `drawing_stopped`：停止绘制时发出
+**交互操作**：
+- 绘制切换：通过动作按钮切换绘制状态
+- 系统监测：自动监测并显示系统资源信息
 
 **系统信息卡片**：
 - CPU使用率卡片：显示当前CPU使用率，带颜色渐变进度条
@@ -273,39 +212,34 @@ if __name__ == "__main__":
 - 进程资源卡片：显示当前进程的CPU和内存使用情况
 
 **特性说明**：
-- 直观控制：提供明确的开始/停止绘制按钮，根据状态切换文本和颜色
+- 直观控制：提供切换绘制状态的按钮，根据状态自动切换文本和颜色
 - 实时系统监控：显示CPU、内存使用率和运行时间
-- 动画效果：资源使用率变化时有平滑的动画过渡
+- 动画效果：资源使用率变化时有动画过渡
 - 颜色反馈：根据资源使用率变化颜色，低(绿)→中(黄)→高(红)
-- 卡片式布局：使用化卡片组件展示系统信息
+- 卡片式布局：使用卡片组件展示系统信息
 - 定时更新：自动定期更新系统资源信息
-- 响应式设计：适应窗口大小变化
+- 自适应设计：适应窗口尺寸变化
 
 **使用方法**：
 ```python
-# 在主窗口中添加控制台选项卡
-from ui.console import ConsoleTab
+# 创建控制台页面
+from ui.console import ConsolePage
 
-# 创建主窗口
-main_window = QMainWindow()
-side_tab = SideTabWidget(main_window)
+# 创建页面实例
+console_page = ConsolePage()
 
-# 创建并添加控制台选项卡
-console_tab = ConsoleTab()
-side_tab.add_tab("控制台", console_tab, QIcon(":/icons/console.png"))
+# 将页面添加到导航菜单
+navigation_menu.addPage(console_page, "控制台", console_icon, navigation_menu.POSITION_TOP)
 
-# 连接信号到槽函数
-console_tab.drawing_started.connect(lambda: print("开始绘制"))
-console_tab.drawing_stopped.connect(lambda: print("停止绘制"))
-
-# 设置主窗口
-main_window.setCentralWidget(side_tab)
-main_window.show()
+# 控制绘制状态
+console_page.start_drawing()  # 开始绘制
+console_page.stop_drawing()   # 停止绘制
+console_page.toggle_drawing() # 切换绘制状态
 ```
 
-##### 2.1.3 手势管理模块
+##### 2.1.2 手势管理模块
 
-###### 2.1.3.1 手势库 (ui/gestures/gestures.py)
+###### 2.1.2.1 手势库 (ui/gestures/gestures.py)
 
 **功能说明**：
 手势库管理模块，负责保存和加载用户手势库，提供添加、删除、修改手势的功能。
@@ -350,10 +284,10 @@ main_window.show()
 - 自动初始化：首次运行时自动创建默认手势库
 - 配置持久化：所有更改自动保存到配置文件
 - ID管理：自动分配和管理手势ID，确保连续性
-- 手势匹配：提供精确的方向序列匹配功能
+- 手势匹配：提供方向序列匹配功能
 - 格式验证：验证手势数据格式，确保数据一致性
 - 错误处理：提供详细的错误日志和恢复机制
-- 智能更改检测：通过`has_changes()`方法精确比较当前手势库与已保存的手势库，识别真正的未保存更改，避免误报（例如：修改后又改回原值），确保只有真正需要保存的变更才会被标记
+- 智能更改检测：通过`has_changes()`方法精确比较当前手势库与已保存的手势库，识别未保存的更改
 
 **使用方法**：
 ```python
@@ -400,114 +334,111 @@ gesture_library.save()
 print("手势库已保存")
 ```
 
-###### 2.1.3.2 手势选项卡 (ui/gestures/gestures_tab.py)
+###### 2.1.2.2 手势选项卡 (ui/gestures/gestures_tab.py)
 
 **功能说明**：
 手势管理界面，为用户提供可视化的手势添加、编辑和删除功能。
 
 **主要类和方法**：
-- `GestureCard`：手势卡片组件类
-  - `__init__(self, gesture_id, name, direction, action, parent=None)`：初始化手势卡片
-  - `update_info(self, name, direction, action)`：更新卡片显示的信息
-  - `set_selected(self, selected)`：设置卡片的选中状态
-  - `mousePressEvent(self, event)`：鼠标点击事件处理，用于选中卡片
+- `GestureContentWidget`：手势内容显示组件类
+  - `__init__(self, direction, action_type, action_value, parent=None)`：初始化手势内容组件
+  - `updateContent(self, direction, action_type, action_value)`：更新内容显示
 
-- `GesturesTab`：手势管理选项卡类
-  - `__init__(self, parent=None)`：初始化手势管理选项卡
+- `GesturesPage`：手势管理页面类
+  - `__init__(self, parent=None)`：初始化手势管理页面
   - `initUI(self)`：初始化UI组件和布局
-  - `load_gestures(self)`：加载并显示手势库中的所有手势
-  - `clear_editor(self)`：清空右侧编辑区域
-  - `fill_editor(self, gesture_info)`：使用指定手势信息填充编辑区域
-  - `on_gesture_card_clicked(self, gesture_id)`：处理手势卡片被点击的事件
-  - `on_add_gesture(self)`：处理添加手势按钮点击事件
-  - `on_delete_gesture(self)`：处理删除手势按钮点击事件
-  - `on_update_gesture(self)`：处理更新手势按钮点击事件
-  - `on_reset_library(self)`：处理重置手势库按钮点击事件
-  - `on_save_changes(self)`：处理保存更改按钮点击事件
+  - `createGestureCardsList(self, parent_widget)`：创建左侧手势卡片列表区域
+  - `createGestureEditor(self, parent_widget)`：创建右侧手势编辑区域
+  - `updateGestureCards(self, maintain_selected=True)`：更新手势卡片列表
+  - `onGestureCardClicked(self, card)`：处理手势卡片被点击事件
+  - `addNewGesture(self)`：添加新手势
+  - `deleteGesture(self)`：删除选中手势
+  - `resetGestures(self)`：重置手势库
+  - `saveGestureLibrary(self)`：保存手势库
+  - `add_direction(self, direction)`：添加方向到方向序列
+  - `remove_last_direction(self)`：移除最后一个方向
+  - `clearEditor(self)`：清空编辑区域
+  - `has_unsaved_changes(self)`：检查是否有未保存的更改
 
 **组件布局**：
 - 左侧：滚动区域，显示手势卡片列表
 - 右侧：编辑区域，包含以下字段：
   - 手势名称输入框（使用AnimatedInputField组件）
-  - 方向选择区域：
-    - 方向显示框（使用AnimatedInputField组件，只读模式）
-    - 九宫格按钮组，八个方向按钮（上、下、左、右、左上、右上、左下、右下）和一个中央删除按钮
-  - 动作类型下拉菜单（使用QCustomComboBox组件）
-  - 动作值输入框（使用AnimatedInputField组件）
+  - 方向序列管理：
+    - 方向显示框（使用AnimatedInputField组件）
+    - 方向按钮组
+  - 动作类型下拉菜单（使用CustomComboBox组件）
+  - 动作值输入框（使用AnimatedInputField或HotkeyInput组件）
   - 操作按钮组（使用AnimatedButton组件）
 
-**交互信号**：
-- `gesture_selected`：当用户选择手势卡片时发出
-- `gesture_added`：当添加新手势时发出
-- `gesture_deleted`：当删除手势时发出
-- `gesture_updated`：当更新手势时发出
-- `library_reset`：当重置手势库时发出
-- `changes_saved`：当保存更改时发出
-
 **特性说明**：
-- 可视化管理：通过卡片形式直观展示所有手势
-- 交互式方向编辑：通过直观的方向按钮组实现更简单的方向序列输入
-- 表单：使用自定义动画输入框组件（AnimatedInputField）提供更好的用户体验
+- 卡片式管理：通过卡片形式展示所有手势
+- 方向编辑：通过方向按钮和方向序列显示框管理方向输入
+- 响应式表单：使用自定义输入组件提供更好的用户体验
 - 实时预览：编辑时实时更新卡片显示
-- 方向验证：自动防止连续添加相同方向，保持手势逻辑合理性
-- 直观操作：提供清晰的添加、删除和编辑功能
-- 验证机制：自动验证输入数据格式
+- 方向验证：防止添加无效方向，保持手势逻辑合理性
+- 操作界面：提供添加、删除和编辑功能
+- 输入验证：自动验证输入数据格式
 - 排序显示：按照ID顺序排列手势卡片
-- 状态反馈：操作后提供明确的状态反馈
+- 状态反馈：操作后提供状态反馈
+- 对话框确认：重要操作需要对话框确认
 
 **使用方法**：
 ```python
-# 在主窗口中添加手势管理选项卡
-from ui.gestures.gestures_tab import GesturesTab
+# 创建手势管理页面
+from ui.gestures.gestures_tab import GesturesPage
 
-# 创建主窗口
-main_window = QMainWindow()
-side_tab = SideTabWidget(main_window)
+# 创建页面实例
+gestures_page = GesturesPage()
 
-# 创建并添加手势管理选项卡
-gestures_tab = GesturesTab()
-side_tab.add_tab("手势", gestures_tab, QIcon(":/icons/gesture.png"))
+# 将页面添加到导航菜单
+navigation_menu.addPage(gestures_page, "手势管理", gestures_icon, navigation_menu.POSITION_TOP)
 
-# 连接信号到槽函数
-gestures_tab.changes_saved.connect(lambda: print("手势库已保存"))
-gestures_tab.gesture_added.connect(lambda id: print(f"添加了新手势：ID {id}"))
-gestures_tab.gesture_deleted.connect(lambda id: print(f"删除了手势：ID {id}"))
+# 卡片管理
+gestures_page.updateGestureCards()  # 更新所有手势卡片
+gestures_page.addNewGesture()       # 添加新手势
+gestures_page.deleteGesture()       # 删除当前选中的手势
 
-# 设置主窗口
-main_window.setCentralWidget(side_tab)
-main_window.show()
+# 方向管理
+gestures_page.add_direction("上")    # 添加向上方向
+gestures_page.add_direction("右")    # 添加向右方向
+gestures_page.remove_last_direction() # 删除最后添加的方向
+
+# 保存和重置
+gestures_page.saveGestureLibrary()  # 保存手势库
+gestures_page.resetGestures()       # 重置为默认手势库
 ```
 
 **方向选择界面示例**：
 ```python
 # 手势方向选择界面示例
-from ui.gestures.gestures_tab import GesturesTab
+from ui.gestures.gestures_tab import GesturesPage
 from PyQt6.QtWidgets import QApplication
 from ui.components.input_field import AnimatedInputField
 
-# 创建手势管理选项卡
+# 创建手势管理页面
 app = QApplication([])
-gestures_tab = GesturesTab()
+gestures_page = GesturesPage()
 
 # 选择一个手势卡片
 # ...
 
 # 使用方向按钮添加方向序列
-gestures_tab.add_direction("上")
-gestures_tab.add_direction("右")
-gestures_tab.add_direction("下")
+gestures_page.add_direction("上")
+gestures_page.add_direction("右")
+gestures_page.add_direction("下")
 
 # 查看当前方向序列
-current_direction = gestures_tab.direction_text.text()
+current_direction = gestures_page.direction_text.text()
 print(f"当前方向序列: {current_direction}")  # 输出: 当前方向序列: 上-右-下
 
 # 删除最后一个方向
-gestures_tab.remove_last_direction()
-print(f"删除后的方向序列: {gestures_tab.direction_text.text()}")  # 输出: 删除后的方向序列: 上-右
+gestures_page.remove_last_direction()
+print(f"删除后的方向序列: {gestures_page.direction_text.text()}")  # 输出: 删除后的方向序列: 上-右
 
 # 访问其他输入字段
-name_input = gestures_tab.name_input           # AnimatedInputField组件
-action_value_input = gestures_tab.action_value_input  # AnimatedInputField组件
+name_input = gestures_page.name_input           # AnimatedInputField组件
+action_value_input = gestures_page.action_value_input  # AnimatedInputField组件
 
 # 设置输入字段值
 name_input.setText("新手势名称")
@@ -518,13 +449,13 @@ print(f"手势名称: {name_input.text()}")
 print(f"动作值: {action_value_input.text()}")
 
 # 显示并运行应用程序
-gestures_tab.show()
+gestures_page.show()
 app.exec()
 ```
 
-##### 2.1.4 设置模块
+##### 2.1.3 设置模块
 
-###### 2.1.4.1 设置管理器 (ui/settings/settings.py)
+###### 2.1.3.1 设置管理器 (ui/settings/settings.py)
 
 **功能说明**：
 设置管理模块，负责保存和加载用户设置，提供设置的持久化和访问机制。
@@ -532,6 +463,8 @@ app.exec()
 **主要类和方法**：
 - `Settings`：设置管理器类
   - `__init__(self)`：初始化设置管理器
+  - `_load_default_settings(self)`：加载默认设置
+  - `_get_settings_file_path(self)`：获取设置文件路径
   - `load(self)`：从配置文件加载设置
   - `save(self)`：保存设置到配置文件
   - `get(self, key, default=None)`：获取指定设置项的值
@@ -539,9 +472,11 @@ app.exec()
   - `reset_to_default(self)`：重置为默认设置
   - `has_changes(self)`：检查是否有未保存的更改
 
+- `get_settings()`：获取设置管理器实例的单例函数
+
 **设置文件管理**：
 - 默认设置来源：`ui/settings/default_settings.json`
-- 用户设置保存路径：`~/.gestrokey/config/settings.json`（Windows）或`~/.gestrokey/config/settings.json`（其他系统）
+- 用户设置保存路径：`~/.gestrokey/config/settings.json`
 - 支持的设置项：
   - `pen_width`：笔尖粗细，范围1-20像素
   - `pen_color`：笔尖颜色，RGB格式数组
@@ -549,10 +484,10 @@ app.exec()
 **特性说明**：
 - 自动初始化：首次运行时自动创建默认配置目录和文件
 - 设置持久化：所有设置保存到用户目录下的配置文件
-- 参数验证：验证设置值是否有效，避免错误设置
+- 参数验证：验证设置值是否有效
 - 默认值回退：缺少设置项时使用默认值
-- 错误处理：提供详细的错误日志和恢复机制
-- 智能更改检测：精确识别真正的未保存更改，避免误报（例如：修改后又改回原值）
+- 错误处理：提供错误日志和恢复机制
+- 更改检测：识别未保存的更改，避免误报
 
 **使用方法**：
 ```python
@@ -581,65 +516,72 @@ else:
     print("所有设置已保存")
 ```
 
-###### 2.1.4.2 设置选项卡 (ui/settings/settings_tab.py)
+###### 2.1.3.2 设置选项卡 (ui/settings/settings_tab.py)
 
 **功能说明**：
 设置界面，允许用户自定义笔迹样式和应用行为，提供直观的设置选项。
 
 **主要类和方法**：
 - `PenPreviewWidget`：笔迹预览组件类
-  - `__init__(self, parent=None)`：初始化预览组件
+  - `__init__(self, width=3, color=[0, 120, 255], parent=None)`：初始化预览组件
   - `update_width(self, width)`：设置笔迹宽度
   - `update_color(self, color)`：设置笔迹颜色
   - `paintEvent(self, event)`：绘制预览效果
 
-- `SettingsTab`：设置选项卡类
-  - `__init__(self, parent=None)`：初始化设置选项卡
+- `SettingsPage`：设置页面类
+  - `__init__(self, parent=None)`：初始化设置页面
   - `initUI(self)`：初始化UI组件和布局
-  - `update_color_button(self, color)`：更新颜色按钮的背景色
-  - `show_color_dialog(self)`：显示颜色选择对话框
+  - `create_brush_settings_page(self)`：创建画笔设置页面
+  - `create_app_settings_page(self)`：创建应用设置页面
+  - `color_changed(self, color)`：处理颜色变化
   - `pen_width_changed(self, value)`：处理笔尖粗细变化
-  - `reset_settings(self)`：处理重置设置按钮点击
-  - `save_settings(self)`：处理保存设置按钮点击
+  - `pen_width_spinner_sync(self, value)`：同步数字选择器的值
+  - `reset_settings(self)`：重置设置为默认值
+  - `save_settings(self)`：保存设置
   - `_update_drawing_manager(self)`：更新绘制管理器的参数
+  - `has_unsaved_changes(self)`：检查是否有未保存的更改
+  - `update_ui_from_settings(self)`：从设置更新UI组件状态
 
 **组件布局**：
-- 顶部：笔迹设置区域
-  - 笔迹宽度调节器（QSpinBox）
-  - 笔迹颜色选择按钮
-  - 笔迹预览组件
+- 顶部：设置标题
+- 中部：横向导航菜单，包含以下页面：
+  - 画笔设置页面：
+    - 笔尖粗细设置（滑块和数字选择器）
+    - 笔尖颜色选择（色彩选择器）
+    - 笔尖预览组件
+  - 应用设置页面
 - 底部：操作按钮区域
-  - 保存设置按钮
   - 重置设置按钮
-
-**设置参数**：
-- `pen_width`：笔迹宽度，范围1-20像素
-- `pen_color`：笔迹颜色，RGB格式数组
+  - 保存设置按钮
 
 **特性说明**：
 - 实时预览：设置变更时实时更新预览效果
-- 直观调节：通过滑块和微调框直观调整参数
-- 颜色选择器：集成标准颜色对话框
+- 直观调节：通过滑块和数字选择器调整参数
+- 色彩选择器：集成色彩选择组件
 - 参数验证：自动验证输入值的有效性
 - 默认值恢复：一键恢复默认设置
-- 显式应用：设置更改只有在点击"保存设置"按钮后才会被应用到绘制功能
+- 分组设置：将相关设置分组显示
+- 设置持久化：保存设置到配置文件
+- 对话框确认：重要操作需要对话框确认
 
 **使用方法**：
 ```python
-# 在主窗口中添加设置选项卡
-from ui.settings.settings_tab import SettingsTab
+# 创建设置页面
+from ui.settings.settings_tab import SettingsPage
 
-# 创建主窗口
-main_window = QMainWindow()
-side_tab = SideTabWidget(main_window)
+# 创建页面实例
+settings_page = SettingsPage()
 
-# 创建并添加设置选项卡
-settings_tab = SettingsTab()
-side_tab.add_tab("设置", settings_tab, QIcon(":/icons/settings.png"))
+# 将页面添加到导航菜单
+navigation_menu.addPage(settings_page, "设置", settings_icon, navigation_menu.POSITION_BOTTOM)
 
-# 设置主窗口
-main_window.setCentralWidget(side_tab)
-main_window.show()
+# 控制设置
+settings_page.update_ui_from_settings()  # 从设置更新UI
+settings_page.save_settings()            # 保存设置
+settings_page.reset_settings()           # 重置为默认设置
+
+# 检查未保存更改
+has_changes = settings_page.has_unsaved_changes()
 ```
 
 #### 2.2 UI组件模块
@@ -663,6 +605,8 @@ main_window.show()
     - `min_height`：按钮最小高度，整数值（像素）
     - `border_color`：边框颜色，RGB格式的数组或十六进制颜色字符串
     - `shadow_color`：阴影颜色，RGB格式的数组或十六进制颜色字符串
+  - `_parse_color(color)`：解析颜色参数，支持RGB列表和十六进制颜色字符串
+  - `_setup_animations()`：设置动画效果
   - `set_primary_color(color)`：设置按钮主色调
     - `color`：RGB格式的数组，如[41, 128, 185]或十六进制颜色字符串
   - `set_hover_color(color)`：设置按钮悬停色调
@@ -698,9 +642,9 @@ main_window.show()
 
 **应用场景**：
 - 主窗口的退出按钮
-- 控制台选项卡的开始和停止绘制按钮
-- 设置选项卡的保存和重置设置按钮
-- 手势管理选项卡的添加、删除和保存手势按钮
+- 控制台页面的开始和停止绘制按钮
+- 设置页面的保存和重置设置按钮
+- 手势管理页面的添加、删除和保存手势按钮
 
 **使用方法**：
 ```python
@@ -713,7 +657,7 @@ button = AnimatedButton("按钮文本")
 # 创建自定义按钮（设置所有可选参数）
 custom_button = AnimatedButton(
     text="自定义按钮", 
-    primary_color=[41, 128, 185],  # 扁平化蓝色
+    primary_color=[41, 128, 185],  # 蓝色
     hover_color=[52, 152, 219],    # 悬停时的颜色（可选，不提供时会自动基于主色计算）
     text_color=[255, 255, 255],    # 白色文本
     icon="path/to/icon.png",       # 设置图标
@@ -767,7 +711,7 @@ red_button = AnimatedButton(
 # 创建扁平风格按钮
 flat_button = AnimatedButton(
     text="扁平风格",
-    primary_color=[248, 249, 250], # 几乎白色背景
+    primary_color=[248, 249, 250], # 白色背景
     text_color=[52, 58, 64],       # 深灰色文本
     border_radius=0                # 无圆角
 )
@@ -776,7 +720,7 @@ flat_button = AnimatedButton(
 high_contrast_button = AnimatedButton(
     text="高对比度",
     primary_color=[52, 58, 64],    # 深灰色背景 
-    text_color=[248, 249, 250],    # 接近白色文本
+    text_color=[248, 249, 250],    # 白色文本
     border_radius=20               # 大圆角半径
 )
 ```
@@ -2122,6 +2066,7 @@ hotkey_input.clear()
 
 - `TransparentDrawingOverlay`：透明绘制覆盖层
   - `__init__(self)`：初始化绘制覆盖层，创建透明窗口和绘制参数
+  - `initUI(self)`：设置窗口属性和创建绘图缓冲区
   - `set_pen_width(self, width)`：设置笔尖粗细
   - `set_pen_color(self, color)`：设置笔尖颜色
   - `startDrawing(self, x, y, pressure)`：开始绘制，同时停止任何正在进行的淡出效果
@@ -2139,7 +2084,7 @@ hotkey_input.clear()
   - `update_settings(self)`：更新设置参数
   - `get_last_direction(self)`：获取最后一次绘制的方向
   - `_init_mouse_hook(self)`：初始化全局鼠标监听
-  - `_calculate_simulated_pressure(self, x, y)`：根据鼠标移动速度计算模拟压力值，经过简化和优化
+  - `_calculate_simulated_pressure(self, x, y)`：根据鼠标移动速度计算模拟压力值，实现速度与压力的映射关系
 
 **特性说明**：
 - 全局透明覆盖层，可在任何应用程序上方进行绘制
@@ -2147,10 +2092,10 @@ hotkey_input.clear()
 - 所有设置值从settings模块获取
 - 绘制结束后自动分析笔画方向，执行匹配手势
 - 支持笔画淡出动画效果
-- 智能处理鼠标事件，只响应鼠标右键绘制
+- 专注处理鼠标右键事件，不影响其他鼠标操作
 - 简化的日志记录，只保留关键信息
-- 优化的压力计算算法
-- 高效的绘制算法，保持流畅性能
+- 基于速度的压力计算算法，实现速度越快压力越小的效果
+- 优化的绘制算法，减少资源占用
 
 **使用方法**：
 ```python
@@ -2320,8 +2265,9 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 1. **主程序模块(main.py)**：提供应用程序入口点，初始化UI和功能模块
 2. **核心功能模块(core/)**：实现手势识别、分析和执行的核心功能
 3. **用户界面模块(ui/)**：提供用户交互界面，包括控制台、设置和手势管理
-4. **资源管理(assets/)**：管理应用程序资源，如图标和配置文件
-5. **版本管理(version.py)**：管理应用程序版本信息和构建参数
+4. **UI组件模块(ui/components/)**：提供自定义的界面组件，如动画按钮、导航菜单等
+5. **资源管理(assets/)**：管理应用程序资源，如图标和配置文件
+6. **版本管理(version.py)**：管理应用程序版本信息和构建参数
 
 **数据流向**：
 1. 用户通过鼠标右键在屏幕上绘制手势
@@ -2333,7 +2279,15 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 **通信机制**：
 - 使用Qt的信号槽机制实现模块间的松耦合通信
 - 使用事件驱动设计，降低模块间的直接依赖
-- 使用单例模式管理共享资源，如日志记录器和设置管理器
+- 使用单例模式管理共享资源，如日志记录器、设置管理器和手势库
+- 通过自定义信号实现异步操作和UI更新
+
+**界面架构**：
+- 采用侧边导航菜单(SideNavigationMenu)设计，实现页面切换
+- 支持页面分组，将页面组织为主要功能组和设置组
+- 导航菜单支持垂直与水平两种布局模式
+- 所有UI组件使用自定义设计，确保统一的视觉风格
+- 页面切换采用平滑动画效果，提升用户体验
 
 #### 4.2 程序流程
 
@@ -2352,23 +2306,23 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
    - 加载默认设置和手势库
 
 3. **UI初始化**
-   - 创建选项卡容器(SideTabWidget)
-   - 初始化控制台选项卡(ConsoleTab)
-   - 初始化设置选项卡(SettingsTab)
-   - 初始化手势管理选项卡(GesturesTab)
-   - 设置底部状态栏和退出按钮
+   - 创建中央部件和主布局
+   - 初始化侧边导航菜单(SideNavigationMenu)
+   - 创建控制台页面(ConsolePage)、设置页面(SettingsPage)和手势管理页面(GesturesPage)
+   - 将页面添加到导航菜单中，设置图标和分组
+   - 设置底部状态栏和退出按钮，显示版本信息
 
 4. **显示主窗口**
    - 应用窗口样式和布局
-   - 设置默认选择的选项卡(控制台)
+   - 设置默认选择的页面(控制台)
    - 显示主窗口
    - 进入应用程序主循环
 
 ##### 4.2.2 绘制流程
 
 1. **启动绘制功能**
-   - 用户点击控制台选项卡上的"开始绘制"按钮
-   - 创建DrawingManager实例
+   - 用户点击控制台页面上的"开始绘制"按钮
+   - 创建DrawingManager实例(如果尚未创建)
    - 启动鼠标监听，准备捕获右键事件
    - 创建透明覆盖层，用于绘制手势轨迹
    - 从设置加载笔尖粗细和颜色参数
@@ -2395,72 +2349,86 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
    - 用户点击"停止绘制"按钮
    - 停止鼠标监听
    - 关闭透明覆盖层
-   - 释放相关资源
+   - 释放相关资源并更新UI状态
 
 ##### 4.2.3 设置管理流程
 
 1. **查看设置**
-   - 用户切换到设置选项卡
+   - 用户通过侧边导航菜单切换到设置页面
    - 加载并显示当前设置，如笔尖粗细和颜色
+   - 设置预览组件实时显示当前配置效果
 
 2. **修改设置**
-   - 用户调整笔尖粗细(QSpinBox)或点击颜色按钮选择新颜色
+   - 用户调整笔尖粗细(使用自定义NumberSpinner组件)
+   - 用户点击颜色按钮，使用AnimatedColorPicker选择新颜色
    - PenPreviewWidget实时显示预览效果
    - 设置更改只保存在内存中，不会立即应用到绘制功能
 
 3. **保存设置**
    - 用户点击"保存设置"按钮
    - 系统检查设置是否有实际变化（智能检测）
-   - 如果没有实际变化（例如修改后又改回原值），提示用户无需保存
+   - 如果没有实际变化，使用Toast通知提示用户无需保存
    - 如果有实际变化，设置保存到配置文件中
    - 同时将设置应用到绘制管理器，若绘制功能正在运行，变更将立即生效
+   - 使用Toast通知提示用户保存成功
 
 4. **重置设置**
    - 用户点击"重置设置"按钮
-   - 从default_settings.json加载默认设置
+   - 系统显示确认对话框，征求用户确认
+   - 用户确认后，从default_settings.json加载默认设置
    - 更新UI显示和预览
    - 自动保存重置后的设置并立即应用到绘制功能
+   - 使用Toast通知提示用户重置成功
 
 ##### 4.2.4 手势管理流程
 
 1. **查看手势**
-   - 用户切换到手势管理选项卡
-   - 加载并显示当前手势库，以卡片形式展示每个手势
+   - 用户通过侧边导航菜单切换到手势管理页面
+   - 加载并显示当前手势库，以自定义卡片(CardWidget)形式展示每个手势
    - 按照ID顺序排列手势卡片，ID越小排在越前面
+   - 使用自定义滚动区域组件显示手势卡片列表
 
 2. **编辑手势**
-   - 用户点击左侧手势卡片
+   - 用户点击左侧手势卡片，卡片显示选中状态动画
    - 右侧编辑区域显示选中手势的详细信息
-   - 用户可以修改手势名称、方向和动作
+   - 用户可以使用自定义输入组件修改手势名称、方向和动作
+   - 对于快捷键动作，用户可以使用HotkeyInput组件输入快捷键
    - 修改立即应用于内存中的手势对象，并实时更新左侧卡片显示
-   - 但这些修改不会影响实际的手势识别和执行，只有在保存后才会生效
+   - 这些修改不会影响实际的手势识别和执行，只有在保存后才会生效
 
 3. **添加手势**
    - 用户填写右侧编辑区域的内容
    - 点击"添加新手势"按钮
    - 系统自动分配新的手势ID（当前最大ID+1）
-   - 新手势添加到左侧卡片列表中
+   - 新手势添加到左侧卡片列表中，带有添加动画效果
+   - 使用Toast通知提示用户添加成功
 
 4. **删除手势**
    - 用户选中要删除的手势卡片
    - 点击"删除手势"按钮
-   - 系统删除选中的手势，并自动重排后续手势的ID，保持ID连续性
-   - 左侧卡片列表更新，移除已删除的手势
+   - 系统显示确认对话框，征求用户确认
+   - 用户确认后，删除选中的手势，并自动重排后续手势的ID，保持ID连续性
+   - 左侧卡片列表更新，移除已删除的手势，带有淡出动画效果
+   - 使用Toast通知提示用户删除成功
 
 5. **重置手势库**
    - 用户点击"重置手势库"按钮
-   - 系统从default_gestures.json加载默认手势库
+   - 系统显示确认对话框，征求用户确认
+   - 用户确认后，从default_gestures.json加载默认手势库
    - 重置所有手势的ID，按照默认顺序排列
    - 左侧卡片列表更新，显示默认手势库
-   - 设置未保存更改标志，提示用户点击"保存更改"按钮保存更改
+   - 使用Toast通知提示用户重置成功
+   - 自动刷新手势执行器，确保使用最新的手势库
 
 6. **保存手势库**
    - 用户点击"保存更改"按钮
    - 系统检查手势库是否有实际变化（智能检测）
-   - 如果没有实际变化（例如修改后又改回原值），提示用户无需保存
+   - 如果没有实际变化，使用Toast通知提示用户无需保存
    - 如果有实际变化，手势库保存到配置文件中
    - 更新内存中的已保存手势对象，使其反映最新的保存状态
    - 保存后的手势库会立即用于手势识别和执行
+   - 自动刷新手势执行器，确保使用最新的已保存手势库
+   - 使用Toast通知提示用户保存成功
 
 #### 4.3 使用场景与示例
 
@@ -2601,12 +2569,39 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 
 本文档详细介绍了GestroKey项目的源代码结构和功能模块，包括：
 
-1. **主程序模块**：提供应用程序入口点和主窗口界面
-2. **用户界面模块**：实现控制台、设置和手势管理选项卡
-3. **UI组件模块**：提供按钮、卡片、滚动条等自定义组件
+1. **主程序模块**：提供应用程序入口点和主窗口界面，使用侧边导航菜单组织页面内容
+2. **用户界面模块**：实现控制台、设置和手势管理页面，提供直观的用户操作界面
+3. **UI组件模块**：提供按钮、卡片、滚动条、颜色选择器等自定义组件，实现统一的动画和视觉效果
 4. **核心功能模块**：实现手势绘制、分析和执行的核心功能
 5. **应用程序集成**：描述架构设计、程序流程和使用场景
 
-通过合理的模块化设计和松耦合架构，GestroKey实现了易用的手势控制功能，为用户提供了提高工作效率的工具。
+GestroKey通过精心设计的UI界面和强大的核心功能，为用户提供了以下特点：
+
+1. **用户体验优先**：
+   - 所有UI操作都有平滑的动画过渡效果
+   - 使用Toast通知和对话框提供清晰的操作反馈
+   - 精细调整的颜色和布局，确保视觉舒适性
+   - 高度可定制的绘制参数，适应不同用户习惯
+
+2. **高效的手势管理**：
+   - 手势库采用ID管理机制，保证数据一致性
+   - 智能的手势匹配算法，提高识别准确率
+   - 支持自定义手势及动作关联，扩展应用场景
+   - 自动化的数据持久化和同步机制
+
+3. **稳健的技术实现**：
+   - 完善的异常处理和日志记录机制
+   - 单例模式管理全局资源，优化内存使用
+   - 模块化和松耦合设计，便于维护和扩展
+   - 多线程处理关键操作，保证UI响应流畅
+
+4. **现代化的界面组件**：
+   - 自定义的AnimatedButton取代标准按钮，提供悬停和点击动画
+   - CardWidget组件实现统一的卡片视觉效果和交互行为
+   - SideNavigationMenu提供分组和动画支持的导航界面
+   - 自定义滚动区域和滚动条，优化滚动体验
+   - AnimatedColorPicker提供直观的颜色选择界面
+
+通过合理的模块化设计和松耦合架构，GestroKey不仅实现了易用的手势控制功能，还提供了流畅的用户体验和扩展性强的开发框架。未来的扩展方向包括更多的手势动作类型、更复杂的手势识别算法和更丰富的用户界面自定义选项。
 
 如需更详细的开发和使用信息，请参考各模块的代码注释和类文档。
