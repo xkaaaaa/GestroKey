@@ -200,11 +200,6 @@ class MessageDialog(QWidget): # 对话框组件
         body_layout.setSpacing(15)
         body_layout.setContentsMargins(0,0,0,0) # 内容垂直布局
         
-        # 添加消息类型说明
-        type_label = QLabel(MESSAGE_TYPES[message_type]["description"])
-        type_label.setStyleSheet(f"color: {CONFIG['color_text_muted']}; font-style: italic;")
-        body_layout.addWidget(type_label)
-        
         # 添加消息内容
         if message:
             message_label = QLabel(message)
@@ -409,6 +404,31 @@ class MessageDialog(QWidget): # 对话框组件
                     # 确保覆盖层总是与目标部件大小相同
                     self.overlay_widget.setGeometry(0, 0, target_widget.width(), target_widget.height())
                     self.overlay_widget.setFixedSize(target_widget.size())
+                    
+                    # 当父窗口大小变化时，重新计算并更新对话框的位置
+                    if self.isVisible():
+                        try:
+                            self.logger.debug("父窗口大小变化，重新计算对话框位置")
+                            # 仅计算目标几何位置(不使用动画)
+                            _, target_geom = self._calc_geometries()
+                            
+                            # 设置新位置
+                            current_opacity = self._opacity  # 保存当前的透明度
+                            current_size = self.size()  # 保存当前的大小
+                            
+                            # 停止任何正在进行的动画
+                            if self.geom_anim.state() == QPropertyAnimation.State.Running:
+                                self.geom_anim.stop()
+                            
+                            # 更新位置，保持大小不变
+                            target_geom.setSize(current_size)
+                            self.setGeometry(target_geom)
+                            
+                            # 确保对话框仍然在覆盖层之上
+                            self.raise_()
+                        except Exception as e:
+                            self.logger.error(f"重新定位对话框时出错: {str(e)}")
+                
             elif event.type() == QEvent.Type.ChildAdded:
                 # 如果添加了新的子部件，确保覆盖层和对话框仍然在最上方
                 if hasattr(self, 'overlay_widget') and self.overlay_widget:
