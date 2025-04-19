@@ -17,7 +17,7 @@ try:
     from ui.gestures.gestures import get_gesture_library  # 导入手势库
     from ui.gestures.gestures_tab import GesturesPage  # 导入手势管理页面
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
-    from ui.components.side_tab import SideNavigationMenu  # 导入侧边栏导航菜单组件
+    from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
     from ui.components.dialog import show_dialog  # 导入自定义对话框组件
 except ImportError:
@@ -28,7 +28,7 @@ except ImportError:
     from ui.gestures.gestures import get_gesture_library  # 导入手势库
     from ui.gestures.gestures_tab import GesturesPage  # 导入手势管理页面
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
-    from ui.components.side_tab import SideNavigationMenu  # 导入侧边栏导航菜单组件
+    from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
     from ui.components.dialog import show_dialog  # 导入自定义对话框组件
 

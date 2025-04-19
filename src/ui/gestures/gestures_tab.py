@@ -14,7 +14,7 @@ try:
     from ui.components.card import CardWidget
     from ui.components.scrollbar import AnimatedScrollArea
     from ui.components.custom_combobox import CustomComboBox
-    from ui.components.animated_stacked_widget import AnimatedStackedWidget
+    from ui.components.navigation_menu import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
     from ui.components.hotkey_input import HotkeyInput
@@ -27,7 +27,7 @@ except ImportError:
     from ui.components.card import CardWidget
     from ui.components.scrollbar import AnimatedScrollArea
     from ui.components.custom_combobox import CustomComboBox
-    from ui.components.animated_stacked_widget import AnimatedStackedWidget
+    from ui.components.navigation_menu import AnimatedStackedWidget
     from ui.components.input_field import AnimatedInputField
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized
     from ui.components.hotkey_input import HotkeyInput

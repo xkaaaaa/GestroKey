@@ -23,22 +23,21 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.2.1 按钮组件](#221-uicomponentsbuttonpy)
     - [2.2.2 卡片组件](#222-uicomponentscardpy)
     - [2.2.3 滚动条组件](#223-uicomponentsscrollbarpy)
-    - [2.2.4 侧边选项卡](#224-uicomponentsside_tabpy)
+    - [2.2.4 导航菜单组件](#224-uicomponentsnavigation_menupy)
     - [2.2.5 下拉菜单组件](#225-uicomponentscustom_comboboxpy)
-    - [2.2.6 动画堆栈组件](#226-uicomponentsanimated_stacked_widgetpy)
-    - [2.2.7 输入框组件](#227-uicomponentsinput_fieldpy)
-    - [2.2.8 滑块组件](#228-uicomponentssliderpy)
-    - [2.2.9 取色器组件](#229-uicomponentscolor_pickerpy)
-    - [2.2.10 数字选择器组件](#2210-uicomponentsnumber_spinnerpy)
-    - [2.2.11 消息提示组件](#2211-uicomponentstoast_notificationpy)
-    - [2.2.12 对话框组件](#2212-uicomponentsdialogpy)
-    - [2.2.13 快捷键输入组件](#2213-uicomponentshotkey_inputpy)
+    - [2.2.6 输入框组件](#226-uicomponentsinput_fieldpy)
+    - [2.2.8 滑块组件](#227-uicomponentssliderpy)
+    - [2.2.9 取色器组件](#228-uicomponentscolor_pickerpy)
+    - [2.2.10 数字选择器组件](#229-uicomponentsnumber_spinnerpy)
+    - [2.2.11 消息提示组件](#2210-uicomponentstoast_notificationpy)
+    - [2.2.12 对话框组件](#2211-uicomponentsdialogpy)
+    - [2.2.13 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
 - [3. 核心功能模块](#3-核心功能模块)
-  - [3.1 drawer.py](#31-coredrawerpy)
-  - [3.2 stroke_analyzer.py](#32-corestroke_analyzerpy)
-  - [3.3 gesture_executor.py](#33-coregesture_executorpy)
-  - [3.4 system_monitor.py](#34-coresystem_monitorpy)
-  - [3.5 logger.py](#35-coreloggerpy)
+  - [3.1 core/drawer.py](#31-coredrawerpy)
+  - [3.2 core/stroke_analyzer.py](#32-corestroke_analyzerpy)
+  - [3.3 core/gesture_executor.py](#33-coregesture_executorpy)
+  - [3.4 core/system_monitor.py](#34-coresystem_monitorpy)
+  - [3.5 core/logger.py](#35-coreloggerpy)
 - [4. 应用程序集成](#4-应用程序集成)
   - [4.1 应用程序架构](#41-应用程序架构)
   - [4.2 程序流程](#42-程序流程)
@@ -70,7 +69,7 @@ src/
 │       ├── button.py        # 自定义动画按钮组件
 │       ├── card.py          # 自定义卡片组件
 │       ├── scrollbar.py     # 自定义滚动条和滚动区域组件
-│       ├── side_tab.py      # 左侧选项卡组件
+│       ├── navigation_menu.py # 导航菜单组件
 │       ├── input_field.py   # 自定义动画输入框组件
 │       ├── slider.py        # 自定义动画滑块组件
 │       ├── color_picker.py  # 自定义颜色选择器组件
@@ -78,7 +77,7 @@ src/
 │       ├── toast_notification.py  # 通知提示组件
 │       ├── dialog.py        # 自定义对话框组件
 │       ├── hotkey_input.py  # 快捷键输入组件
-│       └── animated_stacked_widget.py  # 动画堆栈组件
+│       └── number_spinner.py # 数字选择器组件
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
 │       ├── icon.svg         # 应用图标
@@ -1088,98 +1087,119 @@ gestures_scroll_area.setWidget(gestures_container)
 main_layout.addWidget(gestures_scroll_area)
 ```
 
-##### 2.2.4 ui/components/side_tab.py
+##### 2.2.4 ui/components/navigation_menu.py
 
-**功能说明**：左侧选项卡组件，提供垂直选项卡界面，包含切换动画效果，符合应用主题风格。
+**功能说明**：侧边导航菜单组件，提供垂直和水平两种导航模式，包含分组功能和切换动画效果，符合应用主题风格。
 
 **主要类和方法**：
-- `AnimatedTabButton`：动画选项卡按钮类，用于显示单个选项卡
-  - `__init__(text, icon=None, parent=None)`：初始化选项卡按钮
-    - `text`：选项卡显示文本
-    - `icon`：选项卡图标，QIcon对象或图标路径
+- `AnimatedNavigationButton`：动画导航按钮类，用于显示单个导航按钮
+  - `__init__(text, icon=None, parent=None, orientation=0)`：初始化导航按钮
+    - `text`：按钮显示文本
+    - `icon`：按钮图标，QIcon对象或图标路径
     - `parent`：父窗口组件
-  - `setSelected(selected)`：设置选项卡选中状态，并触发动画
+    - `orientation`：方向，0代表垂直，1代表水平
+  - `setSelected(selected)`：设置按钮选中状态，并触发动画
     - `selected`：布尔值，True表示选中，False表示未选中
-  - `setText(text)`：设置选项卡文本
-    - `text`：新的选项卡文本
-  - `setIcon(icon)`：设置选项卡图标
+  - `setText(text)`：设置按钮文本
+    - `text`：新的按钮文本
+  - `setIcon(icon)`：设置按钮图标
     - `icon`：QIcon对象或图标路径
-  - `enterEvent(event)`：处理鼠标进入事件，触发悬停效果
-  - `leaveEvent(event)`：处理鼠标离开事件，恢复正常效果
-  - `paintEvent(event)`：绘制选项卡外观，包括背景、图标、文本和选中指示器
+  - `setOrientation(orientation)`：设置按钮方向
+    - `orientation`：0代表垂直，1代表水平
+  - `paintEvent(event)`：绘制按钮外观，包括背景、图标、文本和选中指示器
   - `_startAnimation(selected)`：开始选中/未选中状态的动画效果
-  - `_updateAppearance()`：更新选项卡外观，根据当前状态调整颜色和指示器位置
+  - `_updateAppearance()`：更新按钮外观，根据当前状态调整颜色和指示器位置
 
-- `SideTabWidget`：左侧选项卡容器类
-  - `__init__(parent=None)`：初始化选项卡容器
+- `AnimatedStackedWidget`：带动画效果的堆叠窗口小部件，用于切换内容页面，提供平滑过渡动画
+  - `__init__(parent=None)`：初始化堆叠窗口组件
+  - `addWidget(widget)`：添加子窗口组件
+  - `setCurrentIndex(index, direction=None)`：设置当前显示的子窗口，并指定动画方向
+  - `setCurrentWidget(widget, direction=None)`：设置当前显示的子窗口对象，并指定动画方向
+
+- `SideNavigationMenu`：导航菜单容器类，支持垂直和水平布局，以及导航按钮分组
+  - `__init__(parent=None, orientation=ORIENTATION_VERTICAL)`：初始化导航菜单
     - `parent`：父窗口组件
-  - `addTab(widget, text, icon=None, position=POSITION_TOP)`：添加新的选项卡，支持指定位置
-    - `widget`：选项卡内容组件，通常是QWidget的子类
-    - `text`：选项卡显示文本
-    - `icon`：选项卡图标，QIcon对象或图标路径
-    - `position`：选项卡位置，可以是POSITION_TOP或POSITION_BOTTOM，分别表示顶部区域和底部区域
-    - 返回值：新添加选项卡的索引
-  - `setCurrentIndex(index)`：设置当前选项卡，触发动画切换
-    - `index`：选项卡索引，整数值
-  - `currentIndex()`：获取当前选项卡索引
-    - 返回值：当前选中的选项卡索引，整数值
+    - `orientation`：导航方向，ORIENTATION_VERTICAL(0)为垂直导航，ORIENTATION_HORIZONTAL(1)为水平导航
+  - `addPage(widget, text, icon=None, position=POSITION_TOP, group_name=None)`：添加新的页面，支持指定位置和分组
+    - `widget`：页面内容组件，通常是QWidget的子类
+    - `text`：导航按钮显示文本
+    - `icon`：导航按钮图标，QIcon对象或图标路径
+    - `position`：按钮位置，可以是POSITION_TOP或POSITION_BOTTOM，分别表示顶部区域和底部区域
+    - `group_name`：分组名称，指定按钮所属的分组
+    - 返回值：新添加页面的索引
+  - `createGroup(name, position=POSITION_TOP, title=None)`：创建新的导航按钮分组
+    - `name`：分组名称，唯一标识
+    - `position`：分组位置，POSITION_TOP或POSITION_BOTTOM
+    - `title`：分组标题，可选，显示在分组顶部
+  - `setCurrentIndex(index)`：设置当前页面，触发动画切换
+    - `index`：页面索引，整数值
+  - `setCurrentPage(index)`：设置当前页面，同setCurrentIndex
+  - `currentIndex()`：获取当前页面索引
+    - 返回值：当前选中的页面索引，整数值
   - `widget(index)`：获取指定索引的内容窗口
-    - `index`：选项卡索引，整数值
+    - `index`：页面索引，整数值
     - 返回值：对应索引的内容组件
-  - `setTabText(index, text)`：设置指定索引的选项卡文本
-    - `index`：选项卡索引，整数值
-    - `text`：新的选项卡文本
-  - `setTabIcon(index, icon)`：设置指定索引的选项卡图标
-    - `index`：选项卡索引，整数值
+  - `setPageText(index, text)`：设置指定索引的导航按钮文本
+    - `index`：页面索引，整数值
+    - `text`：新的按钮文本
+  - `setPageIcon(index, icon)`：设置指定索引的导航按钮图标
+    - `index`：页面索引，整数值
     - `icon`：QIcon对象或图标路径
-  - `setTabPosition(index, position)`：更改已有选项卡的位置
-    - `index`：选项卡索引，整数值
-    - `position`：新的选项卡位置，POSITION_TOP或POSITION_BOTTOM
-  - `tabPosition(index)`：获取选项卡的位置
-    - `index`：选项卡索引，整数值
-    - 返回值：选项卡位置，POSITION_TOP或POSITION_BOTTOM
-  - `count()`：获取选项卡总数
-    - 返回值：选项卡总数，整数值
-  - `currentChanged`：信号，当前选项卡变化时触发，传递新的索引值
+  - `setPagePosition(index, position, group_name=None)`：更改已有页面的位置和分组
+    - `index`：页面索引，整数值
+    - `position`：新的页面位置，POSITION_TOP或POSITION_BOTTOM
+    - `group_name`：新的分组名称，可选
+  - `pagePosition(index)`：获取页面的位置
+    - `index`：页面索引，整数值
+    - 返回值：页面位置，POSITION_TOP或POSITION_BOTTOM
+  - `pageGroup(index)`：获取页面所在的分组名称
+    - `index`：页面索引，整数值
+    - 返回值：分组名称字符串
+  - `count()`：获取页面总数
+    - 返回值：页面总数，整数值
+  - `currentChanged`：信号，当前页面变化时触发，传递新的索引值
 
 **特性说明**：
+- 多方向布局：支持垂直（左侧）和水平（顶部）两种导航模式
+- 自动适应：根据选择的方向自动调整导航栏和内容区的位置关系
+- 分组功能：支持将导航按钮分组，可以创建多个命名分组并设置分组标题
 - 扁平化设计，与应用主题风格一致，视觉统一
-- 垂直布局的选项卡位于窗口左侧，优化空间使用
-- 选项卡支持两种位置定位：顶部(POSITION_TOP)和底部(POSITION_BOTTOM)
-- 支持将重要和常用选项卡（如控制台）放在顶部，将设置等辅助功能放在底部，优化用户体验
-- 可灵活调整选项卡位置，无需改变选项卡的添加顺序，布局更加灵活
-- 选项卡切换时的平滑动画过渡效果，提升用户体验
-- 智能判断切换方向：根据当前选项卡和目标选项卡的上下关系，自动选择向上或向下的动画方向
-- 区域内切换：同一区域内上下选项卡之间切换时，动画方向跟随实际位置关系
-- 跨区域切换：顶部区域和底部区域之间切换时，动画方向符合直观预期
-- 选项卡支持图标和文本，信息呈现更加丰富
+- 导航按钮支持两种位置定位：顶部(POSITION_TOP)和底部(POSITION_BOTTOM)
+- 支持将重要和常用导航按钮（如控制台）放在顶部，将设置等辅助功能放在底部，优化用户体验
+- 可灵活调整导航按钮位置和分组，无需改变导航按钮的添加顺序，布局更加灵活
+- 导航切换时的平滑动画过渡效果，提升用户体验
+- 智能判断切换方向：根据当前页面和目标页面的位置关系，自动选择动画方向
+- 区域内切换：同一区域内按钮之间切换时，动画方向跟随实际位置关系
+- 跨区域和跨分组切换：不同区域或分组之间切换时，动画方向符合直观预期
+- 导航按钮支持图标和文本，信息呈现更加丰富
 - 选中状态和悬停状态的动画效果，视觉反馈明确
-- 鼠标离开选项卡时的平滑过渡动画效果，避免视觉上的生硬变化
-- 选中选项卡的高亮指示器动画，清晰指示当前选中的选项卡
+- 选中按钮的高亮指示器动画，根据导航方向自动显示垂直或水平指示条
 - 自动适应内容区域大小，根据窗口尺寸调整布局
 - 可直接运行文件查看示例效果，便于单独调试和演示
-- 已应用于整个应用程序的主界面，替代了标准的QTabWidget
 
 **使用方法**：
 ```python
-from ui.components.side_tab import SideTabWidget
+from ui.components.navigation_menu import SideNavigationMenu
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PyQt6.QtGui import QIcon
 
-# 创建左侧选项卡组件
-tab_widget = SideTabWidget()
+# 创建垂直导航菜单组件（默认）
+nav_menu = SideNavigationMenu(orientation=SideNavigationMenu.ORIENTATION_VERTICAL)
 
-# 创建要添加到选项卡的内容页面
-console_tab = QWidget()
-console_layout = QVBoxLayout(console_tab)
+# 创建水平导航菜单组件
+# nav_menu = SideNavigationMenu(orientation=SideNavigationMenu.ORIENTATION_HORIZONTAL)
+
+# 创建要添加到菜单的内容页面
+console_page = QWidget()
+console_layout = QVBoxLayout(console_page)
 console_layout.addWidget(QLabel("控制台内容"))
 
-gestures_tab = QWidget()
-gestures_layout = QVBoxLayout(gestures_tab)
+gestures_page = QWidget()
+gestures_layout = QVBoxLayout(gestures_page)
 gestures_layout.addWidget(QLabel("手势管理内容"))
 
-settings_tab = QWidget()
-settings_layout = QVBoxLayout(settings_tab)
+settings_page = QWidget()
+settings_layout = QVBoxLayout(settings_page)
 settings_layout.addWidget(QLabel("设置内容"))
 
 # 加载图标
@@ -1187,70 +1207,74 @@ console_icon = QIcon("path/to/console_icon.png")
 gestures_icon = QIcon("path/to/gestures_icon.png")
 settings_icon = QIcon("path/to/settings_icon.png")
 
-# 添加带图标的选项卡（放在顶部）
-console_index = tab_widget.addTab(
-    console_tab, 
+# 创建分组
+nav_menu.createGroup("main", nav_menu.POSITION_TOP, "主要功能")
+nav_menu.createGroup("settings", nav_menu.POSITION_BOTTOM, "系统设置")
+
+# 添加带图标的导航页面到指定分组
+console_index = nav_menu.addPage(
+    console_page, 
     "控制台", 
     console_icon, 
-    tab_widget.POSITION_TOP
+    nav_menu.POSITION_TOP,
+    "main"  # 指定分组
 )
 
-# 添加手势管理选项卡（也放在顶部）
-gestures_index = tab_widget.addTab(
-    gestures_tab, 
+# 添加手势管理导航页面
+gestures_index = nav_menu.addPage(
+    gestures_page, 
     "手势管理", 
     gestures_icon, 
-    tab_widget.POSITION_TOP
+    nav_menu.POSITION_TOP,
+    "main"  # 指定分组
 )
 
-# 将设置选项卡放在底部
-settings_index = tab_widget.addTab(
-    settings_tab, 
+# 将设置导航页面放在底部分组
+settings_index = nav_menu.addPage(
+    settings_page, 
     "设置", 
     settings_icon, 
-    tab_widget.POSITION_BOTTOM
+    nav_menu.POSITION_BOTTOM,
+    "settings"  # 指定分组
 )
 
-# 切换到指定选项卡
-tab_widget.setCurrentIndex(0)  # 切换到控制台选项卡
+# 切换到指定页面
+nav_menu.setCurrentIndex(0)  # 切换到控制台页面
 
-# 监听选项卡切换事件
-def onTabChanged(index):
-    print(f"切换到选项卡 {index}")
+# 监听页面切换事件
+def onPageChanged(index):
+    print(f"切换到页面 {index}")
     
-tab_widget.currentChanged.connect(onTabChanged)
+nav_menu.currentChanged.connect(onPageChanged)
 
-# 动态更改选项卡位置
-tab_widget.setTabPosition(1, tab_widget.POSITION_BOTTOM)  # 将手势管理选项卡移到底部
+# 动态更改页面位置和分组
+nav_menu.setPagePosition(1, nav_menu.POSITION_BOTTOM, "settings")  # 将手势管理页面移到底部的settings分组
 
-# 检查选项卡当前位置
-position = tab_widget.tabPosition(1)
-print(f"选项卡1的位置: {'顶部' if position == tab_widget.POSITION_TOP else '底部'}")
+# 检查页面当前位置和分组
+position = nav_menu.pagePosition(1)
+group = nav_menu.pageGroup(1)
+print(f"页面1的位置: {'顶部' if position == nav_menu.POSITION_TOP else '底部'}, 分组: {group}")
 
-# 动态更改选项卡文本
-tab_widget.setTabText(0, "主控制台")
+# 动态更改页面文本
+nav_menu.setPageText(0, "主控制台")
 
-# 获取选项卡内容组件
-content = tab_widget.widget(0)
+# 获取页面内容组件
+content = nav_menu.widget(0)
 
-# 获取选项卡总数
-tab_count = tab_widget.count()
-print(f"选项卡总数: {tab_count}")
-
-# 启用或禁用动画效果
-tab_widget.setAnimationsEnabled(False)  # 禁用动画效果
-tab_widget.setAnimationsEnabled(True)   # 重新启用动画效果
+# 获取页面总数
+page_count = nav_menu.count()
+print(f"页面总数: {page_count}")
 
 # 添加到主窗口布局
 main_layout = QVBoxLayout()
-main_layout.addWidget(tab_widget)
+main_layout.addWidget(nav_menu)
 main_window.setLayout(main_layout)
 ```
 
 **实际应用示例**：
 ```python
-# 在主应用程序中使用SideTabWidget
-from ui.components.side_tab import SideTabWidget
+# 在主应用程序中使用SideNavigationMenu
+from ui.components.navigation_menu import SideNavigationMenu
 from ui.console import ConsoleTab
 from ui.settings.settings_tab import SettingsTab
 from ui.gestures.gestures_tab import GesturesTab
@@ -1268,10 +1292,16 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 创建选项卡
-        self.tab_widget = SideTabWidget()
+        # 创建导航菜单（垂直模式）
+        self.nav_menu = SideNavigationMenu(
+            orientation=SideNavigationMenu.ORIENTATION_VERTICAL
+        )
         
-        # 创建各选项卡内容
+        # 创建分组
+        self.nav_menu.createGroup("main", self.nav_menu.POSITION_TOP, "主要功能")
+        self.nav_menu.createGroup("settings", self.nav_menu.POSITION_BOTTOM)
+        
+        # 创建各页面内容
         self.console_tab = ConsoleTab()
         self.gestures_tab = GesturesTab()
         self.settings_tab = SettingsTab()
@@ -1282,24 +1312,31 @@ class MainWindow(QMainWindow):
         gestures_icon = QIcon(f"{icons_dir}/gestures.svg")
         settings_icon = QIcon(f"{icons_dir}/settings.svg")
         
-        # 添加选项卡
-        self.tab_widget.addTab(self.console_tab, "控制台", console_icon, 
-                             self.tab_widget.POSITION_TOP)
-        self.tab_widget.addTab(self.gestures_tab, "手势管理", gestures_icon, 
-                             self.tab_widget.POSITION_TOP)
-        self.tab_widget.addTab(self.settings_tab, "设置", settings_icon, 
-                             self.tab_widget.POSITION_BOTTOM)
+        # 添加页面到指定分组
+        self.nav_menu.addPage(
+            self.console_tab, 
+            "控制台", 
+            console_icon, 
+            self.nav_menu.POSITION_TOP,
+            "main"
+        )
+        self.nav_menu.addPage(
+            self.gestures_tab, 
+            "手势管理", 
+            gestures_icon, 
+            self.nav_menu.POSITION_TOP,
+            "main"
+        )
+        self.nav_menu.addPage(
+            self.settings_tab, 
+            "设置", 
+            settings_icon, 
+            self.nav_menu.POSITION_BOTTOM,
+            "settings"
+        )
         
-        # 添加到主布局
-        main_layout.addWidget(self.tab_widget)
-
-# 连接信号
-        self.tab_widget.currentChanged.connect(self.onTabChanged)
-    
-    def onTabChanged(self, index):
-        # 根据选项卡切换更新状态
-        tab_name = self.tab_widget.tabText(index)
-        self.statusBar().showMessage(f"当前页面: {tab_name}")
+        # 添加导航菜单到主布局
+        main_layout.addWidget(self.nav_menu)
 ```
 
 ##### 2.2.5 ui/components/custom_combobox.py
@@ -1518,115 +1555,7 @@ class SettingsTab(QWidget):
         # 在这里实现主题切换逻辑
 ```
 
-##### 2.2.6 ui/components/animated_stacked_widget.py
-
-**功能说明**：动画堆栈组件，提供界面切换时的平滑动画效果，支持多种动画方式。
-
-**主要类和方法**：
-- `AnimatedStackedWidget`：动画堆栈组件，继承自QStackedWidget
-  - `__init__(parent=None)`：初始化动画堆栈组件
-    - `parent`：父窗口组件
-  - `setAnimationEnabled(enabled)`：设置是否启用动画效果
-    - `enabled`：布尔值，True表示启用动画，False表示禁用
-  - `setAnimationType(animation_type)`：设置动画类型
-    - `animation_type`：动画类型常量
-      - `ANIMATION_LEFT_TO_RIGHT`：从左到右滑动
-      - `ANIMATION_RIGHT_TO_LEFT`：从右到左滑动
-      - `ANIMATION_TOP_TO_BOTTOM`：从上到下滑动
-      - `ANIMATION_BOTTOM_TO_TOP`：从下到上滑动
-      - `ANIMATION_FADE`：淡入淡出效果
-  - `setAnimationDuration(duration)`：设置动画持续时间
-    - `duration`：动画持续时间（毫秒）
-  - `setAnimationCurve(curve)`：设置动画曲线
-    - `curve`：QEasingCurve对象，定义动画的加速和减速方式
-  - `setCurrentIndex(index)`：设置当前显示的部件索引
-    - `index`：部件索引，整数值
-  - `animationFinished`：信号，动画完成时触发
-
-**特性说明**：
-- 支持多种动画效果：滑动（左右/上下）和淡入淡出
-- 可自定义动画持续时间和动画曲线
-- 无缝集成到PyQt6应用程序
-- 兼容所有QWidget子类作为内容部件
-- 平滑过渡效果，提升用户体验
-- 内部使用QPropertyAnimation进行动画处理，保证流畅性能
-- 可以根据需要启用或禁用动画效果
-- 提供动画完成信号，方便执行后续操作
-- 自动处理部件的可见性，确保正确显示
-- 可单独运行作为演示程序
-
-**使用方法**：
-```python
-from ui.components.animated_stacked_widget import AnimatedStackedWidget
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
-
-# 创建动画堆栈组件
-stacked_widget = AnimatedStackedWidget()
-
-# 设置动画类型
-stacked_widget.setAnimationType(AnimatedStackedWidget.ANIMATION_RIGHT_TO_LEFT)
-
-# 设置动画持续时间（毫秒）
-stacked_widget.setAnimationDuration(300)
-
-# 添加页面
-page1 = QWidget()
-page1_layout = QVBoxLayout(page1)
-page1_layout.addWidget(QLabel("第一页"))
-
-page2 = QWidget()
-page2_layout = QVBoxLayout(page2)
-page2_layout.addWidget(QLabel("第二页"))
-
-stacked_widget.addWidget(page1)
-stacked_widget.addWidget(page2)
-
-# 切换到指定页面（带动画效果）
-stacked_widget.setCurrentIndex(1)
-
-# 添加动画完成处理
-def on_animation_finished():
-    print("动画已完成")
-    
-stacked_widget.animationFinished.connect(on_animation_finished)
-```
-
-**实际应用示例**（在手势选项卡中的使用）：
-```python
-from ui.components.animated_stacked_widget import AnimatedStackedWidget
-
-class GesturesTab(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        # 初始化UI
-        self.initUI()
-    
-    def createGestureEditor(self, parent_widget):
-        """创建右侧手势编辑区域"""
-        # 创建右侧布局
-        right_layout = QVBoxLayout(parent_widget)
-        
-        # 创建标题
-        title_label = QLabel("编辑手势")
-        right_layout.addWidget(title_label)
-        
-        # 创建动画堆栈组件
-        self.content_stack = AnimatedStackedWidget()
-        self.content_stack.setAnimationType(AnimatedStackedWidget.ANIMATION_RIGHT_TO_LEFT)
-        self.content_stack.setAnimationDuration(300)
-        
-        # 创建并添加编辑选项卡
-        edit_tab = self._createEditTab()
-        self.content_stack.addWidget(edit_tab)
-        
-        # 创建并添加其他选项卡（如预览、帮助等）
-        # ...
-        
-        # 添加到布局
-        right_layout.addWidget(self.content_stack)
-```
-
-##### 2.2.7 ui/components/input_field.py
+##### 2.2.6 ui/components/input_field.py
 
 **功能说明**：
 提供具有动画效果和增强交互体验的输入框组件。该组件支持标签动画、焦点动画效果，以及友好的状态反馈。
@@ -1703,7 +1632,7 @@ input_field1.textChanged.connect(lambda text: print(f"文本变化: {text}"))
 6. 精细的阴影效果
 7. 自动文本截断处理
 
-##### 2.2.8 ui/components/slider.py
+##### 2.2.7 ui/components/slider.py
 
 **功能说明**：
 自定义滑块组件，提供带有动画效果的滑块，支持水平和垂直方向，包含交互反馈和视觉特效。
@@ -1782,7 +1711,7 @@ v_slider.setPrimaryColor([231, 76, 60])  # 设置红色主题
 layout.addWidget(v_slider)
 ```
 
-##### 2.2.9 ui/components/color_picker.py
+##### 2.2.8 ui/components/color_picker.py
 
 **功能说明**：
 颜色选择器组件，提供预设颜色选择和自定义颜色对话框，支持RGB精确调色。
@@ -1851,7 +1780,7 @@ layout.addWidget(color_picker)
 current_color = color_picker.get_color()  # 返回[r, g, b]列表
 ```
 
-##### 2.2.10 ui/components/number_spinner.py
+##### 2.2.9 ui/components/number_spinner.py
 
 **功能说明**：
 数字选择器组件，提供带有动画效果的数字输入和调整界面，支持直接输入和按钮/滚轮调整数值。
@@ -1929,7 +1858,7 @@ int_spinner.setValue(75)
 current_value = float_spinner.value()
 ```
 
-##### 2.2.11 ui/components/toast_notification.py
+##### 2.2.10 ui/components/toast_notification.py
 
 **功能说明**：消息提示组件，在窗口角落显示带有动画的通知提示，支持自动消失、鼠标悬停暂停计时、滚动长文本等功能，用于替代传统的弹出对话框。全局通知不会随页面切换而消失，确保重要信息始终可见。
 
@@ -1967,7 +1896,7 @@ current_value = float_spinner.value()
 - 多种样式：支持多种通知类型，每种类型有不同的颜色和图标
 - 自适应布局：根据内容自动调整宽度和高度
 
-#### 2.2.12 ui/components/dialog.py
+#### 2.2.11 ui/components/dialog.py
 
 **功能说明**：
 对话框组件，提供多种类型的交互式对话框，支持动画效果和自定义内容。对话框包含标题、内容、自定义组件和操作按钮，设计符合UI标准，支持多种类型的消息提示和用户交互。
@@ -2127,7 +2056,7 @@ class MainWindow(QMainWindow):
         )
 ```
 
-#### 2.2.13 ui/components/hotkey_input.py
+#### 2.2.12 ui/components/hotkey_input.py
 
 **功能说明**：
 快捷键输入组件，用于捕获和显示用户输入的键盘快捷键组合，包括虚拟键盘支持和多平台兼容性。

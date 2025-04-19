@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                             QGroupBox, QCheckBox, QSlider, QColorDialog, QPushButton,
                             QSizePolicy, QSpacerItem, QFrame)
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QIcon
 
 try:
     from core.logger import get_logger
@@ -17,6 +17,7 @@ try:
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
     from ui.components.dialog import connect_page_to_main_window  # 使用dialog.py中的辅助方法连接到主窗口
+    from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -29,6 +30,7 @@ except ImportError:
     from ui.components.number_spinner import AnimatedNumberSpinner  # 导入自定义数字选择器
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
     from ui.components.dialog import connect_page_to_main_window  # 使用dialog.py中的辅助方法连接到主窗口
+    from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
     from version import APP_NAME  # 导入应用名称
 
 class SettingsPage(QWidget):
@@ -59,10 +61,67 @@ class SettingsPage(QWidget):
         """初始化用户界面"""
         # 创建主布局
         main_layout = QVBoxLayout(self)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # 创建滚动区域，以便在窗口较小时可以滚动查看所有设置
-        # 使用自定义动画滚动区域替代标准滚动区域
+        # 创建标题标签
+        title_layout = QHBoxLayout()
+        title_label = QLabel("设置")
+        title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin: 10px;")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_layout.addWidget(title_label)
+        main_layout.addLayout(title_layout)
+        
+        # 创建横向导航菜单
+        self.nav_menu = SideNavigationMenu(orientation=SideNavigationMenu.ORIENTATION_HORIZONTAL)
+        
+        # 创建画笔设置页面
+        brush_settings_page = self.create_brush_settings_page()
+        
+        # 创建应用设置页面
+        app_settings_page = self.create_app_settings_page()
+        
+        # 添加页面到导航菜单
+        self.nav_menu.addPage(brush_settings_page, "画笔设置", QIcon())
+        self.nav_menu.addPage(app_settings_page, "应用设置", QIcon())
+        
+        # 添加导航菜单到主布局
+        main_layout.addWidget(self.nav_menu)
+        
+        # 创建底部按钮区域
+        buttons_widget = QWidget()
+        buttons_layout = QHBoxLayout(buttons_widget)
+        buttons_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # 使用自定义动画按钮替换标准按钮
+        reset_button = AnimatedButton("重置为默认设置", primary_color=[108, 117, 125])  # 灰色
+        reset_button.setMinimumSize(140, 36)  # 设置最小大小而不是固定大小
+        reset_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        reset_button.clicked.connect(self.reset_settings)
+        
+        save_button = AnimatedButton("保存设置", primary_color=[41, 128, 185])  # 蓝色
+        save_button.setMinimumSize(120, 36)  # 设置最小大小而不是固定大小
+        save_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        save_button.clicked.connect(self.save_settings)
+        
+        buttons_layout.addWidget(reset_button)
+        buttons_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        buttons_layout.addWidget(save_button)
+        
+        main_layout.addWidget(buttons_widget)
+        
+        # 设置布局和大小策略
+        self.setLayout(main_layout)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        # 记录自适应布局启用
+        self.logger.debug("设置页面自适应布局已启用")
+
+    def create_brush_settings_page(self):
+        """创建画笔设置页面"""
+        brush_page = QWidget()
+        
+        # 创建滚动区域
         scroll_area = AnimatedScrollArea()
         scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -73,16 +132,6 @@ class SettingsPage(QWidget):
         content_layout = QVBoxLayout(content_widget)
         content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         content_layout.setContentsMargins(10, 10, 10, 10)
-        
-        # 标题标签
-        title_label = QLabel("设置")
-        title_label.setStyleSheet("font-size: 18pt; font-weight: bold; margin-bottom: 20px;")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        content_layout.addWidget(title_label)
-        
-        # 添加顶部间距
-        content_layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
         
         # 绘制设置组
         drawing_group = QGroupBox("绘制设置")
@@ -152,45 +201,63 @@ class SettingsPage(QWidget):
         drawing_group.setLayout(drawing_layout)
         content_layout.addWidget(drawing_group)
         
-        # 添加中间间距
-        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
-        
-        # 重置和保存按钮
-        buttons_layout = QHBoxLayout()
-        
-        # 使用自定义动画按钮替换标准按钮
-        reset_button = AnimatedButton("重置为默认设置", primary_color=[108, 117, 125])  # 灰色
-        reset_button.setMinimumSize(140, 36)  # 设置最小大小而不是固定大小
-        reset_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        reset_button.clicked.connect(self.reset_settings)
-        
-        save_button = AnimatedButton("保存设置", primary_color=[41, 128, 185])  # 蓝色
-        save_button.setMinimumSize(120, 36)  # 设置最小大小而不是固定大小
-        save_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        save_button.clicked.connect(self.save_settings)
-        
-        buttons_layout.addWidget(reset_button)
-        buttons_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-        buttons_layout.addWidget(save_button)
-        
-        content_layout.addLayout(buttons_layout)
-        
-        # 底部弹性空间
+        # 添加弹性空间
         content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # 设置内容部件
         content_widget.setLayout(content_layout)
         scroll_area.setWidget(content_widget)
         
-        # 将滚动区域添加到主布局
-        main_layout.addWidget(scroll_area)
+        # 创建布局
+        page_layout = QVBoxLayout(brush_page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.addWidget(scroll_area)
         
-        # 设置布局和大小策略
-        self.setLayout(main_layout)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        return brush_page
+    
+    def create_app_settings_page(self):
+        """创建应用设置页面"""
+        app_page = QWidget()
         
-        # 记录自适应布局启用
-        self.logger.debug("设置页面自适应布局已启用")
+        # 创建滚动区域
+        scroll_area = AnimatedScrollArea()
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # 创建内容部件
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # 应用设置组
+        app_group = QGroupBox("应用设置")
+        app_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        app_layout = QVBoxLayout()
+        
+        # 添加临时标签
+        temp_label = QLabel("应用设置页面 - 敬请期待")
+        temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        temp_label.setStyleSheet("font-size: 14pt; color: #888; margin: 20px;")
+        app_layout.addWidget(temp_label)
+        
+        app_group.setLayout(app_layout)
+        content_layout.addWidget(app_group)
+        
+        # 添加弹性空间
+        content_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        
+        # 设置内容部件
+        content_widget.setLayout(content_layout)
+        scroll_area.setWidget(content_widget)
+        
+        # 创建布局
+        page_layout = QVBoxLayout(app_page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.addWidget(scroll_area)
+        
+        return app_page
     
     def resizeEvent(self, event):
         """窗口尺寸变化事件处理，用于调整UI布局"""
