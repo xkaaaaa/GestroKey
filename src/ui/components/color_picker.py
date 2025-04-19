@@ -685,15 +685,42 @@ class AnimatedColorPicker(QWidget):
         # 设置当前颜色
         self.color_dialog.setColor(self.current_color)
         
-        # 居中显示对话框
-        parent_rect = self.parentWidget().geometry() if self.parentWidget() else self.geometry()
-        self.color_dialog.move(
-            parent_rect.x() + (parent_rect.width() - self.color_dialog.width()) // 2,
-            parent_rect.y() + (parent_rect.height() - self.color_dialog.height()) // 2
-        )
+        # 获取主窗口
+        main_window = self._get_main_window()
+        
+        if main_window:
+            # 获取主窗口的几何信息
+            main_geo = main_window.geometry()
+            
+            # 将对话框居中于主窗口
+            self.color_dialog.move(
+                main_geo.x() + (main_geo.width() - self.color_dialog.width()) // 2,
+                main_geo.y() + (main_geo.height() - self.color_dialog.height()) // 2
+            )
+            self.logger.debug(f"对话框位置设置为主窗口中心({main_geo.x() + (main_geo.width() - self.color_dialog.width()) // 2}, {main_geo.y() + (main_geo.height() - self.color_dialog.height()) // 2})")
+        else:
+            # 如果未找到主窗口，则居中于父窗口或当前组件
+            parent_rect = self.parentWidget().geometry() if self.parentWidget() else self.geometry()
+            self.color_dialog.move(
+                parent_rect.x() + (parent_rect.width() - self.color_dialog.width()) // 2,
+                parent_rect.y() + (parent_rect.height() - self.color_dialog.height()) // 2
+            )
+            self.logger.debug("未找到主窗口，对话框位置设置为父组件中心")
         
         # 显示对话框
         result = self.color_dialog.exec()
+    
+    def _get_main_window(self):
+        """获取应用程序的主窗口"""
+        parent = self.parent()
+        while parent:
+            # 检查窗口是否是顶级窗口或主窗口
+            if isinstance(parent, QWidget) and (parent.isWindow() or parent.objectName() == "GestroKeyApp"):
+                return parent
+            parent = parent.parent()
+        
+        # 如果未找到主窗口，尝试获取QApplication的活动窗口
+        return QApplication.activeWindow()
     
     def on_color_selected(self, color):
         """处理颜色选择事件"""
