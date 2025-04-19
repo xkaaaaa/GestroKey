@@ -4,7 +4,7 @@ import os
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, 
                            QLabel, QApplication, QSizePolicy, QGraphicsDropShadowEffect, QGridLayout, QPushButton,
                            QSlider, QFrame, QDialog)
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QPoint, QPointF, QRect, QRectF, pyqtProperty
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QPoint, QPointF, QRect, QRectF, pyqtProperty, QSize, QTimer
 from PyQt6.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, QBrush, QConicalGradient
 
 try:
@@ -340,12 +340,36 @@ class ColorDialogPanel(QDialog):
         
         # 设置无边框窗口
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         # 初始颜色
         self.color = initial_color.copy()
         
+        # 创建内容窗口部件
+        self.contentWidget = QWidget(self)
+        self.contentWidget.setObjectName("colorDialogContent")
+        
         # 定义UI
         self.initUI()
+        
+        # 设置动画属性
+        self._opacity = 0.0
+        
+        # 创建动画
+        self.appearAnimation = QPropertyAnimation(self, b"windowOpacity")
+        self.appearAnimation.setDuration(300)
+        self.appearAnimation.setStartValue(0.0)
+        self.appearAnimation.setEndValue(1.0)
+        self.appearAnimation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        
+        # 创建缩放动画
+        try:
+            self.scaleAnimation = QPropertyAnimation(self, b"size")
+            self.scaleAnimation.setDuration(300)
+            self.scaleAnimation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        except Exception as e:
+            self.logger.warning(f"创建尺寸动画失败: {e}")
+            self.scaleAnimation = None
         
         # 更新显示
         self.updateColorDisplay()
@@ -358,29 +382,29 @@ class ColorDialogPanel(QDialog):
         self.setFixedSize(380, 500)  # 增加高度，避免组件重叠
         
         # 创建主布局
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-        main_layout.setSpacing(15)  # 增加组件间距
+        content_layout = QVBoxLayout(self.contentWidget)
+        content_layout.setContentsMargins(15, 15, 15, 15)
+        content_layout.setSpacing(15)  # 增加组件间距
         
         # 创建标题标签
         title = QLabel("精确调色")
         title.setStyleSheet("color: #333; font-weight: bold; font-size: 14px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
+        content_layout.addWidget(title)
         
         # 创建颜色预览框
         self.color_preview = QFrame()
         self.color_preview.setFixedHeight(50)  # 固定高度
         self.color_preview.setFrameShape(QFrame.Shape.NoFrame)
         self.color_preview.setStyleSheet("border-radius: 5px;")
-        main_layout.addWidget(self.color_preview)
+        content_layout.addWidget(self.color_preview)
         
         # 添加分隔线
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         separator.setStyleSheet("background-color: #ddd;")
-        main_layout.addWidget(separator)
+        content_layout.addWidget(separator)
         
         # 创建调色板容器
         palette_container = QWidget()
@@ -428,14 +452,14 @@ class ColorDialogPanel(QDialog):
                 self.swatches.append(swatch)
         
         # 添加面板到主布局
-        main_layout.addWidget(palette_container)
+        content_layout.addWidget(palette_container)
         
         # 添加分隔线
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
         separator2.setFrameShadow(QFrame.Shadow.Sunken)
         separator2.setStyleSheet("background-color: #ddd;")
-        main_layout.addWidget(separator2)
+        content_layout.addWidget(separator2)
         
         # RGB滑块
         rgb_layout = QVBoxLayout()
@@ -504,7 +528,7 @@ class ColorDialogPanel(QDialog):
         b_layout.addWidget(self.b_value)
         rgb_layout.addLayout(b_layout)
         
-        main_layout.addLayout(rgb_layout)
+        content_layout.addLayout(rgb_layout)
         
         # 添加按钮
         button_layout = QHBoxLayout()
@@ -523,16 +547,17 @@ class ColorDialogPanel(QDialog):
         button_layout.addWidget(self.apply_button)
         button_layout.addWidget(self.cancel_button)
         
-        main_layout.addLayout(button_layout)
+        content_layout.addLayout(button_layout)
         
-        # 设置布局
-        self.setLayout(main_layout)
+        # 为对话框设置总布局
+        dialog_layout = QVBoxLayout(self)
+        dialog_layout.setContentsMargins(0, 0, 0, 0)
+        dialog_layout.addWidget(self.contentWidget)
         
         # 设置样式
         self.setStyleSheet("""
-            QDialog {
+            #colorDialogContent {
                 background-color: white;
-                border: 1px solid #ccc;
                 border-radius: 10px;
             }
             QLabel {
@@ -541,11 +566,91 @@ class ColorDialogPanel(QDialog):
         """)
         
         # 添加阴影效果
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 5)
-        self.setGraphicsEffect(shadow)
+        try:
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(20)
+            shadow.setColor(QColor(0, 0, 0, 80))
+            shadow.setOffset(0, 5)
+            self.contentWidget.setGraphicsEffect(shadow)
+        except Exception as e:
+            self.logger.warning(f"设置阴影效果失败: {e}")
+    
+    def showEvent(self, event):
+        """显示事件处理 - 添加动画"""
+        try:
+            super().showEvent(event)
+            
+            # 记录目标尺寸
+            target_size = self.size()
+            
+            # 如果支持缩放动画则启动
+            if hasattr(self, 'scaleAnimation') and self.scaleAnimation:
+                # 设置起始尺寸为80%
+                start_size = QSize(int(target_size.width() * 0.8), int(target_size.height() * 0.8))
+                self.scaleAnimation.setStartValue(start_size)
+                self.scaleAnimation.setEndValue(target_size)
+                self.scaleAnimation.start()
+            
+            # 设置初始透明度并启动淡入动画
+            self.setWindowOpacity(0.0)
+            self.appearAnimation.start()
+        except Exception as e:
+            self.logger.error(f"显示动画失败: {e}")
+            # 确保窗口可见，即使动画失败
+            self.setWindowOpacity(1.0)
+    
+    def accept(self):
+        """重写接受方法，添加消失动画"""
+        try:
+            # 创建消失动画
+            self.fade_out = QPropertyAnimation(self, b"windowOpacity")
+            self.fade_out.setDuration(200)
+            self.fade_out.setStartValue(1.0)
+            self.fade_out.setEndValue(0.0)
+            self.fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            
+            # 将finished信号直接连接到关闭方法
+            self.fade_out.finished.connect(self._do_accept)
+            
+            # 启动动画
+            self.fade_out.start()
+        except Exception as e:
+            self.logger.error(f"接受动画失败: {e}")
+            # 直接调用基类方法关闭
+            self._do_accept()
+        
+    def _do_accept(self):
+        """实际执行接受操作，避免动画过程中被打断"""
+        QDialog.accept(self)
+    
+    def reject(self):
+        """重写拒绝方法，添加消失动画"""
+        try:
+            # 创建消失动画
+            self.fade_out = QPropertyAnimation(self, b"windowOpacity")
+            self.fade_out.setDuration(200)
+            self.fade_out.setStartValue(1.0)
+            self.fade_out.setEndValue(0.0)
+            self.fade_out.setEasingCurve(QEasingCurve.Type.OutCubic)
+            
+            # 将finished信号直接连接到关闭方法
+            self.fade_out.finished.connect(self._do_reject)
+            
+            # 启动动画
+            self.fade_out.start()
+        except Exception as e:
+            self.logger.error(f"拒绝动画失败: {e}")
+            # 直接调用基类方法关闭
+            self._do_reject()
+        
+    def _do_reject(self):
+        """实际执行拒绝操作，避免动画过程中被打断"""
+        QDialog.reject(self)
+    
+    def exec(self):
+        """重写exec方法，确保正确的动画显示"""
+        self.setWindowOpacity(0.0)  # 确保开始时是透明的
+        return super().exec()
     
     def updateColorDisplay(self):
         """更新颜色显示"""
@@ -588,7 +693,9 @@ class ColorDialogPanel(QDialog):
     
     def onApply(self):
         """应用选择的颜色"""
+        # 先发送颜色选择信号
         self.colorSelected.emit(self.color)
+        # 关闭对话框
         self.accept()
     
     def setColor(self, color):
@@ -693,21 +800,24 @@ class AnimatedColorPicker(QWidget):
             main_geo = main_window.geometry()
             
             # 将对话框居中于主窗口
-            self.color_dialog.move(
-                main_geo.x() + (main_geo.width() - self.color_dialog.width()) // 2,
-                main_geo.y() + (main_geo.height() - self.color_dialog.height()) // 2
-            )
-            self.logger.debug(f"对话框位置设置为主窗口中心({main_geo.x() + (main_geo.width() - self.color_dialog.width()) // 2}, {main_geo.y() + (main_geo.height() - self.color_dialog.height()) // 2})")
+            dialog_x = main_geo.x() + (main_geo.width() - self.color_dialog.width()) // 2
+            dialog_y = main_geo.y() + (main_geo.height() - self.color_dialog.height()) // 2
+            
+            self.color_dialog.move(dialog_x, dialog_y)
+            self.logger.debug(f"对话框位置设置为主窗口中心({dialog_x}, {dialog_y})")
+            
+            # 激活透明背景以允许动画效果
+            self.color_dialog.setWindowOpacity(0.0)
         else:
             # 如果未找到主窗口，则居中于父窗口或当前组件
             parent_rect = self.parentWidget().geometry() if self.parentWidget() else self.geometry()
-            self.color_dialog.move(
-                parent_rect.x() + (parent_rect.width() - self.color_dialog.width()) // 2,
-                parent_rect.y() + (parent_rect.height() - self.color_dialog.height()) // 2
-            )
+            dialog_x = parent_rect.x() + (parent_rect.width() - self.color_dialog.width()) // 2
+            dialog_y = parent_rect.y() + (parent_rect.height() - self.color_dialog.height()) // 2
+            
+            self.color_dialog.move(dialog_x, dialog_y)
             self.logger.debug("未找到主窗口，对话框位置设置为父组件中心")
         
-        # 显示对话框
+        # 显示对话框并等待结果
         result = self.color_dialog.exec()
     
     def _get_main_window(self):
@@ -823,4 +933,4 @@ if __name__ == "__main__":
     window.setLayout(layout)
     window.show()
     
-    sys.exit(app.exec()) 
+    sys.exit(app.exec())
