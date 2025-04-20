@@ -465,12 +465,15 @@ app.exec()
   - `__init__(self)`：初始化设置管理器
   - `_load_default_settings(self)`：加载默认设置
   - `_get_settings_file_path(self)`：获取设置文件路径
-  - `load(self)`：从配置文件加载设置
-  - `save(self)`：保存设置到配置文件
-  - `get(self, key, default=None)`：获取指定设置项的值
-  - `set(self, key, value)`：设置指定设置项的值
+  - `load(self)`：从文件加载设置
+  - `save(self)`：保存设置到文件
+  - `get(self, key, default=None)`：获取设置项
+  - `set(self, key, value)`：设置设置项
   - `reset_to_default(self)`：重置为默认设置
   - `has_changes(self)`：检查是否有未保存的更改
+  - `get_app_path(self)`：获取应用程序可执行文件路径
+  - `is_autostart_enabled(self)`：检查应用程序是否设置为开机自启动
+  - `set_autostart(self, enable)`：设置开机自启动状态
 
 - `get_settings()`：获取设置管理器实例的单例函数
 
@@ -491,29 +494,34 @@ app.exec()
 
 **使用方法**：
 ```python
-# 获取设置管理器实例
 from ui.settings.settings import get_settings
+
+# 获取设置管理器实例
 settings = get_settings()
 
 # 读取设置
-pen_width = settings.get("pen_width")  # 获取笔尖粗细
-pen_color = settings.get("pen_color")  # 获取笔尖颜色，返回RGB数组
+pen_width = settings.get("pen_width")  # 返回笔尖粗细设置，默认为3
+pen_color = settings.get("pen_color")  # 返回笔尖颜色设置，默认为[0, 120, 255]
 
 # 修改设置
-settings.set("pen_width", 5)  # 设置笔尖粗细为5像素
-settings.set("pen_color", [255, 0, 0])  # 设置笔尖颜色为红色
+settings.set("pen_width", 5)
+settings.set("pen_color", [255, 0, 0])  # 设置为红色
 
 # 保存设置
-settings.save()  # 将设置保存到配置文件
-
-# 重置设置
-settings.reset_to_default()  # 重置为默认设置并保存
+settings.save()
 
 # 检查是否有未保存的更改
-if settings.has_changes():
-    print("有未保存的设置更改")
-else:
-    print("所有设置已保存")
+has_changes = settings.has_changes()
+
+# 重置为默认设置
+settings.reset_to_default()
+
+# 检查开机自启动状态
+is_autostart = settings.is_autostart_enabled()
+
+# 设置开机自启动
+settings.set_autostart(True)  # 启用
+settings.set_autostart(False)  # 禁用
 ```
 
 ###### 2.1.3.2 设置选项卡 (ui/settings/settings_tab.py)
@@ -533,6 +541,7 @@ else:
   - `initUI(self)`：初始化UI组件和布局
   - `create_brush_settings_page(self)`：创建画笔设置页面
   - `create_app_settings_page(self)`：创建应用设置页面
+  - `apply_autostart_settings(self)`：应用开机自启动设置
   - `color_changed(self, color)`：处理颜色变化
   - `pen_width_changed(self, value)`：处理笔尖粗细变化
   - `pen_width_spinner_sync(self, value)`：同步数字选择器的值
@@ -549,20 +558,23 @@ else:
     - 笔尖粗细设置（滑块和数字选择器）
     - 笔尖颜色选择（色彩选择器）
     - 笔尖预览组件
-  - 应用设置页面
+  - 应用设置页面：
+    - 开机自启动选项（复选框）
 - 底部：操作按钮区域
   - 重置设置按钮
   - 保存设置按钮
 
 **特性说明**：
+- 前后端分离：界面层只负责UI展示和用户交互，实际设置操作通过调用设置管理器完成
 - 实时预览：设置变更时实时更新预览效果
 - 直观调节：通过滑块和数字选择器调整参数
 - 色彩选择器：集成色彩选择组件
 - 参数验证：自动验证输入值的有效性
 - 默认值恢复：一键恢复默认设置
 - 分组设置：将相关设置分组显示
-- 设置持久化：保存设置到配置文件
+- 设置持久化：保存设置时调用设置管理器
 - 对话框确认：重要操作需要对话框确认
+- 开机自启动：支持设置应用为开机自启动（通过调用设置管理器实现），在点击保存设置按钮后应用而非立即生效
 
 **使用方法**：
 ```python

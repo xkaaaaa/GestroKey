@@ -236,11 +236,23 @@ class SettingsPage(QWidget):
         app_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         app_layout = QVBoxLayout()
         
-        # 添加临时标签
-        temp_label = QLabel("应用设置页面 - 敬请期待")
-        temp_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        temp_label.setStyleSheet("font-size: 14pt; color: #888; margin: 20px;")
-        app_layout.addWidget(temp_label)
+        # 开机自启动设置
+        startup_layout = QHBoxLayout()
+        self.startup_checkbox = QCheckBox("开机自启动")
+        self.startup_checkbox.setToolTip("设置应用程序是否在系统启动时自动运行")
+        
+        # 检查当前自启动状态
+        is_autostart = self.settings.is_autostart_enabled()
+        self.startup_checkbox.setChecked(is_autostart)
+        # 保存当前自启动状态（但不立即应用）
+        self.current_autostart_state = is_autostart
+        
+        startup_layout.addWidget(self.startup_checkbox)
+        startup_layout.addStretch()
+        app_layout.addLayout(startup_layout)
+        
+        # 添加其他应用设置项
+        # ...（未来可以在这里添加更多应用设置项）
         
         app_group.setLayout(app_layout)
         content_layout.addWidget(app_group)
@@ -341,26 +353,47 @@ class SettingsPage(QWidget):
             self.settings.set("pen_width", pen_width)
             self.settings.set("pen_color", pen_color)
             
-            # 检查是否真的有改变需要保存
-            if not self.settings.has_changes():
-                self.logger.info("设置未发生实际变化，无需保存")
-                show_info(self, "设置未发生实际变化，无需保存")
+            # 检查设置文件和自启动设置是否有变化
+            settings_changed = self.settings.has_changes()
+            autostart_changed = self.startup_checkbox.isChecked() != self.settings.is_autostart_enabled()
+            
+            if not settings_changed and not autostart_changed:
+                self.logger.info("所有设置未发生实际变化，无需保存")
+                show_info(self, "所有设置未发生实际变化，无需保存")
                 return True
                 
-            # 保存设置
-            success = self.settings.save()
+            # 先保存设置文件中的设置
+            success = True
+            if settings_changed:
+                success = self.settings.save()
+                if success:
+                    self.logger.info("设置文件已保存")
+                else:
+                    self.logger.error("保存设置文件失败")
+                    show_warning(self, "无法保存设置文件")
+                    return False
             
-            if success:
-                self.logger.info("设置已保存")
+            # 无论设置文件是否有变化，只要自启动有变化就应用
+            autostart_success = True
+            if autostart_changed:
+                # 应用开机自启动设置
+                autostart_success = self.apply_autostart_settings()
+                if autostart_success:
+                    self.logger.info("开机自启动设置已应用")
+                else:
+                    self.logger.warning("开机自启动设置应用失败")
+                    # 不因为自启动设置失败而影响其他设置的保存
+                
+            # 只有设置文件有变化时才需要更新绘制管理器
+            if settings_changed:
                 # 应用设置到绘制管理器
                 self._update_drawing_manager()
-                # 显示成功消息
-                show_success(self, "设置已保存并应用")
-                return True
-            else:
-                self.logger.error("保存设置失败")
-                show_warning(self, "无法保存设置")
-                return False
+            
+            # 显示成功消息
+            show_success(self, "设置已保存并应用")
+            
+            return True
+            
         except Exception as e:
             self.logger.error(f"保存设置时出错: {e}")
             show_error(self, f"保存设置时出错: {str(e)}")
@@ -425,10 +458,40 @@ class SettingsPage(QWidget):
             self.logger.error(f"尝试更新绘制管理器参数时发生错误: {e}")
             self.logger.error(f"错误详情: {str(e)}")
     
+    def apply_autostart_settings(self):
+        """应用开机自启动设置"""
+        try:
+            # 获取当前复选框状态
+            current_state = self.startup_checkbox.isChecked()
+            
+            # 如果状态与系统中的实际状态相同，则无需更改
+            system_state = self.settings.is_autostart_enabled()
+            if current_state == system_state:
+                self.logger.debug("自启动状态未变化，无需应用")
+                return True
+            
+            # 调用settings模块处理自启动设置
+            success = self.settings.set_autostart(current_state)
+            if success:
+                self.logger.info(f"已{'启用' if current_state else '禁用'}开机自启动")
+            else:
+                self.logger.error("设置开机自启动失败")
+            return success
+                
+        except Exception as e:
+            self.logger.error(f"应用开机自启动设置时出错: {e}")
+            return False
+    
     def has_unsaved_changes(self):
         """检查是否有未保存的更改"""
         try:
-            return self.settings.has_changes()
+            # 检查设置文件中的设置是否有变化
+            settings_changed = self.settings.has_changes()
+            
+            # 检查自启动设置是否有变化
+            autostart_changed = self.startup_checkbox.isChecked() != self.settings.is_autostart_enabled()
+            
+            return settings_changed or autostart_changed
         except Exception as e:
             self.logger.error(f"检查设置更改状态时出错: {e}")
             return False
@@ -450,6 +513,10 @@ class SettingsPage(QWidget):
             # 更新预览
             self.preview_widget.update_width(pen_width)
             self.preview_widget.update_color(pen_color)
+            
+            # 检查并更新自启动状态
+            is_autostart = self.settings.is_autostart_enabled()
+            self.startup_checkbox.setChecked(is_autostart)
             
             self.logger.debug(f"UI已从设置更新: 笔尖粗细={pen_width}, 笔尖颜色={pen_color}")
             return True

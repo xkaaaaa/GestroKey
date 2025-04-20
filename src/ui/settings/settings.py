@@ -5,9 +5,14 @@ import logging
 
 try:
     from core.logger import get_logger
+    from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from core.logger import get_logger
+    from version import APP_NAME
+
+# 添加导入Windows注册表操作模块
+import winreg
 
 class Settings:
     """设置管理器，负责保存和加载用户设置"""
@@ -135,6 +140,12 @@ class Settings:
         if success:
             self.saved_settings = self.settings.copy()
             self.has_unsaved_changes = False
+            
+            # 确保开机自启动设置为关闭状态
+            if self.is_autostart_enabled():
+                self.set_autostart(False)
+                self.logger.info("重置为默认设置时已关闭开机自启动")
+                
         return success
         
     def has_changes(self):
@@ -161,6 +172,112 @@ class Settings:
         # 实际上没有差异，重置标志
         self.has_unsaved_changes = False
         return False
+        
+    # 以下为新增的开机自启动相关方法
+    
+    def get_app_path(self):
+        """获取应用程序可执行文件路径"""
+        try:
+            if getattr(sys, 'frozen', False):
+                # PyInstaller打包的应用
+                return sys.executable
+            else:
+                # 开发模式下的主脚本
+                main_script = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../main.py'))
+                python_exe = sys.executable
+                return f"{python_exe} {main_script}"
+        except Exception as e:
+            self.logger.error(f"获取应用程序路径时出错: {e}")
+            return None
+    
+    def is_autostart_enabled(self):
+        """检查应用程序是否设置为开机自启动"""
+        try:
+            if not sys.platform.startswith('win'):
+                self.logger.warning("开机自启动功能仅支持Windows系统")
+                return False
+                
+            app_path = self.get_app_path()
+            if not app_path:
+                self.logger.warning("无法获取应用程序路径")
+                return False
+                
+            # 打开注册表项
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0,
+                winreg.KEY_READ
+            )
+            
+            try:
+                # 尝试读取注册表值
+                value, _ = winreg.QueryValueEx(key, APP_NAME)
+                exists = True
+            except FileNotFoundError:
+                # 注册表项不存在
+                exists = False
+                
+            winreg.CloseKey(key)
+            self.logger.debug(f"自启动状态检查: {exists}")
+            return exists
+            
+        except Exception as e:
+            self.logger.error(f"检查开机自启动状态时出错: {e}")
+            return False
+    
+    def set_autostart(self, enable):
+        """设置开机自启动状态
+        
+        Args:
+            enable (bool): True表示启用开机自启动，False表示禁用
+            
+        Returns:
+            bool: 操作是否成功
+        """
+        try:
+            if not sys.platform.startswith('win'):
+                self.logger.warning("开机自启动功能仅支持Windows系统")
+                return False
+                
+            app_path = self.get_app_path()
+            if not app_path:
+                self.logger.error("无法获取应用程序路径，无法设置自启动")
+                return False
+                
+            # 检查当前状态，如果状态相同则不做改变
+            current_state = self.is_autostart_enabled()
+            if current_state == enable:
+                self.logger.debug(f"自启动状态已经是{'启用' if enable else '禁用'}状态，无需更改")
+                return True
+                
+            # 打开注册表项
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0,
+                winreg.KEY_SET_VALUE
+            )
+            
+            if enable:
+                # 添加自启动项
+                winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, f'"{app_path}"')
+                self.logger.info(f"已添加开机自启动: {app_path}")
+            else:
+                # 移除自启动项
+                try:
+                    winreg.DeleteValue(key, APP_NAME)
+                    self.logger.info("已移除开机自启动")
+                except FileNotFoundError:
+                    # 注册表项不存在，无需处理
+                    self.logger.debug("移除自启动项时未找到注册表项，可能已经不存在")
+                    
+            winreg.CloseKey(key)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"设置开机自启动时出错: {e}")
+            return False
 
 
 # 创建全局设置实例
