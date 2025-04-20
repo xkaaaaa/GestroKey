@@ -33,6 +33,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.2.12 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
     - [2.2.13 复选框组件](#2213-uicomponentscheckboxpy)
     - [2.2.14 悬浮提示组件](#2214-uicomponentsanimated_tooltippy)
+    - [2.2.15 系统托盘组件](#2215-uicomponentssystem_traypy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 core/drawer.py](#31-coredrawerpy)
   - [3.2 core/stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -81,7 +82,8 @@ src/
 │   │   ├── hotkey_input.py  # 快捷键输入组件
 │   │   ├── number_spinner.py # 数字选择器组件
 │   │   ├── checkbox.py       # 自定义动画复选框组件
-│   │   └── animated_tooltip.py # 美化版悬浮提示组件
+│   │   ├── animated_tooltip.py # 美化版悬浮提示组件
+│   │   └── system_tray.py   # 系统托盘图标组件
 │   └── __init__.py          # UI模块初始化文件
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
@@ -159,7 +161,7 @@ sys.exit(app.exec())
 from version import VERSION, APP_NAME, get_version_string, get_full_version_info
 
 # 获取版本号
-current_version = VERSION  # 如："2.0.0"
+current_version = VERSION  # 如："0.0.0"
 
 # 获取应用名称
 app_name = APP_NAME  # 返回："GestroKey"
@@ -2184,6 +2186,95 @@ label = QLabel("这是一个标签")
 set_tooltip(label, "这是一个标签提示", direction=AnimatedToolTip.DIRECTION_TOP)
 ```
 
+#### 2.2.15 ui/components/system_tray.py
+
+**功能说明**：
+系统托盘图标组件，为应用程序提供常驻系统托盘功能，支持自定义右键菜单、单击/双击/中键点击操作，并具有现代化的视觉样式。允许用户在关闭主窗口后继续使用程序功能。
+
+**主要类和方法**：
+- `SystemTrayIcon`：系统托盘图标类
+  - `__init__(self, app_icon=None, parent=None)`：初始化系统托盘图标
+  - `_create_menu(self)`：创建右键菜单，设置样式和菜单项
+  - `_setup_event_handlers(self)`：设置托盘图标事件处理
+  - `_on_tray_activated(self, reason)`：处理托盘图标激活事件（单击、双击等）
+  - `_handle_single_click(self)`：处理延迟的单击事件（防抖处理）
+  - `_on_toggle_action(self)`：处理"开始/停止监听"菜单项的触发
+  - `_show_about(self)`：显示关于信息
+  - `update_drawing_state(self, is_active)`：更新绘制状态，同步更新菜单项和工具提示
+
+- `get_system_tray(parent=None)`：单例函数，获取或创建系统托盘图标实例
+
+**自定义信号**：
+- `toggle_drawing_signal`：切换绘制状态信号
+- `show_settings_signal`：显示设置页面信号
+- `show_window_signal`：显示主窗口信号
+- `exit_app_signal`：退出应用程序信号
+
+**特性说明**：
+- 单例模式：使用全局单例模式确保只创建一个托盘图标实例
+- 美观菜单：自定义样式的右键菜单，包含圆角、悬停效果和平滑过渡
+- 多样交互：支持多种鼠标操作
+  - 左键单击：切换开始/停止监听状态
+  - 双击：显示主窗口
+  - 中键点击：显示设置页面
+  - 右键点击：显示自定义菜单
+- 状态同步：托盘图标状态与应用程序绘制状态保持同步
+- 防抖处理：智能区分单击和双击操作，避免冲突
+- 菜单结构：组织合理的菜单结构，包括基本操作、分隔线和退出选项
+- 工具提示：根据状态显示不同的工具提示文本
+- "关于"功能：集成版本信息显示
+
+**使用方法**：
+```python
+# 获取系统托盘实例
+from ui.components.system_tray import get_system_tray
+
+# 创建并显示托盘图标
+tray_icon = get_system_tray(parent_window)
+tray_icon.show()
+
+# 连接信号到相应的处理方法
+tray_icon.toggle_drawing_signal.connect(toggle_drawing_function)
+tray_icon.show_window_signal.connect(show_window_function)
+tray_icon.show_settings_signal.connect(show_settings_function)
+tray_icon.exit_app_signal.connect(exit_app_function)
+
+# 更新托盘图标状态
+tray_icon.update_drawing_state(is_active)
+```
+
+**菜单项说明**：
+- **开始/停止监听**：切换绘制功能的启动状态
+- **显示主窗口**：显示并激活主窗口
+- **设置**：直接跳转到设置页面
+- **关于**：显示应用程序版本信息
+- **退出**：完全退出应用程序
+
+**集成到主程序**：
+在main.py中，系统托盘图标被初始化并连接到相应的处理方法：
+```python
+def init_system_tray(self):
+    """初始化系统托盘图标"""
+    self.tray_icon = get_system_tray(self)
+    # 连接信号
+    self.tray_icon.toggle_drawing_signal.connect(self.toggle_drawing)
+    self.tray_icon.show_window_signal.connect(self.show_and_activate)
+    self.tray_icon.show_settings_signal.connect(self.show_settings_page)
+    self.tray_icon.exit_app_signal.connect(self.close)
+    # 显示托盘图标
+    self.tray_icon.show()
+```
+
+**状态同步机制**：
+应用程序状态变化会自动同步到托盘图标，确保界面状态与托盘状态的一致性：
+```python
+def on_drawing_state_changed(self, is_active):
+    """响应控制台页面的绘制状态变化"""
+    self.is_drawing_active = is_active
+    if hasattr(self, 'tray_icon'):
+        self.tray_icon.update_drawing_state(is_active)
+```
+
 ### 3. 核心功能模块
 
 #### 3.1 core/drawer.py
@@ -2424,6 +2515,7 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 4. **UI组件模块(ui/components/)**：提供自定义的界面组件，如动画按钮、导航菜单等
 5. **资源管理(assets/)**：管理应用程序资源，如图标和配置文件
 6. **版本管理(version.py)**：管理应用程序版本信息和构建参数
+7. **系统托盘集成**：提供后台运行能力，支持各种鼠标交互和状态显示
 
 **数据流向**：
 1. 用户通过鼠标右键在屏幕上绘制手势
@@ -2431,12 +2523,14 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 3. 笔画分析模块(stroke_analyzer.py)分析轨迹点序列，识别出方向变化
 4. 手势执行模块(gesture_executor.py)查找匹配的手势并执行相应动作
 5. UI模块显示状态变化和结果，并允许用户配置设置和管理手势库
+6. 系统托盘图标反映程序当前状态，提供在后台控制应用的访问点
 
 **通信机制**：
 - 使用Qt的信号槽机制实现模块间的松耦合通信
 - 使用事件驱动设计，降低模块间的直接依赖
 - 使用单例模式管理共享资源，如日志记录器、设置管理器和手势库
 - 通过自定义信号实现异步操作和UI更新
+- 通过系统托盘组件实现应用程序在后台运行时的状态管理和操作接口
 
 **界面架构**：
 - 采用侧边导航菜单(SideNavigationMenu)设计，实现页面切换
@@ -2444,6 +2538,7 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 - 导航菜单支持垂直与水平两种布局模式
 - 所有UI组件使用自定义设计，确保统一的视觉风格
 - 页面切换采用平滑动画效果，提升用户体验
+- 系统托盘提供多样化的交互方式，即使在主窗口关闭时也能操作核心功能
 
 #### 4.2 程序流程
 

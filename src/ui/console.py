@@ -1,7 +1,7 @@
 import os
 import sys
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QSizePolicy, QSpacerItem, QHBoxLayout, QGridLayout, QProgressBar
-from PyQt6.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt6.QtCore import Qt, QTimer, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal
 from PyQt6.QtGui import QCursor, QColor
 
 try:
@@ -10,6 +10,7 @@ try:
     from core.system_monitor import SystemMonitor, format_bytes
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.card import CardWidget  # 导入自定义卡片组件
+    from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
@@ -18,6 +19,7 @@ except ImportError:
     from core.system_monitor import SystemMonitor, format_bytes
     from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.card import CardWidget  # 导入自定义卡片组件
+    from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
     from version import APP_NAME  # 导入应用名称
 
 
@@ -107,6 +109,9 @@ class ConsolePage(QWidget):
     """控制台页面
     用于显示应用程序的运行日志和状态信息。
     """
+    
+    # 添加绘制状态变化信号
+    drawing_state_changed = pyqtSignal(bool)  # 参数为是否处于绘制状态
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -306,6 +311,10 @@ class ConsolePage(QWidget):
                 self.action_button.setText("停止绘制")
                 self.action_button.set_primary_color([220, 53, 69])  # 红色
                 self.is_drawing_active = True
+                
+                # 更新托盘图标状态
+                self.drawing_state_changed.emit(True)
+                
                 self.logger.debug("绘制功能已启动")
             
         except Exception as e:
@@ -327,6 +336,10 @@ class ConsolePage(QWidget):
                     self.action_button.setText("开始绘制")
                     self.action_button.set_primary_color([41, 128, 185])  # 蓝色
                     self.is_drawing_active = False
+                    
+                    # 更新托盘图标状态
+                    self.drawing_state_changed.emit(False)
+                    
                     self.logger.debug("绘制功能已停止")
                 
             except Exception as e:

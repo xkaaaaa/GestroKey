@@ -20,6 +20,7 @@ try:
     from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
     from ui.components.dialog import show_dialog  # 导入自定义对话框组件
+    from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
 except ImportError:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from ui.console import ConsolePage
@@ -31,6 +32,7 @@ except ImportError:
     from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
     from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
     from ui.components.dialog import show_dialog  # 导入自定义对话框组件
+    from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
 
 class GestroKeyApp(QMainWindow):
     """GestroKey应用程序主窗口"""
@@ -46,6 +48,9 @@ class GestroKeyApp(QMainWindow):
         
         # 初始化UI
         self.initUI()
+        
+        # 初始化系统托盘图标
+        self.init_system_tray()
         
         # 初始化Toast管理器并设置主窗口引用
         toast_manager = get_toast_manager()
@@ -67,6 +72,82 @@ class GestroKeyApp(QMainWindow):
         except Exception as e:
             self.logger.error(f"初始化全局资源失败: {e}")
             raise
+    
+    def init_system_tray(self):
+        """初始化系统托盘图标"""
+        try:
+            # 获取托盘图标实例
+            self.tray_icon = get_system_tray(self)
+            
+            # 连接托盘图标信号
+            self.tray_icon.toggle_drawing_signal.connect(self.toggle_drawing)
+            self.tray_icon.show_window_signal.connect(self.show_and_activate)
+            self.tray_icon.show_settings_signal.connect(self.show_settings_page)
+            self.tray_icon.exit_app_signal.connect(self.close)
+            
+            # 显示托盘图标
+            self.tray_icon.show()
+            self.logger.info("系统托盘图标初始化完成")
+        except Exception as e:
+            self.logger.error(f"初始化系统托盘图标失败: {e}")
+    
+    def toggle_drawing(self):
+        """切换绘制状态 - 托盘图标调用"""
+        self.logger.info("从托盘图标切换绘制状态")
+        if hasattr(self, 'console_page'):
+            if self.is_drawing_active:
+                self.stop_drawing()
+            else:
+                self.start_drawing()
+        else:
+            self.logger.warning("找不到控制台页面，无法切换绘制状态")
+    
+    def start_drawing(self):
+        """开始绘制 - 托盘图标调用"""
+        if not self.is_drawing_active and hasattr(self, 'console_page'):
+            self.console_page.start_drawing()
+            self.is_drawing_active = True
+            # 更新托盘图标状态
+            if hasattr(self, 'tray_icon'):
+                self.tray_icon.update_drawing_state(True)
+            self.logger.info("已启动绘制功能")
+    
+    def stop_drawing(self):
+        """停止绘制 - 托盘图标调用"""
+        if self.is_drawing_active and hasattr(self, 'console_page'):
+            self.console_page.stop_drawing()
+            self.is_drawing_active = False
+            # 更新托盘图标状态
+            if hasattr(self, 'tray_icon'):
+                self.tray_icon.update_drawing_state(False)
+            self.logger.info("已停止绘制功能")
+    
+    def show_and_activate(self):
+        """显示并激活主窗口"""
+        self.show()
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+        self.activateWindow()
+        self.raise_()
+        self.logger.info("显示并激活主窗口")
+    
+    def show_settings_page(self):
+        """显示设置页面"""
+        self.show_and_activate()
+        # 切换到设置页面
+        if hasattr(self, 'navigation_menu'):
+            # 查找设置页面的索引（默认为1）
+            settings_index = 1
+            # 由于SideNavigationMenu没有count方法，直接使用我们知道的页面信息
+            # 控制台页面索引为0，手势管理页面索引为1，设置页面索引为2
+            for i in range(3):  # 假设有3个页面
+                if self.navigation_menu.widget(i) == self.settings_page:
+                    settings_index = i
+                    break
+            
+            self.navigation_menu.setCurrentPage(settings_index)
+            self.logger.info(f"切换到设置页面，索引: {settings_index}")
+        else:
+            self.logger.warning("找不到导航菜单，无法切换到设置页面")
         
     def initUI(self):
         """初始化用户界面"""
@@ -96,6 +177,9 @@ class GestroKeyApp(QMainWindow):
         # 创建页面内容
         self.logger.debug("创建控制台页面")
         self.console_page = ConsolePage()
+        
+        # 连接控制台页面的绘制状态变化信号
+        self.console_page.drawing_state_changed.connect(self.on_drawing_state_changed)
         
         self.logger.debug("创建设置页面")
         self.settings_page = SettingsPage()
@@ -131,9 +215,6 @@ class GestroKeyApp(QMainWindow):
         # 设置页面放在底部
         settings_index = self.navigation_menu.addPage(self.settings_page, "设置", settings_icon, 
                                               self.navigation_menu.POSITION_BOTTOM)
-
-        # 记录初始添加的页面索引
-        self.logger.debug(f"控制台索引: {console_index}, 设置索引: {settings_index}, 手势索引: {gestures_index}")
         
         # 页面切换事件连接
         self.navigation_menu.currentChanged.connect(self.onPageChanged)
@@ -390,6 +471,14 @@ class GestroKeyApp(QMainWindow):
         if hasattr(self, 'current_dialog') and self.current_dialog == dialog:
             self.current_dialog = None
             self.logger.debug("已清除当前对话框引用")
+
+    def on_drawing_state_changed(self, is_active):
+        """响应控制台页面的绘制状态变化"""
+        self.is_drawing_active = is_active
+        # 更新托盘图标状态
+        if hasattr(self, 'tray_icon'):
+            self.tray_icon.update_drawing_state(is_active)
+            self.logger.debug(f"托盘图标状态已更新: {'监听中' if is_active else '已停止'}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
