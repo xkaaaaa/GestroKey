@@ -151,7 +151,7 @@ sys.exit(app.exec())
 - `LICENSE`：许可证信息
 
 **主要函数**：
-- `get_version_string()`：获取格式化的版本字符串，如"GestroKey v2.0.0"
+- `get_version_string()`：获取格式化的版本字符串，如"GestroKey v0.0.0"
 - `get_full_version_info()`：获取完整的版本信息，返回包含所有版本相关信息的字典
 
 **使用方法**：
@@ -165,7 +165,7 @@ current_version = VERSION  # 如："2.0.0"
 app_name = APP_NAME  # 返回："GestroKey"
 
 # 获取格式化的版本字符串
-version_string = get_version_string()  # 返回："GestroKey v2.0.0"
+version_string = get_version_string()  # 返回："GestroKey v0.0.0"
 
 # 获取完整的版本信息
 version_info = get_full_version_info()  # 返回包含所有版本信息的字典
