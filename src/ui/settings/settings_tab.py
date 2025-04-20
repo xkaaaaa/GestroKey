@@ -18,6 +18,7 @@ try:
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
     from ui.components.dialog import connect_page_to_main_window  # 使用dialog.py中的辅助方法连接到主窗口
     from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
+    from ui.components.checkbox import AnimatedCheckBox  # 导入自定义动画复选框
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -31,6 +32,7 @@ except ImportError:
     from ui.components.toast_notification import show_info, show_error, show_warning, show_success, ensure_toast_system_initialized  # 导入Toast通知组件
     from ui.components.dialog import connect_page_to_main_window  # 使用dialog.py中的辅助方法连接到主窗口
     from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
+    from ui.components.checkbox import AnimatedCheckBox  # 导入自定义动画复选框
     from version import APP_NAME  # 导入应用名称
 
 class SettingsPage(QWidget):
@@ -238,7 +240,7 @@ class SettingsPage(QWidget):
         
         # 开机自启动设置
         startup_layout = QHBoxLayout()
-        self.startup_checkbox = QCheckBox("开机自启动")
+        self.startup_checkbox = AnimatedCheckBox("开机自启动", primary_color=[52, 152, 219])  # 使用蓝色主题
         self.startup_checkbox.setToolTip("设置应用程序是否在系统启动时自动运行")
         
         # 检查当前自启动状态

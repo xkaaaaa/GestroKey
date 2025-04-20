@@ -31,6 +31,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.2.10 消息提示组件](#2210-uicomponentstoast_notificationpy)
     - [2.2.11 对话框组件](#2211-uicomponentsdialogpy)
     - [2.2.12 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
+    - [2.2.13 复选框组件](#2213-uicomponentscheckboxpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 core/drawer.py](#31-coredrawerpy)
   - [3.2 core/stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -77,7 +78,8 @@ src/
 │   │   ├── toast_notification.py  # 通知提示组件
 │   │   ├── dialog.py        # 自定义对话框组件
 │   │   ├── hotkey_input.py  # 快捷键输入组件
-│   │   └── number_spinner.py # 数字选择器组件
+│   │   ├── number_spinner.py # 数字选择器组件
+│   │   └── checkbox.py       # 自定义动画复选框组件
 │   └── __init__.py          # UI模块初始化文件
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
@@ -242,7 +244,7 @@ console_page.toggle_drawing() # 切换绘制状态
 ###### 2.1.2.1 手势库 (ui/gestures/gestures.py)
 
 **功能说明**：
-手势库管理模块，负责保存和加载用户手势库，提供添加、删除、修改手势的功能。
+手势库管理模块，负责保存和加载用户手势库，提供添加、删除、修改手势的功能。作为后端模块，专注于数据管理和持久化，与前端界面逻辑分离。
 
 **主要类和方法**：
 - `GestureLibrary`：手势库类
@@ -274,13 +276,14 @@ console_page.toggle_drawing() # 切换绘制状态
     "direction": "右-下",
     "action": {
       "type": "shortcut",
-      "value": "ctrl+c"
+      "value": "Ctrl+C"
     }
   }
 }
 ```
 
 **特性说明**：
+- 前后端分离：作为后端模块，专注于数据存储和管理，不涉及UI操作
 - 自动初始化：首次运行时自动创建默认手势库
 - 配置持久化：所有更改自动保存到配置文件
 - ID管理：自动分配和管理手势ID，确保连续性
@@ -337,7 +340,7 @@ print("手势库已保存")
 ###### 2.1.2.2 手势选项卡 (ui/gestures/gestures_tab.py)
 
 **功能说明**：
-手势管理界面，为用户提供可视化的手势添加、编辑和删除功能。
+手势管理界面，为用户提供可视化的手势添加、编辑和删除功能。作为前端模块，专注于用户界面展示和交互，通过调用手势库后端模块完成实际的数据操作。
 
 **主要类和方法**：
 - `GestureContentWidget`：手势内容显示组件类
@@ -372,6 +375,7 @@ print("手势库已保存")
   - 操作按钮组（使用AnimatedButton组件）
 
 **特性说明**：
+- 前后端分离：界面层只负责UI展示和用户交互，通过调用手势库管理器完成实际数据操作
 - 卡片式管理：通过卡片形式展示所有手势
 - 方向编辑：通过方向按钮和方向序列显示框管理方向输入
 - 响应式表单：使用自定义输入组件提供更好的用户体验
@@ -2063,6 +2067,73 @@ hotkey_input.clear()
 - 焦点效果：获取/失去焦点时的动画过渡效果
 - 占位符文本：未设置快捷键时显示引导性占位符文本
 - 跨平台支持：兼容Windows、macOS和Linux系统
+
+#### 2.2.13 ui/components/checkbox.py
+
+**功能说明**：
+自定义动画复选框组件，提供现代化设计的复选框，带有平滑过渡动画效果。支持自定义主题颜色、大小和动画速度。
+
+**主要类和方法**：
+- `AnimatedCheckBox`：动画复选框类
+  - `__init__(self, text="", parent=None, primary_color=None, check_color=None)`：初始化动画复选框
+  - `_setup_animations(self)`：设置动画效果
+  - `_setup_ui(self)`：设置UI样式和属性
+  - `_handle_state_changed(self, state)`：处理复选框状态变化
+  - `enterEvent(self, event)`：鼠标进入事件
+  - `leaveEvent(self, event)`：鼠标离开事件
+  - `paintEvent(self, event)`：绘制复选框
+  - `set_primary_color(self, color)`：设置主题颜色
+  - `set_check_color(self, color)`：设置勾选标记颜色
+  - `set_box_size(self, size)`：设置复选框大小
+  - `set_animation_duration(self, duration)`：设置动画持续时间
+
+**特性说明**：
+- 平滑动画：选中和取消选中状态之间有流畅的过渡动画
+- 悬停效果：鼠标悬停时显示轻微扩大效果
+- 自定义主题：支持设置复选框主题颜色和勾选标记颜色
+- 渐进勾选：勾选标记绘制过程动画化，先绘制第一段再绘制第二段
+- 现代圆角：复选框使用圆角设计，更符合现代UI审美
+- 自定义大小：支持调整复选框大小
+- 自定义动画速度：可设置动画持续时间
+
+**信号**：
+- `colorChanged`：主题颜色更改信号
+- `stateChanged`：复选框状态更改信号（继承自QCheckBox）
+
+**使用方法**：
+```python
+from ui.components.checkbox import AnimatedCheckBox
+
+# 创建默认样式复选框
+checkbox = AnimatedCheckBox("默认样式复选框")
+
+# 创建自定义颜色复选框
+green_checkbox = AnimatedCheckBox("绿色主题复选框", primary_color=[46, 204, 113])
+
+# 设置复选框属性
+checkbox.set_box_size(24)                    # 设置复选框大小
+checkbox.set_primary_color([231, 76, 60])    # 设置红色主题
+checkbox.set_check_color([255, 255, 255])    # 设置白色勾选标记
+checkbox.set_animation_duration(300)         # 设置动画持续时间为300毫秒
+
+# 获取和设置复选框状态
+is_checked = checkbox.isChecked()            # 获取复选框状态
+checkbox.setChecked(True)                    # 设置复选框为选中状态
+
+# 监听状态变化
+def on_state_changed(state):
+    print(f"复选框状态变化为: {'选中' if state == 2 else '未选中'}")
+
+checkbox.stateChanged.connect(on_state_changed)
+```
+
+**优化特点**：
+1. 平滑的勾选动画，勾选标记分两段绘制
+2. 自定义颜色主题支持，可匹配应用程序整体风格
+3. 鼠标悬停效果增强用户体验
+4. 独特的绘制方式，支持透明度渐变
+5. 内置日志记录功能，便于调试
+6. 异常处理机制，提高组件稳定性
 
 ### 3. 核心功能模块
 
