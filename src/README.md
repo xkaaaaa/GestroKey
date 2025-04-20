@@ -32,6 +32,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.2.11 对话框组件](#2211-uicomponentsdialogpy)
     - [2.2.12 快捷键输入组件](#2212-uicomponentshotkey_inputpy)
     - [2.2.13 复选框组件](#2213-uicomponentscheckboxpy)
+    - [2.2.14 悬浮提示组件](#2214-uicomponentsanimated_tooltippy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 core/drawer.py](#31-coredrawerpy)
   - [3.2 core/stroke_analyzer.py](#32-corestroke_analyzerpy)
@@ -79,7 +80,8 @@ src/
 │   │   ├── dialog.py        # 自定义对话框组件
 │   │   ├── hotkey_input.py  # 快捷键输入组件
 │   │   ├── number_spinner.py # 数字选择器组件
-│   │   └── checkbox.py       # 自定义动画复选框组件
+│   │   ├── checkbox.py       # 自定义动画复选框组件
+│   │   └── animated_tooltip.py # 美化版悬浮提示组件
 │   └── __init__.py          # UI模块初始化文件
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
@@ -2134,6 +2136,53 @@ checkbox.stateChanged.connect(on_state_changed)
 4. 独特的绘制方式，支持透明度渐变
 5. 内置日志记录功能，便于调试
 6. 异常处理机制，提高组件稳定性
+
+#### 2.2.14 ui/components/animated_tooltip.py
+
+**功能说明**：美化版悬浮提示组件，提供平滑动画效果和主题样式，可以替代常规的QWidget.setToolTip，呈现更丰富的视觉效果。
+
+**主要类和方法**：
+- `AnimatedToolTip`：悬浮提示类
+  - `__init__(self, parent=None, show_delay=1000, direction=DIRECTION_AUTO, primary_color=None, text_color=None, border_radius=6, hide_delay=200, fade_duration=150, min_width=80, max_width=300)`：初始化悬浮提示
+    - `parent`：父组件
+    - `show_delay`：显示延迟时间(毫秒)
+    - `direction`：提示弹出方向，支持自动、上、下、左、右
+    - `primary_color`：主题颜色
+    - `text_color`：文本颜色
+    - `border_radius`：边框圆角半径
+  - `setText(self, text)`：设置提示文本
+  - `setShowDelay(self, delay_ms)`：设置显示延迟时间
+  - `setDirection(self, direction)`：设置提示弹出方向
+  - `setPrimaryColor(self, color)`：设置主题颜色
+  - `setTextColor(self, color)`：设置文本颜色
+  - `attachTo(self, widget, text)`：将提示附加到指定控件
+  - `showTooltip(self)`：显示提示
+  - `hideTooltip(self, force=False)`：隐藏提示
+
+- `wrap_widget_with_tooltip(widget, text, tooltip=None, show_delay=1000, direction=AnimatedToolTip.DIRECTION_AUTO, primary_color=None, text_color=None, border_radius=6)`：为控件添加美化版提示
+- `set_tooltip(widget, text, show_delay=1000, direction=AnimatedToolTip.DIRECTION_AUTO, primary_color=None, text_color=None, border_radius=6)`：使用全局单例为控件设置美化版提示
+
+**特性说明**：
+- 平滑动画：显示和隐藏时具有淡入淡出动画效果
+- 方向选择：支持自动、上、下、左、右五种弹出方向
+- 主题定制：可自定义主题颜色、文本颜色和边框圆角
+- 智能位置：自动调整位置避免超出屏幕边界
+- 全局事件处理：支持全局鼠标跟踪和键盘事件(如ESC键关闭所有提示)
+- 单例模式：可复用提示实例提高效率
+
+**使用方法**：
+```python
+from ui.components.animated_tooltip import wrap_widget_with_tooltip, set_tooltip
+from PyQt6.QtWidgets import QPushButton
+
+# 方法一：创建独立提示实例
+button = QPushButton("测试按钮")
+wrap_widget_with_tooltip(button, "这是一个按钮提示", primary_color=[52, 152, 219])
+
+# 方法二：使用全局单例提示
+label = QLabel("这是一个标签")
+set_tooltip(label, "这是一个标签提示", direction=AnimatedToolTip.DIRECTION_TOP)
+```
 
 ### 3. 核心功能模块
 
