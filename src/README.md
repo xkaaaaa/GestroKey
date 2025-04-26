@@ -18,6 +18,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.1.3 设置模块](#213-设置模块)
       - [2.1.3.1 设置管理器](#2131-设置管理器-uisettingssettingspy)
       - [2.1.3.2 设置选项卡](#2132-设置选项卡-uisettingssettings_tabpy)
+    - [2.1.4 启动加载页面](#214-启动加载页面-uisplash_screenpy)
   - [2.2 UI组件模块](#22-ui组件模块)
     - [2.2.1 按钮组件](#221-uicomponentsbuttonpy)
     - [2.2.2 卡片组件](#222-uicomponentscardpy)
@@ -59,6 +60,7 @@ src/
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
 │   ├── console.py           # 控制台选项卡
+│   ├── splash_screen.py     # 启动加载画面
 │   ├── settings/            # 设置模块
 │   │   ├── settings_tab.py  # 设置选项卡
 │   │   ├── settings.py      # 设置管理器
@@ -603,6 +605,85 @@ settings_page.reset_settings()           # 重置为默认设置
 # 检查未保存更改
 has_changes = settings_page.has_unsaved_changes()
 ```
+
+#### 2.1.4 启动加载页面 (ui/splash_screen.py)
+
+**功能说明**：
+启动加载页面模块，在应用程序启动过程中显示带有淡入淡出动画的加载画面，提供视觉上的过渡和反馈。
+
+**主要类和方法**：
+- `LoadingIcon`：自定义加载图标组件类
+  - `__init__(self, parent=None, size=80, color=None, icon_path=None)`：初始化加载图标
+  - `_update_dots_opacity(self)`：更新点的不透明度，创建脉动效果
+  - `paintEvent(self, event)`：绘制加载图标
+  - `_get_rotation_angle(self)/_set_rotation_angle(self, angle)`：获取/设置旋转角度属性
+  - `set_color(self, color)`：设置图标颜色
+  - `start_animation(self)`：开始动画
+  - `stop_animation(self)`：停止动画
+
+- `SplashScreen`：加载画面类
+  - `__init__(self)`：初始化加载画面
+  - `_process_events(self)`：处理事件队列，保持UI响应
+  - `_create_pixmap(self)`：创建背景图像
+  - `_create_content(self)`：创建内容组件
+  - `_update_status_text(self)`：更新状态文本，创建动画效果
+  - `showEvent(self, event)`：显示事件处理，启动淡入动画
+  - `fade_out_and_close(self)`：淡出并关闭加载画面
+  - `drawContents(self, painter)`：绘制内容，覆盖基类方法
+  - `mousePressEvent(self, event)`：鼠标按下事件处理
+
+**组件特性**：
+- `LoadingIcon` 加载图标特性：
+  - 旋转动画：图标外环连续旋转
+  - 脉动效果：五个点的不透明度循环变化
+  - 自定义颜色：支持设置主题颜色
+  - 中心图标：支持在中心显示自定义图标
+  - 双环设计：内外两个圆环组成基本结构
+
+- `SplashScreen` 加载画面特性：
+  - 淡入动画：显示时带有淡入效果
+  - 淡出动画：关闭时带有淡出效果
+  - 状态文本循环：显示不同的加载状态文本
+  - 圆角背景：半透明圆角矩形背景
+  - 顶层窗口：始终保持在其他窗口之上
+  - 无边框：无标题栏和边框
+  - 事件拦截：禁止用户与加载画面交互
+  - 事件处理：独立定时器保持UI响应
+
+**使用方法**：
+```python
+# 在应用程序启动时显示加载画面
+from ui.splash_screen import SplashScreen
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QTimer
+import sys
+
+app = QApplication(sys.argv)
+
+# 创建并显示加载画面
+splash = SplashScreen()
+splash.show()
+
+# 主窗口加载完成后关闭加载画面
+def initialize_main_window():
+    # 初始化主窗口代码...
+    main_window.show()
+    splash.fade_out_and_close()
+
+# 模拟延迟加载
+QTimer.singleShot(2000, initialize_main_window)
+
+sys.exit(app.exec())
+```
+
+**特性说明**：
+- 动画效果：使用Qt的属性动画实现平滑的淡入淡出效果
+- 加载指示：加载图标提供直观的加载状态指示
+- 自定义样式：使用自定义绘制而非标准控件，确保独特的外观
+- 加载状态提示：通过循环显示的状态文本提供加载进度感知
+- 事件处理：特殊的事件处理机制确保在长时间加载过程中UI保持响应
+- 无缝集成：与主程序流程无缝集成，提供流畅的视觉体验过渡
+- 资源高效：最小化资源占用，确保快速启动和平滑过渡
 
 #### 2.2 UI组件模块
 
@@ -2525,18 +2606,22 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 1. **主程序模块(main.py)**：提供应用程序入口点，初始化UI和功能模块
 2. **核心功能模块(core/)**：实现手势识别、分析和执行的核心功能
 3. **用户界面模块(ui/)**：提供用户交互界面，包括控制台、设置和手势管理
-4. **UI组件模块(ui/components/)**：提供自定义的界面组件，如动画按钮、导航菜单等
-5. **资源管理(assets/)**：管理应用程序资源，如图标和配置文件
-6. **版本管理(version.py)**：管理应用程序版本信息和构建参数
-7. **系统托盘集成**：提供后台运行能力，支持各种鼠标交互和状态显示
+4. **启动加载模块(ui/splash_screen.py)**：提供应用程序启动时的加载画面和视觉过渡
+5. **UI组件模块(ui/components/)**：提供自定义的界面组件，如动画按钮、导航菜单等
+6. **资源管理(assets/)**：管理应用程序资源，如图标和配置文件
+7. **版本管理(version.py)**：管理应用程序版本信息和构建参数
+8. **系统托盘集成**：提供后台运行能力，支持各种鼠标交互和状态显示
 
 **数据流向**：
-1. 用户通过鼠标右键在屏幕上绘制手势
-2. 绘制模块(drawer.py)捕获鼠标事件并记录轨迹点
-3. 笔画分析模块(stroke_analyzer.py)分析轨迹点序列，识别出方向变化
-4. 手势执行模块(gesture_executor.py)查找匹配的手势并执行相应动作
-5. UI模块显示状态变化和结果，并允许用户配置设置和管理手势库
-6. 系统托盘图标反映程序当前状态，提供在后台控制应用的访问点
+1. 用户启动应用程序，显示带有淡入动画的加载画面
+2. 后台初始化各个模块和资源，同时更新加载画面状态
+3. 主窗口准备就绪后，加载画面以淡出动画过渡到主界面
+4. 用户通过鼠标右键在屏幕上绘制手势
+5. 绘制模块(drawer.py)捕获鼠标事件并记录轨迹点
+6. 笔画分析模块(stroke_analyzer.py)分析轨迹点序列，识别出方向变化
+7. 手势执行模块(gesture_executor.py)查找匹配的手势并执行相应动作
+8. UI模块显示状态变化和结果，并允许用户配置设置和管理手势库
+9. 系统托盘图标反映程序当前状态，提供在后台控制应用的访问点
 
 **通信机制**：
 - 使用Qt的信号槽机制实现模块间的松耦合通信
@@ -2546,6 +2631,7 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 - 通过系统托盘组件实现应用程序在后台运行时的状态管理和操作接口
 
 **界面架构**：
+- 启动加载画面提供流畅的视觉过渡体验
 - 采用侧边导航菜单(SideNavigationMenu)设计，实现页面切换
 - 支持页面分组，将页面组织为主要功能组和设置组
 - 导航菜单支持垂直与水平两种布局模式
@@ -2557,19 +2643,23 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 
 ##### 4.2.1 启动流程
 
-1. **程序初始化**
+1. **程序初始化与加载界面**
    - 启动PyQt应用程序(QApplication)
-   - 设置高DPI支持，适应高分辨率显示器
-   - 创建主窗口(GestroKeyApp)
-   - 加载应用图标和资源
+   - 创建并显示加载画面(SplashScreen)
+   - 加载画面显示带有淡入动画的UI，提供视觉上的延续性
+   - 开始加载资源和初始化组件，同时更新加载状态文本
 
 2. **全局资源初始化**
    - 初始化日志系统(logger.py)
    - 初始化设置管理器(settings.py)
    - 初始化手势库管理器(gestures.py)
    - 加载默认设置和手势库
+   - 加载画面显示相应的加载状态
 
 3. **UI初始化**
+   - 创建主窗口(GestroKeyApp)
+   - 设置高DPI支持，适应高分辨率显示器
+   - 加载应用图标和资源
    - 创建中央部件和主布局
    - 初始化侧边导航菜单(SideNavigationMenu)
    - 创建控制台页面(ConsolePage)、设置页面(SettingsPage)和手势管理页面(GesturesPage)
@@ -2579,7 +2669,9 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 4. **显示主窗口**
    - 应用窗口样式和布局
    - 设置默认选择的页面(控制台)
-   - 显示主窗口
+   - 准备显示主窗口
+   - 加载画面淡出并关闭
+   - 主窗口显示，带有可选的淡入效果
    - 进入应用程序主循环
 
 ##### 4.2.2 绘制流程

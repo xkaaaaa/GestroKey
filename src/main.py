@@ -4,35 +4,22 @@ from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout,
                             QLabel, QMainWindow, QHBoxLayout, QSizePolicy)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon
+import time
 
 from core.drawer import DrawingManager
 from core.logger import get_logger
 from version import get_version_string, APP_NAME  # 导入版本信息
-
-# 导入页面模块
-try:
-    from ui.console import ConsolePage
-    from ui.settings.settings import get_settings
-    from ui.settings.settings_tab import SettingsPage
-    from ui.gestures.gestures import get_gesture_library  # 导入手势库
-    from ui.gestures.gestures_tab import GesturesPage  # 导入手势管理页面
-    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
-    from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
-    from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
-    from ui.components.dialog import show_dialog  # 导入自定义对话框组件
-    from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
-except ImportError:
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from ui.console import ConsolePage
-    from ui.settings.settings import get_settings
-    from ui.settings.settings_tab import SettingsPage
-    from ui.gestures.gestures import get_gesture_library  # 导入手势库
-    from ui.gestures.gestures_tab import GesturesPage  # 导入手势管理页面
-    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
-    from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
-    from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
-    from ui.components.dialog import show_dialog  # 导入自定义对话框组件
-    from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
+from ui.splash_screen import SplashScreen  # 导入加载动画页面
+from ui.console import ConsolePage
+from ui.settings.settings import get_settings
+from ui.settings.settings_tab import SettingsPage
+from ui.gestures.gestures import get_gesture_library  # 导入手势库
+from ui.gestures.gestures_tab import GesturesPage  # 导入手势管理页面
+from ui.components.button import AnimatedButton  # 导入自定义动画按钮
+from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
+from ui.components.toast_notification import show_info, show_warning, show_error, get_toast_manager  # 导入Toast通知组件
+from ui.components.dialog import show_dialog  # 导入自定义对话框组件
+from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
 
 class GestroKeyApp(QMainWindow):
     """GestroKey应用程序主窗口"""
@@ -481,7 +468,38 @@ class GestroKeyApp(QMainWindow):
             self.logger.debug(f"托盘图标状态已更新: {'监听中' if is_active else '已停止'}")
 
 if __name__ == "__main__":
+    # 创建应用程序实例
     app = QApplication(sys.argv)
     
+    # 解决高DPI显示问题
+    app.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    
+    # 创建日志记录器
+    logger = get_logger("Main")
+    logger.info("启动GestroKey应用程序")
+    
+    # 显示加载画面
+    splash = SplashScreen()
+    splash.show()
+    
+    # 强制处理事件，确保加载画面立即显示
+    for i in range(5):  # 多次处理事件，确保UI更新
+        app.processEvents()
+    
+    # 延迟一会儿，给加载动画一些显示时间
+    start_time = time.time()
+    
+    # 创建主窗口（但不显示）
     window = GestroKeyApp()
+    
+    # 确保加载画面至少显示1.5秒
+    elapsed = time.time() - start_time
+    if elapsed < 1.5:
+        time.sleep(1.5 - elapsed)
+    
+    # 显示主窗口并关闭加载画面
+    window.show()
+    splash.fade_out_and_close()
+    
+    # 启动应用程序主循环
     sys.exit(app.exec()) 

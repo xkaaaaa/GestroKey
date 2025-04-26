@@ -12,4 +12,7 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from version import VERSION
 
+# 导出模块
+from ui.splash_screen import SplashScreen
+
 __version__ = VERSION 
