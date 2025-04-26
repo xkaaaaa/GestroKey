@@ -212,19 +212,19 @@ jobs:
           # 根据操作系统选择不同的构建方式
           if ("${{ matrix.os }}" -eq "windows-latest") {
             # Windows便携版
-            python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+            python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
             mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
             Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
             Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
           } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
             # Linux便携版 (使用bash语法)
-            bash -c 'python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py'
             bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
             bash -c 'cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"'
             bash -c 'cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
           } else {
             # macOS便携版 (使用bash语法)
-            bash -c 'python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --macos-create-app-bundle --macos-app-icon=src/assets/images/icon.icns --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --macos-create-app-bundle --macos-app-icon=src/assets/images/icon.icns --output-dir=dist --assume-yes-for-downloads src/main.py'
             bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
             bash -c 'cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"'
             bash -c 'cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
@@ -267,16 +267,16 @@ jobs:
           # 根据操作系统选择不同的构建方式
           if ("${{ matrix.os }}" -eq "windows-latest") {
             # Windows单文件版
-            python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+            python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
             Move-Item -Path dist/main.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
           } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
             # Linux单文件版 (使用bash语法)
-            bash -c 'python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py'
             bash -c 'mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
             bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
           } else {
             # macOS单文件版 (使用bash语法)
-            bash -c 'python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py'
             bash -c 'mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
             bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
           }
