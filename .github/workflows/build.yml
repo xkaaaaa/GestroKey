@@ -230,28 +230,35 @@ jobs:
             bash -c 'cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
           }
 
-      # 模拟构建便携版（跳过实际编译）
-      - name: 模拟构建便携版（跳过实际编译）
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true'
+      # 模拟构建便携版（跳过实际编译）- Windows
+      - name: 模拟构建便携版（跳过实际编译）- Windows
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
-          echo "跳过编译过程，仅创建输出目录..."
-          mkdir -p dist
-          if ("${{ matrix.os }}" -eq "windows-latest") {
-            echo "创建Windows便携版虚拟包..."
-            mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
-            echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/README.txt"
-            Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
-          } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
-            bash -c 'echo "创建Linux便携版虚拟包..."'
-            bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
-            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/README.txt"'
-            bash -c 'cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
-          } else {
-            bash -c 'echo "创建macOS便携版虚拟包..."'
-            bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
-            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/README.txt"'
-            bash -c 'cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
-          }
+          echo "跳过编译过程，创建Windows便携版虚拟包..."
+          mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
+          "模拟构建" | Out-File -FilePath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/README.txt"
+          Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+
+      # 模拟构建便携版（跳过实际编译）- Linux
+      - name: 模拟构建便携版（跳过实际编译）- Linux
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建Linux便携版虚拟包..."
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/README.txt"
+          cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+
+      # 模拟构建便携版（跳过实际编译）- macOS
+      - name: 模拟构建便携版（跳过实际编译）- macOS
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建macOS便携版虚拟包..."
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/README.txt"
+          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
 
       # 构建单文件版本
       - name: 构建单文件版
@@ -274,24 +281,34 @@ jobs:
             bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
           }
 
-      # 模拟构建单文件版（跳过实际编译）
-      - name: 模拟构建单文件版（跳过实际编译）
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true'
+      # 模拟构建单文件版（跳过实际编译）- Windows
+      - name: 模拟构建单文件版（跳过实际编译）- Windows
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
-          echo "跳过编译过程，仅创建输出文件..."
+          echo "跳过编译过程，创建Windows单文件版虚拟包..."
+          mkdir -Force -Path dist
+          "模拟构建" | Out-File -FilePath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
+
+      # 模拟构建单文件版（跳过实际编译）- Linux
+      - name: 模拟构建单文件版（跳过实际编译）- Linux
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建Linux单文件版虚拟包..."
           mkdir -p dist
-          if ("${{ matrix.os }}" -eq "windows-latest") {
-            echo "创建Windows单文件版虚拟包..."
-            echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
-          } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
-            bash -c 'echo "创建Linux单文件版虚拟包..."'
-            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
-            bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
-          } else {
-            bash -c 'echo "创建macOS单文件版虚拟包..."'
-            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
-            bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
-          }
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+
+      # 模拟构建单文件版（跳过实际编译）- macOS
+      - name: 模拟构建单文件版（跳过实际编译）- macOS
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建macOS单文件版虚拟包..."
+          mkdir -p dist
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
 
       # 上传构建产物
       - name: 上传构建产物
