@@ -50,15 +50,7 @@ jobs:
           # 创建临时脚本读取版本信息
           cat << EOF > temp_version_script.py
           import sys
-          from src.version import VERSION, CURRENT_VERSION_TYPE, VERSION_TYPE_RELEASE, VERSION_TYPE_PREVIEW, VERSION_TYPE_DEVELOPMENT
-          
-          # 尝试获取仓库URL，如果存在的话
-          repo_url = ""
-          try:
-              from src.version import REPO_URL
-              repo_url = REPO_URL
-          except ImportError:
-              repo_url = "https://github.com/${{ github.repository }}"
+          from src.version import VERSION, CURRENT_VERSION_TYPE, VERSION_TYPE_RELEASE, VERSION_TYPE_PREVIEW, VERSION_TYPE_DEVELOPMENT, REPO_URL
           
           # 输出版本号
           print(VERSION)
@@ -74,7 +66,7 @@ jobs:
               print("unknown")
               
           # 输出仓库URL
-          print(repo_url)
+          print(REPO_URL)
           EOF
           
           # 执行脚本并读取输出
@@ -180,12 +172,20 @@ jobs:
             mkdir -p src/assets/images
           fi
           if [ -f src/assets/images/icon.svg ]; then
-            mkdir -p iconset
+            # 创建正确的iconset目录
+            mkdir -p "iconset.iconset"
+            # 使用magick命令替代convert
             for size in 16 32 64 128 256 512 1024; do
-              convert -background none src/assets/images/icon.svg -resize ${size}x${size} iconset/icon_${size}x${size}.png
+              magick src/assets/images/icon.svg -background none -resize ${size}x${size} "iconset.iconset/icon_${size}x${size}.png"
+              # 为Retina显示创建@2x版本
+              if [ "$size" -le "512" ]; then
+                dsize=$((size*2))
+                magick src/assets/images/icon.svg -background none -resize ${dsize}x${dsize} "iconset.iconset/icon_${size}x${size}@2x.png"
+              fi
             done
-            iconutil -c icns -o src/assets/images/icon.icns iconset
-            rm -rf iconset
+            # 使用正确格式创建icns文件
+            iconutil -c icns -o src/assets/images/icon.icns "iconset.iconset"
+            rm -rf "iconset.iconset"
           else
             echo "缺少图标文件: src/assets/images/icon.svg"
             exit 1
@@ -207,47 +207,91 @@ jobs:
 
       # 构建多文件便携版
       - name: 构建便携版
-        if: matrix.package-type == 'portable'
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true'
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          # 根据操作系统选择不同的构建方式
+          if ("${{ matrix.os }}" -eq "windows-latest") {
             # Windows便携版
             python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
-            mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
-            cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/"
-            powershell Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
-          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            # Linux便携版
-            python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py
-            mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
-            cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
-            cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
-          else
-            # macOS便携版
-            python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --macos-create-app-bundle --macos-app-icon=src/assets/images/icon.icns --output-dir=dist --assume-yes-for-downloads src/main.py
-            mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
-            cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
-            cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
-          fi
+            mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
+            Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
+            Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+          } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
+            # Linux便携版 (使用bash语法)
+            bash -c 'python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
+            bash -c 'cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"'
+            bash -c 'cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
+          } else {
+            # macOS便携版 (使用bash语法)
+            bash -c 'python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --macos-create-app-bundle --macos-app-icon=src/assets/images/icon.icns --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
+            bash -c 'cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"'
+            bash -c 'cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
+          }
+
+      # 模拟构建便携版（跳过实际编译）
+      - name: 模拟构建便携版（跳过实际编译）
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true'
+        run: |
+          echo "跳过编译过程，仅创建输出目录..."
+          mkdir -p dist
+          if ("${{ matrix.os }}" -eq "windows-latest") {
+            echo "创建Windows便携版虚拟包..."
+            mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
+            echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/README.txt"
+            Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+          } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
+            bash -c 'echo "创建Linux便携版虚拟包..."'
+            bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
+            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/README.txt"'
+            bash -c 'cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"'
+          } else {
+            bash -c 'echo "创建macOS便携版虚拟包..."'
+            bash -c 'mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
+            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/README.txt"'
+            bash -c 'cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"'
+          }
 
       # 构建单文件版本
       - name: 构建单文件版
-        if: matrix.package-type == 'standalone'
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true'
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          # 根据操作系统选择不同的构建方式
+          if ("${{ matrix.os }}" -eq "windows-latest") {
             # Windows单文件版
             python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
-            mv dist/main.exe "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
-          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            # Linux单文件版
-            python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py
-            mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
-            chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
-          else
-            # macOS单文件版
-            python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py
-            mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-            chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-          fi
+            Move-Item -Path dist/main.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
+          } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
+            # Linux单文件版 (使用bash语法)
+            bash -c 'python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
+            bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
+          } else {
+            # macOS单文件版 (使用bash语法)
+            bash -c 'python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --output-dir=dist --assume-yes-for-downloads src/main.py'
+            bash -c 'mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
+            bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
+          }
+
+      # 模拟构建单文件版（跳过实际编译）
+      - name: 模拟构建单文件版（跳过实际编译）
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true'
+        run: |
+          echo "跳过编译过程，仅创建输出文件..."
+          mkdir -p dist
+          if ("${{ matrix.os }}" -eq "windows-latest") {
+            echo "创建Windows单文件版虚拟包..."
+            echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
+          } elseif ("${{ matrix.os }}" -eq "ubuntu-latest") {
+            bash -c 'echo "创建Linux单文件版虚拟包..."'
+            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
+            bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"'
+          } else {
+            bash -c 'echo "创建macOS单文件版虚拟包..."'
+            bash -c 'echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
+            bash -c 'chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"'
+          }
 
       # 上传构建产物
       - name: 上传构建产物

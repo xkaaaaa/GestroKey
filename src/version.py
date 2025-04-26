@@ -14,6 +14,9 @@ BUILD_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 AUTHOR = "xkaaaaa"
 LICENSE = "GPL-3.0"
 
+# 仓库地址
+REPO_URL = f"https://github.com/{AUTHOR}/{APP_NAME}"
+
 # 版本类型
 VERSION_TYPE_RELEASE = "正式版"       # 正式发布版本
 VERSION_TYPE_PREVIEW = "预览版"       # 预览版本
@@ -45,7 +48,8 @@ def get_full_version_info():
         "description": APP_DESCRIPTION,
         "build_date": BUILD_DATE,
         "author": AUTHOR,
-        "license": LICENSE
+        "license": LICENSE,
+        "repo_url": REPO_URL
     }
 
 # 测试代码
