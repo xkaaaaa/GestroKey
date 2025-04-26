@@ -378,16 +378,16 @@ EOF
         id: generate_table
         run: |
           # 生成包含下载链接的表格
-          cat << 'EOF' > release_table.md
+          cat << EOF > release_table.md
 # GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}
 
 ## 下载链接
 
 | 操作系统 | 安装包 | 单文件版 | 便携版 |
 |---------|--------|---------|-------|
-| Windows | [安装程序]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Setup.exe) | [独立可执行文件]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe) | [ZIP压缩包]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip) |
-| macOS   | [DMG安装镜像]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Setup.dmg) | [独立可执行文件]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone) | [ZIP压缩包]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip) |
-| Linux   | [DEB安装包]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Setup.deb) | [独立可执行文件]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone) | [TAR.GZ压缩包]($(echo "${{ needs.get-version.outputs.repo_url }}")/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz) |
+| Windows | [安装程序](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Setup.exe) | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip) |
+| macOS   | [DMG安装镜像](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Setup.dmg) | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip) |
+| Linux   | [DEB安装包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Setup.deb) | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone) | [TAR.GZ压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz) |
 
 ## 系统要求
 
