@@ -14,6 +14,14 @@ BUILD_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 AUTHOR = "xkaaaaa"
 LICENSE = "GPL-3.0"
 
+# 版本类型
+VERSION_TYPE_RELEASE = "正式版"       # 正式发布版本
+VERSION_TYPE_PREVIEW = "预览版"       # 预览版本
+VERSION_TYPE_DEVELOPMENT = "未发布版" # 开发中版本
+
+# 当前版本类型
+CURRENT_VERSION_TYPE = VERSION_TYPE_DEVELOPMENT
+
 def get_version_string():
     """
     获取格式化的版本字符串
@@ -32,6 +40,7 @@ def get_full_version_info():
     """
     return {
         "version": VERSION,
+        "version_type": CURRENT_VERSION_TYPE,
         "app_name": APP_NAME,
         "description": APP_DESCRIPTION,
         "build_date": BUILD_DATE,

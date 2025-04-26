@@ -153,6 +153,10 @@ sys.exit(app.exec())
 - `BUILD_DATE`：构建日期，格式为"YYYY-MM-DD"
 - `AUTHOR`：作者信息
 - `LICENSE`：许可证信息
+- `VERSION_TYPE_RELEASE`：正式发布版本的类型标识
+- `VERSION_TYPE_PREVIEW`：预览版本的类型标识
+- `VERSION_TYPE_DEVELOPMENT`：未发布版本的类型标识
+- `CURRENT_VERSION_TYPE`：当前版本的类型，可设置为上述三种类型之一
 
 **主要函数**：
 - `get_version_string()`：获取格式化的版本字符串，如"GestroKey v0.0.0"
@@ -160,13 +164,16 @@ sys.exit(app.exec())
 
 **使用方法**：
 ```python
-from version import VERSION, APP_NAME, get_version_string, get_full_version_info
+from version import VERSION, APP_NAME, CURRENT_VERSION_TYPE, get_version_string, get_full_version_info
 
 # 获取版本号
 current_version = VERSION  # 如："0.0.0"
 
 # 获取应用名称
 app_name = APP_NAME  # 返回："GestroKey"
+
+# 获取当前版本类型
+version_type = CURRENT_VERSION_TYPE  # 返回："未发布版"、"预览版"或"正式版"
 
 # 获取格式化的版本字符串
 version_string = get_version_string()  # 返回："GestroKey v0.0.0"
@@ -178,6 +185,10 @@ version_info = get_full_version_info()  # 返回包含所有版本信息的字�
 **版本管理说明**：
 - 更新应用程序版本时，只需修改`VERSION`和相关变量
 - 构建日期`BUILD_DATE`自动设置为当前日期
+- 版本类型`CURRENT_VERSION_TYPE`根据发布阶段设置为对应的值：
+  - 开发阶段设置为`VERSION_TYPE_DEVELOPMENT`(未发布版)
+  - 预发布阶段设置为`VERSION_TYPE_PREVIEW`(预览版)
+  - 正式发布阶段设置为`VERSION_TYPE_RELEASE`(正式版)
 
 ### 2. 用户界面模块 (UI)
 
