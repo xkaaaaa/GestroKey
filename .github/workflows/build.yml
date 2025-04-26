@@ -284,7 +284,7 @@ jobs:
         id: generate_table
         run: |
           # 生成包含下载链接的表格
-          cat << EOF > release_table.md
+          cat << 'EOF' > release_table.md
 # GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}
 
 ## 下载链接
