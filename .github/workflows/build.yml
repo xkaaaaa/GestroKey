@@ -284,27 +284,25 @@ jobs:
         id: generate_table
         run: |
           # 生成包含下载链接的表格
-          cat << 'EOF' > release_table.md
-# GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}
-
-## 下载链接
-
-| 操作系统 | 单文件版 | 便携版 |
-|---------|---------|-------|
-| Windows | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip) |
-| macOS   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip) |
-| Linux   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone) | [TAR.GZ压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz) |
-
-## 系统要求
-
-- **Windows**: Windows 10/11 64位
-- **macOS**: macOS 11.0+ (Big Sur及更高版本)
-- **Linux**: 主流桌面发行版 (Ubuntu 20.04+, Fedora 36+, Debian 11+)
-
-## 更新说明
-
-此版本由GitHub Actions自动构建于 ${{ github.event.repository.updated_at }}
-EOF
+          echo "# GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}" > release_table.md
+          echo "" >> release_table.md
+          echo "## 下载链接" >> release_table.md
+          echo "" >> release_table.md
+          echo "| 操作系统 | 单文件版 | 便携版 |" >> release_table.md
+          echo "|---------|---------|-------|" >> release_table.md
+          echo "| Windows | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip) |" >> release_table.md
+          echo "| macOS   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip) |" >> release_table.md
+          echo "| Linux   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone) | [TAR.GZ压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz) |" >> release_table.md
+          echo "" >> release_table.md
+          echo "## 系统要求" >> release_table.md
+          echo "" >> release_table.md
+          echo "- **Windows**: Windows 10/11 64位" >> release_table.md
+          echo "- **macOS**: macOS 11.0+ (Big Sur及更高版本)" >> release_table.md
+          echo "- **Linux**: 主流桌面发行版 (Ubuntu 20.04+, Fedora 36+, Debian 11+)" >> release_table.md
+          echo "" >> release_table.md
+          echo "## 更新说明" >> release_table.md
+          echo "" >> release_table.md
+          echo "此版本由GitHub Actions自动构建于 ${{ github.event.repository.updated_at }}" >> release_table.md
           
           echo "TABLE_CONTENT<<EOF" >> $GITHUB_OUTPUT
           cat release_table.md >> $GITHUB_OUTPUT
