@@ -13,6 +13,13 @@ on:
         default: 'false'
         type: boolean
 
+# 为工作流添加权限
+permissions:
+  contents: write
+  packages: read
+  issues: read
+  pull-requests: read
+
 jobs:
   # 手动触发的Nuitka编译工作流
   nuitka-build:
@@ -37,9 +44,8 @@ jobs:
           pip install nuitka
           pip install -r requirements.txt
           
-          # 仅在不跳过构建时安装Nuitka和ImageMagick
+          # 仅在不跳过构建时安装ImageMagick
           if ('${{ github.event.inputs.skip_build }}' -ne 'true') {
-            pip install nuitka
             # 安装ImageMagick
             choco install imagemagick -y
           }
@@ -145,7 +151,7 @@ jobs:
             echo "IS_PRERELEASE=true" >> $env:GITHUB_OUTPUT
           } elseif ($version_type -eq "preview") {
             echo "VERSION_TYPE=Preview Version" >> $env:GITHUB_OUTPUT
-            echo "RELEASE_NAME=$version" >> $env:GITHUB_OUTPUT
+            echo "RELEASE_NAME=$version-preview" >> $env:GITHUB_OUTPUT
             echo "IS_PRERELEASE=true" >> $env:GITHUB_OUTPUT
           } else {
             echo "VERSION_TYPE=Release Version" >> $env:GITHUB_OUTPUT
@@ -153,23 +159,44 @@ jobs:
             echo "IS_PRERELEASE=false" >> $env:GITHUB_OUTPUT
           }
 
+      # 检查标签时使用显式权限
       - name: 检查latest标签是否存在
         id: check_tag
         uses: mukunku/tag-exists-action@v1.4.0
         with:
-          tag: latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.version_info.outputs.RELEASE_NAME }}
 
-      - name: 删除已存在的latest发布
+      # 移除已存在的标签和release，避免冲突
+      - name: 删除已存在的release和标签
         if: steps.check_tag.outputs.exists == 'true'
-        uses: dev-drprasad/delete-tag-and-release@v0.2.1
-        with:
-          delete_release: true
-          tag_name: latest
+        run: |
+          gh auth status
+          
+          echo "移除已存在的标签: ${{ steps.version_info.outputs.RELEASE_NAME }}"
+          
+          # 使用GitHub CLI删除release和标签
+          gh release delete ${{ steps.version_info.outputs.RELEASE_NAME }} --yes || echo "Release不存在或无法删除"
+          
+          # 删除远程标签
+          git tag -d ${{ steps.version_info.outputs.RELEASE_NAME }} || echo "本地标签不存在"
+          git push --delete origin ${{ steps.version_info.outputs.RELEASE_NAME }} || echo "远程标签不存在或无法删除"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 创建并推送标签
+      - name: 创建并推送标签
+        run: |
+          # 创建标签
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          echo "创建标签: ${{ steps.version_info.outputs.RELEASE_NAME }}"
+          git tag -a ${{ steps.version_info.outputs.RELEASE_NAME }} -m "Release ${{ steps.version_info.outputs.RELEASE_NAME }}"
+          
+          # 推送标签
+          git push origin ${{ steps.version_info.outputs.RELEASE_NAME }}
+        
+      # 创建Release
       - name: 创建Release
         uses: softprops/action-gh-release@v1
         with:
@@ -182,5 +209,3 @@ jobs:
             
             由GitHub Actions自动构建于 ${{ github.event.repository.updated_at }}
             ${{ github.event.inputs.skip_build == 'true' && '(快速构建 - 跳过编译)' || '(完整构建)' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
