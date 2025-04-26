@@ -278,13 +278,11 @@ class GestroKeyApp(QMainWindow):
             event.accept()
             return
         
-        # 如果有活动的对话框，先关闭它
+        # 如果有活动的对话框，忽略此次关闭事件
         if hasattr(self, 'current_dialog') and self.current_dialog:
-            try:
-                self.current_dialog.close()
-                self.current_dialog = None
-            except:
-                pass
+            self.logger.info("检测到活动对话框，忽略此次关闭事件")
+            event.ignore()
+            return
         
         # 如果控制台页面存在，停止绘制
         if hasattr(self, 'console_page'):

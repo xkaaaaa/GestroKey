@@ -109,7 +109,7 @@ src/
   - `_select_initial_page(self)`：选择初始页面（默认为控制台页面）
   - `onPageChanged(self, index)`：处理页面切换事件
   - `resizeEvent(self, event)`：处理窗口尺寸变化事件
-  - `closeEvent(self, event)`：处理窗口关闭事件，检查未保存的设置和手势库更改
+  - `closeEvent(self, event)`：处理窗口关闭事件，检查未保存的设置和手势库更改，并防止多个对话框同时弹出
   - `show_global_dialog(self, ...)`：显示全局对话框
   - `_handle_save_changes_response(self, button_text)`：处理保存更改对话框的响应
   - `handle_dialog_close(self, dialog)`：处理对话框关闭事件
