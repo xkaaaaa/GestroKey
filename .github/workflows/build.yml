@@ -70,9 +70,9 @@ jobs:
       - name: 复制必要文件
         run: |
           # 复制默认手势库、默认设置等必要文件
-          if exist "src/assets" xcopy /E /I "src/assets" "dist/main.dist/assets"
-          if exist "src/core" xcopy /E /I "src/core" "dist/main.dist/core"
-          if exist "src/ui" xcopy /E /I "src/ui" "dist/main.dist/ui"
+          if (Test-Path -Path "src/assets") { Copy-Item -Path "src/assets" -Destination "dist/main.dist/assets" -Recurse -Force }
+          if (Test-Path -Path "src/core") { Copy-Item -Path "src/core" -Destination "dist/main.dist/core" -Recurse -Force }
+          if (Test-Path -Path "src/ui") { Copy-Item -Path "src/ui" -Destination "dist/main.dist/ui" -Recurse -Force }
 
       - name: 创建压缩包
         run: |
