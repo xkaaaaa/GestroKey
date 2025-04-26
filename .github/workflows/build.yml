@@ -159,14 +159,14 @@ jobs:
             mkdir -p src/assets/images
           }
           if (Test-Path -Path src/assets/images/icon.svg) {
-          magick src/assets/images/icon.svg -background none -resize 256x256 icon-256.png
-          magick src/assets/images/icon.svg -background none -resize 128x128 icon-128.png
-          magick src/assets/images/icon.svg -background none -resize 64x64 icon-64.png
-          magick src/assets/images/icon.svg -background none -resize 48x48 icon-48.png
-          magick src/assets/images/icon.svg -background none -resize 32x32 icon-32.png
-          magick src/assets/images/icon.svg -background none -resize 16x16 icon-16.png
-          magick icon-256.png icon-128.png icon-64.png icon-48.png icon-32.png icon-16.png src/assets/images/icon.ico
-          Remove-Item icon-*.png
+            magick src/assets/images/icon.svg -background none -resize 256x256 icon-256.png
+            magick src/assets/images/icon.svg -background none -resize 128x128 icon-128.png
+            magick src/assets/images/icon.svg -background none -resize 64x64 icon-64.png
+            magick src/assets/images/icon.svg -background none -resize 48x48 icon-48.png
+            magick src/assets/images/icon.svg -background none -resize 32x32 icon-32.png
+            magick src/assets/images/icon.svg -background none -resize 16x16 icon-16.png
+            magick icon-256.png icon-128.png icon-64.png icon-48.png icon-32.png icon-16.png src/assets/images/icon.ico
+            Remove-Item icon-*.png
           } else {
             Write-Error "缺少图标文件: src/assets/images/icon.svg"
             exit 1
