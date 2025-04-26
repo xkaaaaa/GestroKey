@@ -260,7 +260,7 @@ jobs:
             python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
             
             # 创建Inno Setup脚本
-            cat > installer.iss << 'EOF'
+            cat > installer.iss << EOF
 [Setup]
 AppName=GestroKey
 AppVersion=${{ needs.get-version.outputs.version }}
