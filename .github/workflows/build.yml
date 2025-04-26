@@ -23,7 +23,7 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 设置Python
+      - name: 设置环境
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -31,57 +31,48 @@ jobs:
 
       - name: 安装依赖
         run: |
+          # 安装Python依赖
           python -m pip install --upgrade pip
           pip install nuitka
           pip install -r requirements.txt
+          
+          # 安装ImageMagick
+          choco install imagemagick -y
 
-      - name: 安装ImageMagick
-        run: choco install imagemagick -y
-
-      - name: 转换SVG到ICO
+      - name: 构建应用程序
         run: |
-          # 确保目标文件夹存在
+          # 1. 准备图标
           New-Item -ItemType Directory -Force -Path src/assets/images | Out-Null
           
-          # 检查SVG文件是否存在
           if (-not (Test-Path -Path src/assets/images/icon.svg)) {
               Write-Error "缺少SVG图标文件: src/assets/images/icon.svg"
               exit 1
           }
           
-          # 使用更新的magick命令语法
-          magick src/assets/images/icon.svg -background none -resize 256x256 icon-256.png
-          magick src/assets/images/icon.svg -background none -resize 128x128 icon-128.png
-          magick src/assets/images/icon.svg -background none -resize 64x64 icon-64.png
-          magick src/assets/images/icon.svg -background none -resize 48x48 icon-48.png
-          magick src/assets/images/icon.svg -background none -resize 32x32 icon-32.png
-          magick src/assets/images/icon.svg -background none -resize 16x16 icon-16.png
-          
-          # 合并所有PNG为一个ICO文件
+          # 转换SVG到ICO并确保透明度保持
+          magick src/assets/images/icon.svg -transparent white -background transparent -resize 256x256 icon-256.png
+          magick src/assets/images/icon.svg -transparent white -background transparent -resize 128x128 icon-128.png
+          magick src/assets/images/icon.svg -transparent white -background transparent -resize 64x64 icon-64.png
+          magick src/assets/images/icon.svg -transparent white -background transparent -resize 48x48 icon-48.png
+          magick src/assets/images/icon.svg -transparent white -background transparent -resize 32x32 icon-32.png
+          magick src/assets/images/icon.svg -transparent white -background transparent -resize 16x16 icon-16.png
           magick icon-256.png icon-128.png icon-64.png icon-48.png icon-32.png icon-16.png src/assets/images/icon.ico
-          
-          # 清理临时文件
           Remove-Item icon-*.png
-
-      - name: 使用Nuitka编译
-        run: |
+          
+          # 2. 使用Nuitka编译
           python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
-
-      - name: 复制必要文件
-        run: |
-          # 复制默认手势库、默认设置等必要文件
+          
+          # 3. 复制必要文件并准备发布
           if (Test-Path -Path "src/assets") { Copy-Item -Path "src/assets" -Destination "dist/main.dist/assets" -Recurse -Force }
           if (Test-Path -Path "src/core") { Copy-Item -Path "src/core" -Destination "dist/main.dist/core" -Recurse -Force }
           if (Test-Path -Path "src/ui") { Copy-Item -Path "src/ui" -Destination "dist/main.dist/ui" -Recurse -Force }
-
-      - name: 创建压缩包
-        run: |
-          cd dist
-          powershell Compress-Archive -Path main.dist -DestinationPath GestroKey-windows.zip
+          
+          # 4. 重命名为最终产品名称
+          Rename-Item -Path "dist/main.dist" -NewName "GestroKey-windows"
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: GestroKey-windows
-          path: dist/GestroKey-windows.zip
+          path: dist/GestroKey-windows
           retention-days: 7
