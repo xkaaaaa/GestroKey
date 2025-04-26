@@ -69,10 +69,52 @@ jobs:
           
           # 4. 重命名为最终产品名称
           Rename-Item -Path "dist/main.dist" -NewName "GestroKey-windows"
+          
+          # 5. 打包成zip文件用于Release
+          Compress-Archive -Path "dist/GestroKey-windows/*" -DestinationPath "dist/GestroKey-windows.zip" -Force
 
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+      - name: 读取版本信息
+        id: version_info
+        run: |
+          # 读取版本号和版本类型
+          $version = python -c "from src.version import VERSION; print(VERSION)"
+          $version_type = python -c "from src.version import CURRENT_VERSION_TYPE, VERSION_TYPE_RELEASE, VERSION_TYPE_PREVIEW, VERSION_TYPE_DEVELOPMENT; print(CURRENT_VERSION_TYPE)"
+          
+          # 输出版本信息供后续步骤使用
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "VERSION_TYPE=$version_type" >> $env:GITHUB_OUTPUT
+          
+          # 根据版本类型判断要创建的release名称和是否为预览版
+          if ($version_type -eq "未发布版") {
+            echo "RELEASE_NAME=latest" >> $env:GITHUB_OUTPUT
+            echo "IS_PRERELEASE=true" >> $env:GITHUB_OUTPUT
+          } elseif ($version_type -eq "预览版") {
+            echo "RELEASE_NAME=$version" >> $env:GITHUB_OUTPUT
+            echo "IS_PRERELEASE=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "RELEASE_NAME=$version" >> $env:GITHUB_OUTPUT
+            echo "IS_PRERELEASE=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: 删除已存在的latest发布
+        if: always()
+        uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
-          name: GestroKey-windows
-          path: dist/GestroKey-windows
-          retention-days: 7
+          delete_release: true
+          tag_name: latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 创建Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.version_info.outputs.RELEASE_NAME }}
+          tag_name: ${{ steps.version_info.outputs.RELEASE_NAME }}
+          files: dist/GestroKey-windows.zip
+          prerelease: ${{ steps.version_info.outputs.IS_PRERELEASE }}
+          body: |
+            GestroKey ${{ steps.version_info.outputs.VERSION }} ${{ steps.version_info.outputs.VERSION_TYPE }}
+            
+            由GitHub Actions自动构建于 ${{ github.event.repository.updated_at }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
