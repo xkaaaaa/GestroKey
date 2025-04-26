@@ -257,9 +257,13 @@ jobs:
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest'
         shell: bash
         run: |
-          python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
-          mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          # macOS需要创建app bundle才能正常工作
+          python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --macos-create-app-bundle --macos-app-icon=src/assets/images/icon.icns --output-dir=dist --assume-yes-for-downloads src/main.py
+          
+          # 创建dmg包
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone/GestroKey.app"
+          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
 
       # 模拟构建便携版（跳过实际编译）- Windows
       - name: 模拟构建便携版（跳过实际编译）- Windows
