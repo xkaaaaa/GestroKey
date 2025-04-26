@@ -49,14 +49,22 @@ class GestureExecutor:
             
         # 初始化特殊键映射字典
         self.special_keys = {
-            # 修饰键
+            # 修饰键 - 根据不同操作系统调整
             'ctrl': Key.ctrl,
             'control': Key.ctrl,
             'alt': Key.alt,
             'shift': Key.shift,
             'win': Key.cmd,
             'cmd': Key.cmd,
+            'command': Key.cmd,
             'meta': Key.cmd,
+            'super': Key.cmd,  # Linux中的Super键
+            
+            # macOS符号
+            '⌃': Key.ctrl,  # Control符号
+            '⌥': Key.alt,   # Option符号
+            '⇧': Key.shift,  # Shift符号
+            '⌘': Key.cmd,    # Command符号
             
             # 功能键
             'tab': Key.tab,
@@ -211,9 +219,14 @@ class GestureExecutor:
             return False
         
         try:
-            # 分割快捷键字符串
-            keys = shortcut_str.lower().split('+')
-            self.logger.debug(f"解析快捷键: {keys}")
+            # 处理macOS上可能的空格分隔符格式（如 "⌘ C"）
+            if " " in shortcut_str and "+" not in shortcut_str:
+                keys = shortcut_str.lower().split()
+                self.logger.debug(f"检测到macOS格式快捷键，解析为: {keys}")
+            else:
+                # 处理标准的加号分隔格式（如 "Ctrl+C"）
+                keys = shortcut_str.lower().split('+')
+                self.logger.debug(f"解析标准格式快捷键: {keys}")
             
             # 提取修饰键和普通键
             modifier_keys = []

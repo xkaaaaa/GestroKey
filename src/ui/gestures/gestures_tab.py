@@ -585,6 +585,14 @@ class GesturesPage(QWidget):
             if name in self.gestures.list_gestures():
                 self.logger.warning(f"手势名称已存在: {name}")
                 return
+            
+            # 确保使用当前平台的快捷键格式
+            if action_type == "shortcut":
+                # 先检查是否需要转换格式
+                import sys
+                if sys.platform != 'win32' and '+' in action_value:
+                    action_value = self._convert_shortcut_for_platform(action_value)
+                    self.logger.debug(f"已转换快捷键格式为当前平台格式: {action_value}")
                 
             # 获取下一个可用ID
             next_id = self.gestures._get_next_id()
@@ -780,11 +788,99 @@ class GesturesPage(QWidget):
             self._handle_reset_response
         )
     
+    def _convert_shortcut_for_platform(self, shortcut_str):
+        """根据当前操作系统转换快捷键格式
+        
+        Args:
+            shortcut_str: Windows格式的快捷键字符串(如'Ctrl+C')
+            
+        Returns:
+            str: 当前平台适用的快捷键格式
+        """
+        import sys
+        
+        # 如果是Windows，保持原样
+        if sys.platform == 'win32':
+            return shortcut_str
+        
+        # 将快捷键分解为各个部分
+        parts = shortcut_str.split('+')
+        result_parts = []
+        
+        # macOS特殊映射
+        if sys.platform == 'darwin':
+            # macOS使用特殊符号
+            mac_mapping = {
+                'Ctrl': '⌃',
+                'Control': '⌃',
+                'Alt': '⌥',
+                'Shift': '⇧',
+                'Win': '⌘',
+                'Cmd': '⌘',
+                'Command': '⌘',
+                'Meta': '⌘'
+            }
+            
+            for part in parts:
+                if part in mac_mapping:
+                    result_parts.append(mac_mapping[part])
+                else:
+                    result_parts.append(part)
+            
+            # macOS使用空格而不是加号连接
+            return " ".join(result_parts)
+        
+        # Linux特殊映射
+        else:
+            # Linux平台映射
+            linux_mapping = {
+                'Win': 'Super',
+                'Cmd': 'Super',
+                'Command': 'Super',
+                'Meta': 'Super'
+            }
+            
+            for part in parts:
+                if part in linux_mapping:
+                    result_parts.append(linux_mapping[part])
+                else:
+                    result_parts.append(part)
+            
+            # Linux仍使用加号连接
+            return "+".join(result_parts)
+
     def _handle_reset_response(self, button_text):
         """处理重置对话框的响应"""
         if button_text == "是":
             # 重置手势库
             self.gestures.reset_to_default()
+            
+            # 根据操作系统调整快捷键格式
+            try:
+                # 获取所有手势
+                gestures = self.gestures.get_all_gestures()
+                
+                # 遍历并更新快捷键格式
+                for name, gesture in gestures.items():
+                    action = gesture.get("action", {})
+                    if action.get("type") == "shortcut":
+                        action_value = action.get("value", "")
+                        if action_value:
+                            # 转换为当前平台的快捷键格式
+                            new_value = self._convert_shortcut_for_platform(action_value)
+                            # 如果格式有变化，更新手势
+                            if new_value != action_value:
+                                self.logger.info(f"转换手势快捷键格式: {name}: {action_value} -> {new_value}")
+                                action["value"] = new_value
+                                self.gestures.add_gesture(
+                                    name, 
+                                    gesture.get("direction", ""), 
+                                    action.get("type", ""), 
+                                    new_value,
+                                    gesture.get("id")
+                                )
+            except Exception as e:
+                self.logger.error(f"转换快捷键格式失败: {e}")
             
             # 保存手势库
             self.gestures.save()
@@ -805,7 +901,7 @@ class GesturesPage(QWidget):
             self.clearEditor()
             
             self.logger.info("重置为默认手势库并已保存应用")
-            show_success(self, "已重置为默认手势库并应用成功。")
+            show_success(self, "已重置为默认手势库并根据当前系统调整了快捷键格式。")
     
     def saveGestureLibrary(self):
         """保存手势库"""

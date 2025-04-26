@@ -111,11 +111,105 @@ class GestroKeyApp(QMainWindow):
     
     def show_and_activate(self):
         """显示并激活主窗口"""
+        # 先显示窗口
         self.show()
-        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
-        self.activateWindow()
-        self.raise_()
-        self.logger.info("显示并激活主窗口")
+        
+        # 根据不同操作系统处理窗口激活方式
+        import sys
+        
+        if sys.platform == 'win32':
+            # Windows平台 - 增强版激活方法
+            # 首先确保窗口不是最小化状态
+            if self.isMinimized():
+                self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+            
+            # 使用多种窗口标志组合来激活窗口
+            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+            
+            # 提高窗口显示的优先级
+            self.raise_()
+            self.activateWindow()
+            
+            # 使用Win32 API确保窗口激活（在某些Windows版本上更可靠）
+            try:
+                import ctypes
+                from ctypes import wintypes
+                
+                # 获取窗口句柄
+                hwnd = int(self.winId())
+                
+                # 在前台显示窗口并激活
+                user32 = ctypes.WinDLL('user32', use_last_error=True)
+                
+                # SetForegroundWindow函数使窗口置于前台
+                user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+                user32.SetForegroundWindow.restype = wintypes.BOOL
+                user32.SetForegroundWindow(hwnd)
+                
+                # 确保不是最小化
+                user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+                user32.ShowWindow.restype = wintypes.BOOL
+                
+                # SW_RESTORE = 9, SW_SHOW = 5, SW_SHOWNA = 8 (显示窗口但不激活)
+                user32.ShowWindow(hwnd, 9)  # 如果窗口最小化则还原
+                
+                # BringWindowToTop函数将窗口带到Z序顶部
+                user32.BringWindowToTop.argtypes = [wintypes.HWND]
+                user32.BringWindowToTop.restype = wintypes.BOOL
+                user32.BringWindowToTop(hwnd)
+                
+                self.logger.debug("成功使用Win32 API激活窗口")
+            except Exception as e:
+                # 如果Win32 API调用失败，使用Qt方法作为备选
+                self.logger.warning(f"Win32 API窗口激活失败: {e}，使用Qt方法作为备选")
+                # 继续使用Qt方法
+            
+            # 添加延迟处理，确保窗口被激活
+            QTimer.singleShot(50, lambda: [
+                self.activateWindow(),
+                self.raise_(),
+                QApplication.processEvents()
+            ])
+            
+            # 再次尝试，有些Windows版本需要多次尝试才能激活
+            QTimer.singleShot(150, lambda: [
+                self.activateWindow(),
+                self.raise_(),
+                QApplication.processEvents()
+            ])
+                
+        elif sys.platform == 'darwin':
+            # macOS平台 - 使用不同顺序可以提高可靠性
+            # 先还原窗口（如果最小化）
+            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+            # 延迟一点再激活窗口，让系统有时间处理窗口状态
+            QTimer.singleShot(10, self.raise_)
+            QTimer.singleShot(20, self.activateWindow)
+            
+            # 对于macOS，使用两步操作提高可靠性
+            QTimer.singleShot(50, lambda: [
+                self.raise_(),
+                QApplication.processEvents(),
+                self.activateWindow()
+            ])
+        else:
+            # Linux平台 - 不同窗口管理器的处理方式可能不同
+            # 先还原窗口（如果最小化）
+            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+            
+            # 在Linux上，多次尝试激活窗口，并处理事件循环
+            def try_activate():
+                self.raise_()
+                self.activateWindow()
+                QApplication.processEvents()
+                
+            # 立即尝试一次
+            try_activate()
+            # 然后延迟再尝试几次
+            QTimer.singleShot(50, try_activate)
+            QTimer.singleShot(150, try_activate)
+        
+        self.logger.info(f"在{sys.platform}平台上显示并激活主窗口")
     
     def show_settings_page(self):
         """显示设置页面"""

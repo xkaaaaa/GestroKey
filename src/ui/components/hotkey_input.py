@@ -15,7 +15,7 @@ except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
 
-# Windows平台特定代码
+# 平台特定代码
 if sys.platform == 'win32':
     try:
         # 获取用户32库
@@ -28,6 +28,21 @@ if sys.platform == 'win32':
         WM_SYSKEYUP = 0x0105
     except Exception as e:
         print(f"加载Windows库失败: {e}")
+elif sys.platform == 'darwin':
+    # macOS平台特定代码
+    try:
+        import Quartz
+        # 如果需要其他macOS特定库，在此处导入
+    except ImportError:
+        print("无法导入macOS特定库，某些功能可能受限")
+elif sys.platform.startswith('linux'):
+    # Linux平台特定代码
+    try:
+        import Xlib
+        from Xlib import X, XK, display
+        # 如果需要其他Linux特定库，在此处导入
+    except ImportError:
+        print("无法导入Linux特定库，某些功能可能受限")
 
 # 虚拟键盘对话框类
 class VirtualKeyboardDialog(QDialog):
@@ -619,25 +634,56 @@ class VirtualKeyboardDialog(QDialog):
     def on_win_clicked(self):
         """处理Win按钮点击事件"""
         sender = self.sender()
-        self.modifier_states["Win"] = sender.isChecked()
+        
+        # 获取当前操作系统对应的Win键名称
+        # 这里需要一致使用HotkeyInput中的命名
+        import sys
+        if sys.platform == 'darwin':  # macOS
+            win_key_name = "⌘"
+        elif sys.platform == 'win32':  # Windows
+            win_key_name = "Win"
+        else:  # Linux和其他
+            win_key_name = "Super"
+        
+        self.modifier_states[win_key_name] = sender.isChecked()
         
         # 如果一个Win按钮被点击，另一个也应该同步状态
         for btn in self.findChildren(QPushButton):
-            if btn != sender and btn.text() == "Win":
+            if btn != sender and (btn.text() == "Win" or btn.text() == "⌘" or btn.text() == "Super"):
                 btn.setChecked(sender.isChecked())
     
     def on_key_selected(self, key):
         """当用户选择一个非修饰键时触发"""
         # 获取选中的修饰键
         modifiers = []
-        if self.modifier_states["Ctrl"]:
-            modifiers.append("Ctrl")
-        if self.modifier_states["Alt"]:
-            modifiers.append("Alt")
-        if self.modifier_states["Shift"]:
-            modifiers.append("Shift")
-        if self.modifier_states["Win"]:
-            modifiers.append("Win")
+        
+        # 获取操作系统相关的修饰键名称
+        import sys
+        if sys.platform == 'darwin':  # macOS
+            ctrl_name, alt_name, shift_name, meta_name = "⌃", "⌥", "⇧", "⌘"
+        elif sys.platform == 'win32':  # Windows
+            ctrl_name, alt_name, shift_name, meta_name = "Ctrl", "Alt", "Shift", "Win"
+        else:  # Linux和其他
+            ctrl_name, alt_name, shift_name, meta_name = "Ctrl", "Alt", "Shift", "Super"
+            
+        # 检查每个修饰键的状态
+        if self.modifier_states.get("Ctrl", False):
+            modifiers.append(ctrl_name)
+        if self.modifier_states.get("Alt", False):
+            modifiers.append(alt_name)
+        if self.modifier_states.get("Shift", False):
+            modifiers.append(shift_name)
+            
+        # 针对不同系统检查Win/Command/Super键
+        if sys.platform == 'darwin':
+            if self.modifier_states.get("⌘", False):
+                modifiers.append(meta_name)
+        elif sys.platform == 'win32':
+            if self.modifier_states.get("Win", False):
+                modifiers.append(meta_name)
+        else:
+            if self.modifier_states.get("Super", False):
+                modifiers.append(meta_name)
         
         # 组合修饰键和主键
         if modifiers:
@@ -656,29 +702,41 @@ class VirtualKeyboardDialog(QDialog):
             self.modifier_states["Ctrl"] = state
             # 更新所有Ctrl按钮
             for btn in self.findChildren(QPushButton):
-                if btn.text() == "Ctrl":
+                if btn.text() in ["Ctrl", "⌃"]:  # 支持macOS的Control键符号
                     btn.setChecked(state)
         
         elif key == Qt.Key.Key_Alt:
             self.modifier_states["Alt"] = state
             # 更新所有Alt按钮
             for btn in self.findChildren(QPushButton):
-                if btn.text() == "Alt":
+                if btn.text() in ["Alt", "⌥"]:  # 支持macOS的Option键符号
                     btn.setChecked(state)
         
         elif key == Qt.Key.Key_Shift:
             self.modifier_states["Shift"] = state
             # 更新所有Shift按钮
             for btn in self.findChildren(QPushButton):
-                if btn.text() == "Shift":
+                if btn.text() in ["Shift", "⇧"]:  # 支持macOS的Shift键符号
                     btn.setChecked(state)
         
         elif key == Qt.Key.Key_Meta:
-            self.modifier_states["Win"] = state
-            # 更新Win按钮
-            for btn in self.findChildren(QPushButton):
-                if btn.text() == "Win":
-                    btn.setChecked(state)
+            # 处理各个系统的Win/Command/Super键
+            import sys
+            if sys.platform == 'darwin':
+                self.modifier_states["⌘"] = state  # macOS中的Command
+                for btn in self.findChildren(QPushButton):
+                    if btn.text() == "⌘":
+                        btn.setChecked(state)
+            elif sys.platform == 'win32':
+                self.modifier_states["Win"] = state  # Windows中的Win键
+                for btn in self.findChildren(QPushButton):
+                    if btn.text() == "Win":
+                        btn.setChecked(state)
+            else:
+                self.modifier_states["Super"] = state  # Linux中的Super键
+                for btn in self.findChildren(QPushButton):
+                    if btn.text() == "Super":
+                        btn.setChecked(state)
         
         # 更新其他按键状态
         if key in self.key_states:
@@ -787,11 +845,11 @@ class VirtualKeyboardDialog(QDialog):
             Qt.Key.Key_CapsLock: "CapsLock",
             Qt.Key.Key_NumLock: "NumLock",
             Qt.Key.Key_ScrollLock: "ScrollLock",
-            # 添加修饰键映射
-            Qt.Key.Key_Control: "Ctrl",
-            Qt.Key.Key_Shift: "Shift",
-            Qt.Key.Key_Alt: "Alt",
-            Qt.Key.Key_Meta: "Win",
+            # 添加修饰键映射 - 现在使用platform相关的名称
+            Qt.Key.Key_Control: self._modifier_keys["ctrl"]["name"],
+            Qt.Key.Key_Shift: self._modifier_keys["shift"]["name"],
+            Qt.Key.Key_Alt: self._modifier_keys["alt"]["name"],
+            Qt.Key.Key_Meta: self._modifier_keys["meta"]["name"],
             # 字母键
             Qt.Key.Key_A: "A",
             Qt.Key.Key_B: "B",
@@ -880,6 +938,48 @@ class HotkeyInput(QWidget):
         self._keyboard_animation_group = None
         self._pressed_keys = set()
         self._pressed_modifiers = set()
+        
+        # 初始化修饰键状态
+        self._modifier_keys = {
+            "ctrl": {"pressed": False, "name": "Ctrl"},
+            "alt": {"pressed": False, "name": "Alt"},
+            "shift": {"pressed": False, "name": "Shift"},
+            "meta": {"pressed": False, "name": "Win"}
+        }
+        
+        # 根据操作系统设置修饰键名称
+        if sys.platform == 'darwin':  # macOS
+            self._modifier_keys["ctrl"]["name"] = "⌃"  # Control symbol
+            self._modifier_keys["alt"]["name"] = "⌥"   # Option symbol
+            self._modifier_keys["shift"]["name"] = "⇧"  # Shift symbol
+            self._modifier_keys["meta"]["name"] = "⌘"   # Command symbol
+        elif sys.platform == 'win32':  # Windows
+            self._modifier_keys["ctrl"]["name"] = "Ctrl"
+            self._modifier_keys["alt"]["name"] = "Alt"
+            self._modifier_keys["shift"]["name"] = "Shift"
+            self._modifier_keys["meta"]["name"] = "Win"
+        else:  # Linux 和其他
+            self._modifier_keys["ctrl"]["name"] = "Ctrl"
+            self._modifier_keys["alt"]["name"] = "Alt"
+            self._modifier_keys["shift"]["name"] = "Shift"
+            self._modifier_keys["meta"]["name"] = "Super"
+            
+            # 在某些Linux发行版中可能使用不同名称
+            try:
+                # 尝试检测常见的Linux发行版
+                import platform
+                distro = platform.linux_distribution()[0].lower() if hasattr(platform, 'linux_distribution') else ''
+                
+                # 基于发行版调整按键名称
+                if 'ubuntu' in distro or 'debian' in distro:
+                    self._modifier_keys["meta"]["name"] = "Super"
+                elif 'fedora' in distro or 'redhat' in distro:
+                    self._modifier_keys["meta"]["name"] = "Super"
+                elif 'arch' in distro or 'manjaro' in distro:
+                    self._modifier_keys["meta"]["name"] = "Super"
+            except Exception:
+                # 如果检测失败，保持默认值
+                pass
         
         # 波纹动画属性
         self._ripple_position = QPointF()
@@ -1172,16 +1272,25 @@ class HotkeyInput(QWidget):
         # 根据当前输入框显示的快捷键解析按键状态
         key_parts = self._hotkey.split('+')
         
+        # 获取当前系统的修饰键名称
+        import sys
+        if sys.platform == 'darwin':  # macOS
+            ctrl_name, alt_name, shift_name, meta_name = "⌃", "⌥", "⇧", "⌘"
+        elif sys.platform == 'win32':  # Windows
+            ctrl_name, alt_name, shift_name, meta_name = "Ctrl", "Alt", "Shift", "Win"
+        else:  # Linux 和其他
+            ctrl_name, alt_name, shift_name, meta_name = "Ctrl", "Alt", "Shift", "Super"
+        
         # 检查并设置所有修饰键状态
         for part in key_parts:
             part = part.strip()
-            if part == "Ctrl":
+            if part in [ctrl_name, "Ctrl"]:
                 self._virtual_keyboard.update_modifier_state(Qt.Key.Key_Control, True)
-            elif part == "Alt":
+            elif part in [alt_name, "Alt"]:
                 self._virtual_keyboard.update_modifier_state(Qt.Key.Key_Alt, True)
-            elif part == "Shift":
+            elif part in [shift_name, "Shift"]:
                 self._virtual_keyboard.update_modifier_state(Qt.Key.Key_Shift, True)
-            elif part == "Win":
+            elif part in [meta_name, "Win", "Command", "Super", "⌘"]:
                 self._virtual_keyboard.update_modifier_state(Qt.Key.Key_Meta, True)
             else:
                 # 尝试找到对应的非修饰键并高亮
@@ -1377,21 +1486,27 @@ class HotkeyInput(QWidget):
         
         # 添加修饰键
         if modifiers & Qt.KeyboardModifier.ControlModifier:
-            hotkey_parts.append("Ctrl")
+            hotkey_parts.append(self._modifier_keys["ctrl"]["name"])
         if modifiers & Qt.KeyboardModifier.AltModifier:
-            hotkey_parts.append("Alt")
+            hotkey_parts.append(self._modifier_keys["alt"]["name"])
         if modifiers & Qt.KeyboardModifier.ShiftModifier:
-            hotkey_parts.append("Shift")
+            hotkey_parts.append(self._modifier_keys["shift"]["name"])
         if modifiers & Qt.KeyboardModifier.MetaModifier:
-            hotkey_parts.append("Win")
+            hotkey_parts.append(self._modifier_keys["meta"]["name"])
         
         # 添加键名（如果不是修饰键）
         key_name = self._get_key_name(key)
         if key_name and key not in [Qt.Key.Key_Control, Qt.Key.Key_Shift, Qt.Key.Key_Alt, Qt.Key.Key_Meta]:
             hotkey_parts.append(key_name)
         
-        # 返回格式化的快捷键
-        return "+".join(hotkey_parts)
+        # 针对macOS，使用特殊连接符
+        import sys
+        if sys.platform == 'darwin':
+            # macOS通常使用符号而不是+号
+            return " ".join(hotkey_parts)
+        else:
+            # 其他系统使用+连接
+            return "+".join(hotkey_parts)
     
     def set_hotkey(self, hotkey):
         """设置快捷键"""
@@ -1521,7 +1636,14 @@ class HotkeyInput(QWidget):
                 # 特殊处理Win键 (Meta键)
                 if key == Qt.Key.Key_Meta:
                     self._pressed_modifiers.add(key)
-                    self.set_hotkey("Win")
+                    # 根据不同操作系统设置相应的名称
+                    import sys
+                    if sys.platform == 'darwin':
+                        self.set_hotkey("⌘")  # macOS中的Command
+                    elif sys.platform == 'win32':
+                        self.set_hotkey("Win")  # Windows中的Win键
+                    else:
+                        self.set_hotkey("Super")  # Linux中的Super键
                     return True
                 
                 # 处理其他修饰键
@@ -1593,61 +1715,12 @@ class HotkeyInput(QWidget):
             Qt.Key.Key_CapsLock: "CapsLock",
             Qt.Key.Key_NumLock: "NumLock",
             Qt.Key.Key_ScrollLock: "ScrollLock",
-            # 添加修饰键映射
-            Qt.Key.Key_Control: "Ctrl",
-            Qt.Key.Key_Shift: "Shift",
-            Qt.Key.Key_Alt: "Alt",
-            Qt.Key.Key_Meta: "Win",
-            # 字母键
-            Qt.Key.Key_A: "A",
-            Qt.Key.Key_B: "B",
-            Qt.Key.Key_C: "C",
-            Qt.Key.Key_D: "D",
-            Qt.Key.Key_E: "E",
-            Qt.Key.Key_F: "F",
-            Qt.Key.Key_G: "G",
-            Qt.Key.Key_H: "H",
-            Qt.Key.Key_I: "I",
-            Qt.Key.Key_J: "J",
-            Qt.Key.Key_K: "K",
-            Qt.Key.Key_L: "L",
-            Qt.Key.Key_M: "M",
-            Qt.Key.Key_N: "N",
-            Qt.Key.Key_O: "O",
-            Qt.Key.Key_P: "P",
-            Qt.Key.Key_Q: "Q",
-            Qt.Key.Key_R: "R",
-            Qt.Key.Key_S: "S",
-            Qt.Key.Key_T: "T",
-            Qt.Key.Key_U: "U",
-            Qt.Key.Key_V: "V",
-            Qt.Key.Key_W: "W",
-            Qt.Key.Key_X: "X",
-            Qt.Key.Key_Y: "Y",
-            Qt.Key.Key_Z: "Z",
-            # 数字键
-            Qt.Key.Key_0: "0",
-            Qt.Key.Key_1: "1",
-            Qt.Key.Key_2: "2",
-            Qt.Key.Key_3: "3",
-            Qt.Key.Key_4: "4",
-            Qt.Key.Key_5: "5",
-            Qt.Key.Key_6: "6",
-            Qt.Key.Key_7: "7",
-            Qt.Key.Key_8: "8",
-            Qt.Key.Key_9: "9",
-            # 符号键
-            Qt.Key.Key_Minus: "-",
-            Qt.Key.Key_Equal: "=",
-            Qt.Key.Key_BracketLeft: "[",
-            Qt.Key.Key_BracketRight: "]",
-            Qt.Key.Key_Backslash: "\\",
-            Qt.Key.Key_Semicolon: ";",
-            Qt.Key.Key_Apostrophe: "'",
-            Qt.Key.Key_Comma: ",",
-            Qt.Key.Key_Period: ".",
-            Qt.Key.Key_Slash: "/",
-            Qt.Key.Key_QuoteLeft: "`"
+            # 添加修饰键映射 - 现在使用platform相关的名称
+            Qt.Key.Key_Control: self._modifier_keys["ctrl"]["name"],
+            Qt.Key.Key_Shift: self._modifier_keys["shift"]["name"],
+            Qt.Key.Key_Alt: self._modifier_keys["alt"]["name"],
+            Qt.Key.Key_Meta: self._modifier_keys["meta"]["name"],
+            # ... 保留其他键映射 ...
         }
         
         # 检查是否是特殊键
@@ -1836,6 +1909,15 @@ class HotkeyDemo(QWidget):
 # 测试代码，直接运行该文件时执行
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # 设置应用程序样式
+    app.setStyle("Fusion")
+    
+    # 创建演示窗口
+    demo = HotkeyDemo()
+    demo.show()
+    
+    sys.exit(app.exec()) 
     
     # 设置应用程序样式
     app.setStyle("Fusion")

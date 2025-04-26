@@ -19,6 +19,7 @@ class SystemTrayIcon(QSystemTrayIcon):
     
     提供系统托盘图标及其菜单和事件处理功能。
     支持单击、双击、中键点击等操作，以及右键自定义菜单。
+    兼容Windows、macOS和Linux平台。
     """
     
     # 自定义信号
@@ -47,6 +48,10 @@ class SystemTrayIcon(QSystemTrayIcon):
         self.click_timer = None
         self.is_double_click = False
         
+        # 检测操作系统类型
+        self.platform = sys.platform
+        self.logger.info(f"检测到操作系统平台: {self.platform}")
+        
         # 创建右键菜单和设置事件处理
         self._create_menu()
         self._setup_event_handlers()
@@ -61,31 +66,87 @@ class SystemTrayIcon(QSystemTrayIcon):
         
         # 创建菜单实例
         self.menu = QMenu()
-        self.menu.setStyleSheet("""
-            QMenu {
-                background-color: #ffffff;
-                border: 1px solid #dddddd;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            QMenu::item {
-                background-color: transparent;
-                padding: 8px 25px 8px 25px;
-                border-radius: 4px;
-                margin: 2px 5px;
-            }
-            QMenu::item:selected {
-                background-color: rgba(52, 152, 219, 0.2);
-            }
-            QMenu::item:pressed {
-                background-color: rgba(52, 152, 219, 0.3);
-            }
-            QMenu::separator {
-                height: 1px;
-                background-color: #dddddd;
-                margin: 5px 10px;
-            }
-        """)
+        
+        # 根据不同操作系统应用不同样式
+        if self.platform == 'win32':
+            self.menu.setStyleSheet("""
+                QMenu {
+                    background-color: #ffffff;
+                    border: 1px solid #dddddd;
+                    border-radius: 5px;
+                    padding: 5px;
+                }
+                QMenu::item {
+                    background-color: transparent;
+                    padding: 8px 25px 8px 25px;
+                    border-radius: 4px;
+                    margin: 2px 5px;
+                }
+                QMenu::item:selected {
+                    background-color: rgba(52, 152, 219, 0.2);
+                }
+                QMenu::item:pressed {
+                    background-color: rgba(52, 152, 219, 0.3);
+                }
+                QMenu::separator {
+                    height: 1px;
+                    background-color: #dddddd;
+                    margin: 5px 10px;
+                }
+            """)
+        elif self.platform == 'darwin':
+            # macOS风格菜单（更简洁，边距较小）
+            self.menu.setStyleSheet("""
+                QMenu {
+                    background-color: #ffffff;
+                    border: 1px solid #cccccc;
+                    border-radius: 6px;
+                    padding: 3px;
+                }
+                QMenu::item {
+                    background-color: transparent;
+                    padding: 5px 20px 5px 20px;
+                    border-radius: 4px;
+                    margin: 1px 3px;
+                }
+                QMenu::item:selected {
+                    background-color: rgba(0, 122, 255, 0.2);
+                }
+                QMenu::item:pressed {
+                    background-color: rgba(0, 122, 255, 0.3);
+                }
+                QMenu::separator {
+                    height: 1px;
+                    background-color: #cccccc;
+                    margin: 3px 8px;
+                }
+            """)
+        else:
+            # Linux风格菜单
+            self.menu.setStyleSheet("""
+                QMenu {
+                    background-color: #f5f5f5;
+                    border: 1px solid #d0d0d0;
+                    border-radius: 3px;
+                    padding: 4px;
+                }
+                QMenu::item {
+                    background-color: transparent;
+                    padding: 6px 22px 6px 22px;
+                    margin: 1px 4px;
+                }
+                QMenu::item:selected {
+                    background-color: rgba(61, 174, 233, 0.2);
+                }
+                QMenu::item:pressed {
+                    background-color: rgba(61, 174, 233, 0.3);
+                }
+                QMenu::separator {
+                    height: 1px;
+                    background-color: #d0d0d0;
+                    margin: 4px 8px;
+                }
+            """)
         
         # 创建菜单项 - 开始/停止监听
         self.toggle_action = QAction("开始监听", self)
@@ -136,6 +197,14 @@ class SystemTrayIcon(QSystemTrayIcon):
         
         self.logger.debug(f"托盘图标被激活，原因: {reason}")
         
+        # macOS系统托盘行为特殊处理
+        if self.platform == 'darwin':
+            # macOS上单击通常显示菜单，我们将双击/单击都处理为显示窗口
+            if reason in [QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick]:
+                self.show_window_signal.emit()
+                self.logger.debug("macOS托盘事件：显示主窗口")
+                return
+        
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             # 双击 - 显示主窗口
             self.is_double_click = True
@@ -145,6 +214,13 @@ class SystemTrayIcon(QSystemTrayIcon):
             self.logger.debug("双击事件：显示主窗口")
             
         elif reason == QSystemTrayIcon.ActivationReason.Trigger:
+            # Linux上可能不响应单击，使用单独的处理
+            if self.platform.startswith('linux'):
+                # 在Linux上直接处理单击，无需延迟
+                self.toggle_drawing_signal.emit()
+                self.logger.debug("Linux单击事件：切换绘制状态")
+                return
+            
             # 左键单击 - 使用定时器延迟处理，避免与双击冲突
             self.is_double_click = False
             if self.click_timer:
@@ -154,7 +230,10 @@ class SystemTrayIcon(QSystemTrayIcon):
             self.click_timer = QTimer()
             self.click_timer.setSingleShot(True)
             self.click_timer.timeout.connect(self._handle_single_click)
-            self.click_timer.start(300)  # 300毫秒的等待时间，可根据需要调整
+            
+            # Windows上使用较短的延迟
+            delay = 250 if self.platform == 'win32' else 300
+            self.click_timer.start(delay)
             
         elif reason == QSystemTrayIcon.ActivationReason.MiddleClick:
             # 中键点击 - 显示设置页面
@@ -180,19 +259,55 @@ class SystemTrayIcon(QSystemTrayIcon):
         """更新绘制状态，同步更新菜单项文本"""
         self.drawing_active = is_active
         self.toggle_action.setText("停止监听" if is_active else "开始监听")
+        
         # 更新工具提示
-        self.setToolTip(f"{APP_NAME} {'(监听中)' if is_active else '(已停止)'}")
+        # 根据不同系统设置不同的状态显示格式
+        if self.platform == 'darwin':
+            # macOS通常对通知文本更简洁
+            self.setToolTip(f"{APP_NAME} {is_active and '●' or '○'}")
+        elif self.platform == 'win32':
+            # Windows上使用括号提示
+            self.setToolTip(f"{APP_NAME} {'(监听中)' if is_active else '(已停止)'}")
+        else:
+            # Linux等其他系统
+            self.setToolTip(f"{APP_NAME} - {'监听中' if is_active else '已停止'}")
+            
         self.logger.debug(f"更新托盘图标状态: {'监听中' if is_active else '已停止'}")
 
 def get_system_tray(parent=None):
     """获取系统托盘图标单例实例"""
     if not hasattr(get_system_tray, "_instance") or get_system_tray._instance is None:
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                                '../../assets/images/icon.svg')
-        if os.path.exists(icon_path):
-            app_icon = QIcon(icon_path)
+        # 尝试加载不同平台适合的图标格式
+        icon_found = False
+        app_icon = QIcon()
+        
+        # 图标查找顺序（根据平台优先级）
+        icon_formats = []
+        
+        if sys.platform == 'win32':
+            # Windows优先查找ICO格式
+            icon_formats = ['icon.ico', 'icon.svg', 'icon.png']
+        elif sys.platform == 'darwin':
+            # macOS优先查找高分辨率图标
+            icon_formats = ['icon.svg', 'icon@2x.png', 'icon.png', 'icon.icns']
         else:
-            app_icon = QIcon()
+            # Linux和其他系统
+            icon_formats = ['icon.svg', 'icon.png']
+        
+        # 尝试按优先级加载图标
+        assets_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../assets/images'))
+        for icon_name in icon_formats:
+            icon_path = os.path.join(assets_dir, icon_name)
+            if os.path.exists(icon_path):
+                app_icon = QIcon(icon_path)
+                icon_found = True
+                break
+        
+        if not icon_found:
+            # 最后尝试加载默认SVG图标
+            default_icon_path = os.path.join(assets_dir, 'icon.svg')
+            if os.path.exists(default_icon_path):
+                app_icon = QIcon(default_icon_path)
         
         get_system_tray._instance = SystemTrayIcon(app_icon, parent)
     
@@ -235,7 +350,7 @@ if __name__ == "__main__":
     # 显示托盘图标
     tray_icon.show()
     
-    print("系统托盘示例已启动")
+    print(f"系统托盘示例已启动 (平台: {sys.platform})")
     print("- 左键单击: 切换开始/停止监听")
     print("- 双击: 显示主窗口")
     print("- 中键点击: 显示设置页面")

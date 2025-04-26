@@ -28,11 +28,17 @@ class Logger:
     def setup_logger(self):
         """设置日志记录器"""
         try:
-            # 获取日志目录路径 - 修改为 ~/.作者名/项目名/log
+            # 获取日志目录路径
             if sys.platform.startswith('win'):
                 log_dir = os.path.join(os.path.expanduser("~"), f".{AUTHOR}", APP_NAME.lower(), "log")
+            elif sys.platform.startswith('darwin'):
+                # macOS系统使用Library/Application Support目录
+                user_dir = os.path.expanduser("~")
+                log_dir = os.path.join(user_dir, "Library", "Application Support", f"{AUTHOR}", APP_NAME, "log")
             else:
-                log_dir = os.path.join(os.path.expanduser("~"), f".{AUTHOR}", APP_NAME.lower(), "log")
+                # Linux和其他系统遵循XDG标准，使用~/.config/目录
+                xdg_config_home = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser("~"), ".config"))
+                log_dir = os.path.join(xdg_config_home, f"{AUTHOR}", APP_NAME, "log")
             
             # 确保日志目录存在
             os.makedirs(log_dir, exist_ok=True)

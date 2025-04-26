@@ -46,7 +46,12 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
   - [4.2 程序流程](#42-程序流程)
   - [4.3 使用场景与示例](#43-使用场景与示例)
   - [4.4 扩展开发指南](#44-扩展开发指南)
-- [5. 总结](#5-总结)
+- [5. 跨平台兼容性](#5-跨平台兼容性)
+  - [5.1 多平台支持概述](#51-多平台支持概述)
+  - [5.2 Windows平台适配](#52-windows平台适配)
+  - [5.3 macOS平台适配](#53-macos平台适配)
+  - [5.4 Linux平台适配](#54-linux平台适配)
+- [6. 总结](#6-总结)
 
 ## 目录结构
 
@@ -113,6 +118,7 @@ src/
   - `show_global_dialog(self, ...)`：显示全局对话框
   - `_handle_save_changes_response(self, button_text)`：处理保存更改对话框的响应
   - `handle_dialog_close(self, dialog)`：处理对话框关闭事件
+  - `show_and_activate(self)`：多平台窗口显示和激活方法，针对Windows、macOS和Linux平台进行了优化
 
 **使用方法**：
 ```python
@@ -136,6 +142,7 @@ sys.exit(app.exec())
 
 **主窗口功能**：
 - 高DPI缩放支持
+- 跨平台窗口管理：针对Windows、macOS和Linux优化了窗口显示和激活方法
 - 自适应布局，在窗口尺寸变化时维持界面结构
 - 自动加载应用图标和页面图标
 - 底部状态栏显示退出按钮和版本信息
@@ -494,8 +501,11 @@ app.exec()
   - `reset_to_default(self)`：重置为默认设置
   - `has_changes(self)`：检查是否有未保存的更改
   - `get_app_path(self)`：获取应用程序可执行文件路径
-  - `is_autostart_enabled(self)`：检查应用程序是否设置为开机自启动
-  - `set_autostart(self, enable)`：设置开机自启动状态
+  - `is_autostart_enabled(self)`：检查应用程序是否设置为开机自启动，支持Windows、macOS和Linux系统
+  - `set_autostart(self, enable)`：设置开机自启动状态，在不同系统上使用不同的实现方式：
+    - Windows：通过注册表实现
+    - macOS：通过LaunchAgents的plist文件实现
+    - Linux：通过~/.config/autostart目录下的.desktop文件实现
 
 - `get_settings()`：获取设置管理器实例的单例函数
 
@@ -2133,37 +2143,62 @@ class MainWindow(QMainWindow):
 #### 2.2.12 ui/components/hotkey_input.py
 
 **功能说明**：
-快捷键输入组件，用于捕获和显示用户输入的键盘快捷键组合，包括虚拟键盘支持和多平台兼容性。
+快捷键输入组件，用于捕获和显示用户输入的键盘快捷键组合，包括虚拟键盘支持和多平台兼容性。支持Windows、macOS和Linux系统下不同的快捷键格式和表示方式。
 
 **主要类和方法**：
 - `HotkeyInput`：快捷键输入组件类
   - `__init__(self, parent=None, placeholder="请输入快捷键", enable_virtual_keyboard=True)`：初始化快捷键输入组件
-  - `set_hotkey(self, hotkey)`：设置快捷键值并更新显示
+  - `set_hotkey(self, hotkey)`：设置快捷键值并更新显示，自动转换为当前平台格式
   - `get_hotkey(self)`：获取当前的快捷键值
+  - `get_platform_hotkey(self)`：获取适用于当前平台的快捷键格式
+  - `convert_to_platform_format(self, hotkey)`：将通用格式快捷键转换为当前平台的特定格式
+  - `convert_to_universal_format(self, hotkey)`：将平台特定格式转换为通用格式
   - `clear(self)`：清除当前输入的快捷键
   - `_setup_ui(self)`：设置UI界面，包括输入框、虚拟键盘按钮和整体布局
   - `_on_key_pressed(self, key, modifiers)`：处理按键按下事件，更新当前快捷键值
   - `_show_virtual_keyboard(self)`：显示虚拟键盘对话框
   - `_virtual_key_selected(self, key_name)`：处理从虚拟键盘选择的按键
   - `_highlight_key_by_name(self, key_name)`：在虚拟键盘中高亮显示对应的按键
-  - `_get_key_name(self, key)`：获取按键对应的显示名称
+  - `_get_key_name(self, key)`：获取按键对应的显示名称，根据当前平台返回适当的名称
+  - `_detect_platform(self)`：检测当前操作系统平台并设置相应的键映射
 
 - `VirtualKeyboardDialog`：虚拟键盘对话框类
-  - `__init__(self, parent=None)`：初始化虚拟键盘对话框
+  - `__init__(self, parent=None)`：初始化虚拟键盘对话框，根据平台显示不同的键盘布局
   - `setup_ui(self)`：设置虚拟键盘界面，包括各种功能键和字母数字键
   - `update_modifier_state(self, key, state)`：更新修饰键（如Ctrl、Shift等）的状态
   - `on_key_selected(self, key_name)`：处理按键选择事件，发出信号通知选择了某个按键
+  - `get_platform_modifier_names(self)`：根据当前平台返回修饰键的名称（如Windows的"Win"对应macOS的"Command"）
+
+**跨平台兼容性特性**：
+- **多平台键映射**：自动识别操作系统并使用适当的按键映射
+  - Windows: `Ctrl`, `Alt`, `Shift`, `Win`
+  - macOS: `⌘` (Command), `⌥` (Option), `⇧` (Shift), `⌃` (Control)
+  - Linux: `Ctrl`, `Alt`, `Shift`, `Super`
+- **格式自动转换**：
+  - 存储时使用通用格式（如"ctrl+c"）
+  - 显示时转换为平台特定格式（如macOS显示为"⌘C"）
+  - 执行时根据平台自动转换为系统识别的格式
+- **虚拟键盘适配**：
+  - Windows/Linux显示标准功能键布局
+  - macOS显示Apple键盘布局，包括特殊的修饰键
+- **按键名称本地化**：按键名称根据平台进行适当的显示
 
 **使用方法**：
 ```python
 # 创建快捷键输入组件
 hotkey_input = HotkeyInput(parent_widget, "请输入快捷键")
 
-# 设置初始快捷键值
-hotkey_input.set_hotkey("Ctrl+C")
+# 设置初始快捷键值（通用格式）
+hotkey_input.set_hotkey("ctrl+c")
 
-# 获取当前设置的快捷键
-current_hotkey = hotkey_input.get_hotkey()
+# 获取当前设置的快捷键（通用格式）
+current_hotkey = hotkey_input.get_hotkey()  # 返回 "ctrl+c"
+
+# 获取平台特定格式的快捷键
+platform_hotkey = hotkey_input.get_platform_hotkey()
+# Windows: "Ctrl+C"
+# macOS: "⌘C"
+# Linux: "Ctrl+C"
 
 # 连接快捷键变更信号
 hotkey_input.hotkeyChanged.connect(on_hotkey_changed)
@@ -2174,13 +2209,13 @@ hotkey_input.clear()
 
 **特性说明**：
 - 实时捕获：实时捕获键盘按键，支持组合键
-- 格式化显示：将按键组合格式化为易读的形式
-- 虚拟键盘：内置虚拟键盘对话框，支持鼠标点击选择按键
+- 格式化显示：将按键组合格式化为平台特定的易读形式
+- 虚拟键盘：内置虚拟键盘对话框，支持鼠标点击选择按键，自动适应当前平台
 - 视觉反馈：按键按下时提供视觉高亮反馈
 - 波纹动画：点击输入框时显示水波纹动画效果
 - 焦点效果：获取/失去焦点时的动画过渡效果
 - 占位符文本：未设置快捷键时显示引导性占位符文本
-- 跨平台支持：兼容Windows、macOS和Linux系统
+- 跨平台支持：完全兼容Windows、macOS和Linux系统，提供平台特定的键盘体验
 
 #### 2.2.13 ui/components/checkbox.py
 
@@ -2302,17 +2337,17 @@ set_tooltip(label, "这是一个标签提示", direction=AnimatedToolTip.DIRECTI
 系统托盘图标组件，为应用程序提供常驻系统托盘功能，支持自定义右键菜单、单击/双击/中键点击操作，并具有现代化的视觉样式。允许用户在关闭主窗口后继续使用程序功能。
 
 **主要类和方法**：
-- `SystemTrayIcon`：系统托盘图标类
-  - `__init__(self, app_icon=None, parent=None)`：初始化系统托盘图标
-  - `_create_menu(self)`：创建右键菜单，设置样式和菜单项
-  - `_setup_event_handlers(self)`：设置托盘图标事件处理
-  - `_on_tray_activated(self, reason)`：处理托盘图标激活事件（单击、双击等）
+- `SystemTrayIcon`：系统托盘图标类，继承自`QSystemTrayIcon`
+  - `__init__(self, app_icon=None, parent=None)`：初始化系统托盘图标，检测操作系统类型
+  - `_create_menu(self)`：创建托盘图标右键菜单，根据不同操作系统应用不同样式
+  - `_setup_event_handlers(self)`：设置托盘图标事件处理器
+  - `_on_tray_activated(self, reason)`：处理托盘图标激活事件，包含平台特定行为处理
   - `_handle_single_click(self)`：处理延迟的单击事件（防抖处理）
   - `_on_toggle_action(self)`：处理"开始/停止监听"菜单项的触发
   - `_show_about(self)`：显示关于信息
   - `update_drawing_state(self, is_active)`：更新绘制状态，同步更新菜单项和工具提示
 
-- `get_system_tray(parent=None)`：单例函数，获取或创建系统托盘图标实例
+- `get_system_tray(parent=None)`：获取系统托盘图标单例实例，支持不同平台优先加载适合的图标格式
 
 **自定义信号**：
 - `toggle_drawing_signal`：切换绘制状态信号
@@ -2507,34 +2542,93 @@ print(f"描述: {description}")
 
 #### 3.3 core/gesture_executor.py
 
-**功能说明**：手势执行模块，负责根据识别的手势方向序列执行对应的操作。
+**功能说明**：负责执行手势对应的动作，如模拟键盘快捷键、鼠标操作或启动程序等。设计为完全跨平台兼容，确保手势在不同操作系统上表现一致。
 
 **主要类和方法**：
-- `GestureExecutor`：手势执行器
-  - `__init__(self)`：初始化手势执行器，加载键盘控制器和手势库
-  - `get_instance(cls)`：获取手势执行器的单例实例
-  - `execute_gesture(self, direction)`：执行与方向匹配的手势动作，经过优化简化
-  - `_execute_shortcut(self, shortcut_str)`：执行键盘快捷键，简化实现，提高稳定性
+- `GestureExecutor`：手势执行器类
+  - `__init__(self)`：初始化手势执行器，检测平台并设置平台特定的按键映射
+  - `execute_gesture(self, gesture)`：执行手势动作，根据动作类型调用相应的执行方法
+  - `_execute_hotkey(self, gesture)`：执行快捷键，根据操作系统自动转换快捷键格式
+  - `_execute_mouse_action(self, gesture)`：执行鼠标动作
+  - `_execute_text(self, gesture)`：执行文本输入
+  - `_execute_command(self, gesture)`：执行系统命令
+  - `convert_hotkey_for_platform(self, hotkey_str)`：将通用格式的快捷键字符串转换为当前平台的特定格式
+  - `_parse_hotkey(self, hotkey_str)`：解析快捷键字符串，提取修饰键和主键
+  - `_is_special_key(self, key)`：检查是否为特殊键（如Ctrl、Alt等）
+  - `_get_platform_mapping(self, key)`：获取键的平台特定映射（例如Windows的"win"对应macOS的"command"）
+  - `send_keys(self, keys)`：发送键盘按键，使用适合当前平台的方法
+  - `release_all_keys(self)`：释放所有可能的按键状态，防止按键卡住
 
-**特性说明**：
-- 单例模式设计，确保全局只有一个执行器实例
-- 支持多种操作类型，包括快捷键执行
-- 优化的错误处理机制
-- 精简的日志记录
-- 多线程键盘操作，避免阻塞UI线程
-- 提高代码可读性和维护性
+- `get_gesture_executor()`：获取手势执行器的单例实例
+
+**平台特定实现**：
+- **Windows平台**：
+  - 使用`ctypes`和Windows API发送按键，支持特殊按键和组合键
+  - 支持Windows特有的键如`Win`键
+  - 实现windows注册表操作支持系统设置相关功能
+  - 快捷键通常格式为`Ctrl+C`，`Alt+Tab`等
+
+- **macOS平台**：
+  - 使用`AppKit`和`Quartz`库发送按键事件
+  - 支持macOS特有的键如`Command`(⌘)、`Option`(⌥)键
+  - 快捷键映射：Windows的`Ctrl`→macOS的`Command`，`Alt`→`Option`，`Win`→`Control`
+  - 快捷键通常以符号表示：如`⌘C`，`⌥⇥`等
+
+- **Linux平台**：
+  - 使用`Xlib`或`XTest`发送按键事件（X11环境）
+  - 在Wayland环境下使用替代方法
+  - 支持`Super`键（相当于Windows键）
+  - 快捷键通常格式为`Ctrl+C`，`Alt+Tab`等
+
+**键名映射表**：
+| 通用键名 | Windows | macOS | Linux |
+|---------|---------|-------|-------|
+| ctrl    | Ctrl    | ⌘ Command | Ctrl |
+| alt     | Alt     | ⌥ Option  | Alt  |
+| shift   | Shift   | ⇧ Shift   | Shift |
+| win     | Win     | ⌃ Control | Super |
+| escape  | Esc     | ⎋ Esc     | Escape |
+| return  | Enter   | ↩ Return  | Return |
+| space   | Space   | Space     | space |
 
 **使用方法**：
 ```python
+# 获取手势执行器实例
 from core.gesture_executor import get_gesture_executor
 
-# 获取执行器实例
-executor = get_gesture_executor()
-
 # 执行手势
-result = executor.execute_gesture("上右下")
-print(f"执行结果: {'成功' if result else '失败'}")
+executor = get_gesture_executor()
+executor.execute_gesture(gesture_object)
+
+# 转换快捷键格式（通用格式 → 平台特定格式）
+platform_hotkey = executor.convert_hotkey_for_platform("ctrl+c")
+# 在Windows上返回 "Ctrl+C"
+# 在macOS上返回 "Command+C"
+# 在Linux上返回 "Ctrl+C"
+
+# 直接发送按键
+executor.send_keys(["ctrl", "c"])  # 发送Ctrl+C组合键
+
+# 确保释放所有按键
+executor.release_all_keys()  # 防止按键卡住
 ```
+
+**特性说明**：
+- **自动平台检测**：启动时自动检测操作系统平台，加载对应的实现
+- **快捷键转换**：智能转换快捷键格式，确保在任何平台上都能正确执行
+- **手势持久化**：手势库在保存时使用通用格式，在不同平台间可无缝迁移
+- **库兼容性**：根据不同平台自动选择合适的按键模拟库
+- **异常处理**：完善的错误处理机制，确保在按键模拟失败时能够平稳恢复
+- **特殊键支持**：支持各种特殊功能键，如媒体控制键、亮度调节键等
+- **多模式支持**：支持单击、双击、长按等多种按键模式
+
+**执行流程**：
+1. 从`get_gesture_executor()`获取单例实例
+2. 调用`execute_gesture(gesture)`执行手势
+3. 根据手势的动作类型选择不同的执行方法
+4. 对于快捷键动作，自动将通用格式转换为平台特定格式
+5. 使用平台特定的方法发送按键或执行其他操作
+6. 完成后确保所有按键都已释放
 
 #### 3.4 core/system_monitor.py
 
@@ -2624,6 +2718,41 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 6. **资源管理(assets/)**：管理应用程序资源，如图标和配置文件
 7. **版本管理(version.py)**：管理应用程序版本信息和构建参数
 8. **系统托盘集成**：提供后台运行能力，支持各种鼠标交互和状态显示
+9. **跨平台文件管理**：提供对Windows、macOS和Linux系统的文件路径适配
+
+**跨平台文件路径支持**：
+GestroKey针对不同操作系统提供了特定的文件路径处理，确保配置文件、手势库和日志文件在不同系统中都能正确存储和访问：
+
+- **Windows系统**：
+  - 配置文件路径：`C:\Users\<用户名>\.xkaaaaa\gestrokey\config\`
+  - 日志文件路径：`C:\Users\<用户名>\.xkaaaaa\gestrokey\log\`
+
+- **macOS系统**：
+  - 配置文件路径：`~/Library/Application Support/xkaaaaa/GestroKey/config/`
+  - 日志文件路径：`~/Library/Application Support/xkaaaaa/GestroKey/log/`
+
+- **Linux系统**：
+  - 配置文件路径：`~/.config/xkaaaaa/GestroKey/config/`（遵循XDG标准）
+  - 日志文件路径：`~/.config/xkaaaaa/GestroKey/log/`（遵循XDG标准）
+
+这种跨平台设计确保了应用程序能够在各种操作系统上无缝运行，同时遵循各操作系统的最佳实践和文件系统约定。
+
+**跨平台开机自启动支持**：
+GestroKey提供了适用于各种操作系统的开机自启动功能实现，用户可以通过设置界面的复选框轻松启用此功能：
+
+- **Windows系统**：
+  - 通过修改注册表的`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`项实现
+  - 添加程序路径作为自启动项的值
+
+- **macOS系统**：
+  - 通过在`~/Library/LaunchAgents`目录创建plist文件实现
+  - 使用标准的macOS启动项格式，设置RunAtLoad属性为true
+
+- **Linux系统**：
+  - 通过在`~/.config/autostart`目录创建.desktop文件实现
+  - 遵循XDG自动启动规范，设置合适的应用程序类型和执行命令
+
+所有系统的开机自启动设置都通过统一的API进行管理，确保用户体验的一致性。设置变更在用户点击"保存设置"按钮后生效，而不是立即应用。
 
 **数据流向**：
 1. 用户启动应用程序，显示带有淡入动画的加载画面
@@ -2934,7 +3063,58 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
    - 在UI中添加新设置的控件
    - 添加适当的验证和保存逻辑
 
-### 5. 总结
+### 5. 跨平台兼容性
+
+#### 5.1 多平台支持概述
+
+GestroKey从设计之初就考虑了跨平台兼容性，通过在关键模块中加入平台检测和条件处理，确保应用在Windows、macOS和Linux系统上提供一致的功能和用户体验。主要的跨平台兼容策略包括：
+
+- **平台检测**：使用`sys.platform`识别操作系统类型，并根据不同平台执行对应代码分支
+- **文件路径处理**：兼容不同操作系统的文件路径格式和目录结构
+- **UI组件适配**：根据平台特性调整UI组件的外观和行为
+- **快捷键转换**：自动转换快捷键格式，适应不同平台的键盘布局和惯例
+- **系统API调用**：按需导入并使用平台特定的API，如Windows注册表、macOS启动项和Linux配置文件
+
+#### 5.2 Windows平台适配
+
+**功能适配**：
+- **窗口管理**：使用Win32 API (`user32.dll`)增强窗口激活功能，通过`SetForegroundWindow`和`BringWindowToTop`等函数确保窗口能够正确显示在最前面
+- **开机自启动**：使用Windows注册表(`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`)管理开机自启动
+- **路径处理**：处理包含空格的路径，使用引号包围路径字符串
+- **系统托盘**：优化Windows系统托盘交互，使用250毫秒的单击延迟
+
+**UI适配**：
+- **菜单样式**：为Windows设计特定的菜单样式，符合Windows设计语言
+- **图标加载**：优先加载ICO格式图标，其次是SVG和PNG格式
+- **工具提示**：使用括号格式的状态显示，如"GestroKey (监听中)"
+
+#### 5.3 macOS平台适配
+
+**功能适配**：
+- **窗口管理**：使用macOS特定的窗口激活序列，调整`activateWindow`和`raise_`调用顺序，并添加短延迟以提高可靠性
+- **开机自启动**：创建plist文件在`~/Library/LaunchAgents`目录下管理开机自启动
+- **路径处理**：处理macOS应用包结构(`.app/Contents/MacOS/`)，正确识别应用路径
+- **系统托盘**：特殊处理macOS系统托盘行为，将单击和双击都处理为显示窗口
+
+**UI适配**：
+- **菜单样式**：使用更简洁、边距较小的菜单样式，符合macOS设计语言
+- **图标加载**：优先加载SVG和高分辨率(@2x)图标，支持icns格式
+- **工具提示**：使用简洁的符号状态显示，如"GestroKey ●"表示活动状态
+
+#### 5.4 Linux平台适配
+
+**功能适配**：
+- **窗口管理**：针对Linux窗口管理器的特性，多次尝试激活窗口并处理事件循环，提高窗口激活的可靠性
+- **开机自启动**：在`~/.config/autostart`目录创建desktop文件管理开机自启动
+- **路径处理**：处理Linux文件路径，确保shell命令正确执行
+- **系统托盘**：优化Linux系统托盘交互，直接处理单击事件而不使用延迟
+
+**UI适配**：
+- **菜单样式**：使用符合主流Linux桌面环境的菜单样式
+- **图标加载**：优先加载SVG格式图标，确保在不同分辨率下的清晰度
+- **工具提示**：使用短横线格式的状态显示，如"GestroKey - 监听中"
+
+### 6. 总结
 
 本文档详细介绍了GestroKey项目的源代码结构和功能模块，包括：
 
@@ -2942,7 +3122,7 @@ GestroKey采用模块化的架构设计，各个模块之间通过明确的接�
 2. **用户界面模块**：实现控制台、设置和手势管理页面，提供直观的用户操作界面
 3. **UI组件模块**：提供按钮、卡片、滚动条、颜色选择器等自定义组件，实现统一的动画和视觉效果
 4. **核心功能模块**：实现手势绘制、分析和执行的核心功能
-5. **应用程序集成**：描述架构设计、程序流程和使用场景
+5. **跨平台兼容性**：确保应用在Windows、macOS和Linux系统上提供一致的功能体验
 
 GestroKey通过精心设计的UI界面和强大的核心功能，为用户提供了以下特点：
 
@@ -2970,6 +3150,12 @@ GestroKey通过精心设计的UI界面和强大的核心功能，为用户提供
    - SideNavigationMenu提供分组和动画支持的导航界面
    - 自定义滚动区域和滚动条，优化滚动体验
    - AnimatedColorPicker提供直观的颜色选择界面
+
+5. **跨平台兼容设计**：
+   - 自动检测操作系统并优化交互行为
+   - 快捷键格式在不同系统间自动转换
+   - 平台特定的窗口管理和UI风格
+   - 适应各平台的文件路径、配置目录和启动机制
 
 通过合理的模块化设计和松耦合架构，GestroKey不仅实现了易用的手势控制功能，还提供了流畅的用户体验和扩展性强的开发框架。未来的扩展方向包括更多的手势动作类型、更复杂的手势识别算法和更丰富的用户界面自定义选项。
 
