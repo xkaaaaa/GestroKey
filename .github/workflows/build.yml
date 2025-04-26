@@ -1,54 +1,76 @@
-name: Build with Nuitka
+name: GestroKey CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - main
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: '触发原因'
+        required: false
+        default: '手动触发构建'
 
 jobs:
-  build:
-    runs-on: windows-latest
+  test:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Run tests
+      run: |
+        # 如果有测试脚本，可以在这里运行
+        echo "运行测试..."
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+  # 手动触发的Nuitka编译工作流
+  nuitka-build:
+    name: Nuitka编译
+    runs-on: windows-latest
+    # 仅在手动触发时运行
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      - name: 设置Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          architecture: 'x64'
+          cache: 'pip'
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka ordered-set
-          # 安装你的项目依赖
+          pip install nuitka
           pip install -r requirements.txt
 
-      - name: Build with Nuitka
+      - name: 使用Nuitka编译
         run: |
-          python -m nuitka --standalone --mingw64 --windows-disable-console --onefile --show-progress --show-memory --plugin-enable=tk-inter --output-dir=dist src/main.py
+          python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist src/main.py
 
-      - name: Create release directory
+      - name: 复制必要文件
         run: |
-          mkdir release
-          copy dist\main.exe release\app.exe
-          # 如果需要包含其他文件（如配置文件、资源文件等）
-          # copy config.ini release\
-          # copy -Recurse assets\ release\assets\
+          # 复制默认手势库、默认设置等必要文件
+          if exist "src/assets" xcopy /E /I "src/assets" "dist/main.dist/assets"
+          if exist "src/core" xcopy /E /I "src/core" "dist/main.dist/core"
+          if exist "src/ui" xcopy /E /I "src/ui" "dist/main.dist/ui"
 
-      - name: Compress release files
+      - name: 创建压缩包
         run: |
-          # 使用7-Zip压缩（Windows runner自带）
-          7z a -tzip release/app.zip .\release\*
-          # 或者使用PowerShell压缩（不需要额外工具）
-          # Compress-Archive -Path .\release\* -DestinationPath .\release\app.zip -Force
+          cd dist
+          powershell Compress-Archive -Path main.dist -DestinationPath GestroKey-windows.zip
 
-      - name: Upload Artifact
+      - name: 上传构建产物
         uses: actions/upload-artifact@v3
         with:
-          name: release-package
-          path: release/app.zip
+          name: GestroKey-windows
+          path: dist/GestroKey-windows.zip
+          retention-days: 7
