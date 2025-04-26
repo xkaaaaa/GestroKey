@@ -8,9 +8,11 @@ from PyQt6.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, Q
 
 try:
     from core.logger import get_logger
+    from version import APP_NAME
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
+    from version import APP_NAME
 
 class GesturePattern(QWidget):
     """自定义SVG样式手势图案，用于滑块的滑块部分"""
@@ -770,7 +772,7 @@ if __name__ == "__main__":
     
     # 创建主窗口
     window = QWidget()
-    window.setWindowTitle("GestroKey 滑块测试")
+    window.setWindowTitle(f"{APP_NAME} 滑块测试")
     window.setMinimumSize(600, 400)
     window.setStyleSheet("background-color: #f5f5f5;")
     
@@ -780,7 +782,7 @@ if __name__ == "__main__":
     layout.setSpacing(30)
     
     # 添加标题
-    title = QLabel("GestroKey 滑块组件")
+    title = QLabel(f"{APP_NAME} 滑块组件")
     title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title.setStyleSheet("font-size: 18pt; font-weight: bold; color: #333;")
     layout.addWidget(title)

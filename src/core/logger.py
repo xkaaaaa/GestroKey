@@ -5,28 +5,34 @@ from datetime import datetime
 import getpass
 import sys
 
+try:
+    from version import APP_NAME, AUTHOR
+except ImportError:
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+    from version import APP_NAME, AUTHOR
+
 class Logger:
     """日志记录工具类，负责将日志存储到指定位置"""
     
-    def __init__(self, module_name="GestroKey"):
+    def __init__(self, module_name=None):
         """
         初始化日志记录器
         
         Args:
-            module_name: 模块名称，默认为"GestroKey"
+            module_name: 模块名称，默认为APP_NAME
         """
-        self.module_name = module_name
+        self.module_name = module_name if module_name else APP_NAME
         self.logger = None
         self.setup_logger()
         
     def setup_logger(self):
         """设置日志记录器"""
         try:
-            # 获取日志目录路径
+            # 获取日志目录路径 - 修改为 ~/.作者名/项目名/log
             if sys.platform.startswith('win'):
-                log_dir = os.path.join(os.path.expanduser("~"), ".gestrokey", "log")
+                log_dir = os.path.join(os.path.expanduser("~"), f".{AUTHOR}", APP_NAME.lower(), "log")
             else:
-                log_dir = os.path.join(os.path.expanduser("~"), ".gestrokey", "log")
+                log_dir = os.path.join(os.path.expanduser("~"), f".{AUTHOR}", APP_NAME.lower(), "log")
             
             # 确保日志目录存在
             os.makedirs(log_dir, exist_ok=True)
@@ -126,7 +132,7 @@ class Logger:
 # 创建一个默认的logger实例
 default_logger = Logger()
 
-def get_logger(module_name="GestroKey"):
+def get_logger(module_name=None):
     """获取一个命名的日志记录器"""
     return Logger(module_name)
 

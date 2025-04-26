@@ -3,7 +3,13 @@ import json
 import sys
 import pathlib
 
-from core.logger import get_logger
+try:
+    from core.logger import get_logger
+    from version import APP_NAME, AUTHOR
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core.logger import get_logger
+    from version import APP_NAME, AUTHOR
 
 class GestureLibrary:
     """手势库管理器，负责保存和加载用户手势库"""
@@ -87,10 +93,10 @@ class GestureLibrary:
         if sys.platform.startswith('win'):
             # Windows系统使用用户文档目录
             user_dir = os.path.expanduser("~")
-            config_dir = os.path.join(user_dir, ".gestrokey", "config")
+            config_dir = os.path.join(user_dir, f".{AUTHOR}", APP_NAME.lower(), "config")
         else:
             # 其他系统默认使用home目录
-            config_dir = os.path.join(os.path.expanduser("~"), ".gestrokey", "config")
+            config_dir = os.path.join(os.path.expanduser("~"), f".{AUTHOR}", APP_NAME.lower(), "config")
         
         # 确保配置目录存在
         os.makedirs(config_dir, exist_ok=True)
@@ -120,9 +126,7 @@ class GestureLibrary:
                 self.save()  # 保存默认手势库
         except Exception as e:
             self.logger.error(f"加载手势库失败: {e}")
-            # 出错时使用默认手势库并尝试保存
-            self.gestures = self.DEFAULT_GESTURES.copy()
-            self.save()
+            raise
     
     def save(self):
         """保存手势库到文件"""
@@ -302,10 +306,22 @@ class GestureLibrary:
     def reset_to_default(self):
         """重置为默认手势库"""
         self.logger.info("重置为默认手势库")
-        if self.gestures != self.DEFAULT_GESTURES:
-            self.gestures = self.DEFAULT_GESTURES.copy()
-            self.has_unsaved_changes = True
-        return True
+        try:
+            default_gestures = self._load_default_gestures()
+            if self.gestures != default_gestures:
+                self.gestures = default_gestures.copy()
+                self.has_unsaved_changes = True
+                
+            # 保存并更新saved_gestures
+            success = self.save()
+            if success:
+                self.saved_gestures = self.gestures.copy()
+                self.has_unsaved_changes = False
+                
+            return success
+        except Exception as e:
+            self.logger.error(f"重置为默认手势库失败: {e}")
+            return False
     
     def list_gestures(self):
         """获取所有手势名称列表"""

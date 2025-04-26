@@ -9,9 +9,11 @@ from PyQt6.QtGui import QPainter, QPainterPath, QColor, QLinearGradient, QPen, Q
 
 try:
     from core.logger import get_logger
+    from version import APP_NAME
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
+    from version import APP_NAME
 
 class SpinnerButton(QWidget):
     """数字选择器按钮，用于增加或减少值"""
@@ -587,7 +589,7 @@ if __name__ == "__main__":
     layout = QVBoxLayout(window)
     
     # 添加标题
-    title = QLabel("GestroKey 数字选择器")
+    title = QLabel(f"{APP_NAME} 数字选择器")
     title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title.setStyleSheet("font-size: 18pt; font-weight: bold; margin: 10px;")
     layout.addWidget(title)

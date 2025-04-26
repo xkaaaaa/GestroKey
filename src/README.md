@@ -302,6 +302,7 @@ console_page.toggle_drawing() # 切换绘制状态
 **特性说明**：
 - 前后端分离：作为后端模块，专注于数据存储和管理，不涉及UI操作
 - 自动初始化：首次运行时自动创建默认手势库
+- 手势库文件保存路径：`~/.xkaaaaa/gestrokey/config/gestures.json`
 - 配置持久化：所有更改自动保存到配置文件
 - ID管理：自动分配和管理手势ID，确保连续性
 - 手势匹配：提供方向序列匹配功能
@@ -500,7 +501,7 @@ app.exec()
 
 **设置文件管理**：
 - 默认设置来源：`ui/settings/default_settings.json`
-- 用户设置保存路径：`~/.gestrokey/config/settings.json`
+- 用户设置保存路径：`~/.xkaaaaa/gestrokey/config/settings.json`
 - 支持的设置项：
   - `pen_width`：笔尖粗细，范围1-20像素
   - `pen_color`：笔尖颜色，RGB格式数组
@@ -2582,20 +2583,17 @@ monitor.stop()
 
 **功能说明**：日志记录模块，提供统一的日志记录接口。
 
-**主要类和方法**：
+**主要组件**：
 - `Logger`：日志工具类
-  - `__init__(self, module_name="GestroKey")`：初始化日志记录器
-  - `setup_logger(self)`：设置日志记录器，经过优化简化
-  - `debug(self, message)`、`info(self, message)`等：不同级别的日志记录方法
-- `get_logger(module_name="GestroKey")`：获取一个命名的日志记录器
+- `__init__(self, module_name=None)`：初始化日志记录器，默认使用APP_NAME
+- `setup_logger(self)`：设置日志记录器，经过优化简化
+- `debug(self, message)`、`info(self, message)`等：不同级别的日志记录方法
+- `get_logger(module_name=None)`：获取一个命名的日志记录器
 
-**特性说明**：
-- 支持文件和控制台双重输出
+**特性**：
 - 自动处理日志目录和文件创建
-- 适当的错误处理和回退机制
+- 日志保存在用户目录的 `~/.xkaaaaa/gestrokey/log/` 路径下
 - 不同级别的日志控制
-- 模块化设计，便于在不同组件中使用
-- 简化的初始化流程
 
 **使用方法**：
 ```python

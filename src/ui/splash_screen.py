@@ -208,9 +208,9 @@ class SplashScreen(QSplashScreen):
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # 绘制圆角矩形背景
-        painter.setBrush(QColor(30, 30, 30, 230))  # 半透明深色背景
-        painter.setPen(Qt.PenStyle.NoPen)
+        # 绘制圆角矩形背景 - 改为浅色背景
+        painter.setBrush(QColor(245, 245, 245, 245))  # 浅灰色背景
+        painter.setPen(QColor(220, 220, 220))  # 浅灰色边框
         painter.drawRoundedRect(0, 0, 400, 400, 20, 20)
         
         painter.end()
@@ -237,35 +237,35 @@ class SplashScreen(QSplashScreen):
         # 获取应用图标路径
         icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'images', 'icon.svg')
         
-        # 添加标题标签
+        # 添加标题标签 - 改为深色文本
         title_label = QLabel(APP_NAME)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("font-size: 28px; font-weight: bold; color: white;")
+        title_label.setStyleSheet("font-size: 28px; font-weight: bold; color: #333333;")
         layout.addWidget(title_label)
         
-        # 添加版本标签
+        # 添加版本标签 - 改为中等深度文本
         version_label = QLabel(f"v{get_version_string().split('v')[1]}")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version_label.setStyleSheet("font-size: 14px; color: rgba(255, 255, 255, 180);")
+        version_label.setStyleSheet("font-size: 14px; color: #666666;")
         layout.addWidget(version_label)
         
         # 添加间隔
         layout.addSpacing(20)
         
-        # 添加带图标的加载动画
-        self.loading_icon = LoadingIcon(color=QColor(0, 120, 255), size=120, icon_path=icon_path)
+        # 添加带图标的加载动画 - 更改颜色
+        self.loading_icon = LoadingIcon(color=QColor(52, 152, 219), size=120, icon_path=icon_path)
         layout.addWidget(self.loading_icon, 0, Qt.AlignmentFlag.AlignCenter)
         
-        # 添加加载状态标签
+        # 添加加载状态标签 - 改为深色文本
         self.status_label = QLabel("正在启动...")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("font-size: 14px; color: white;")
+        self.status_label.setStyleSheet("font-size: 14px; color: #333333;")
         layout.addWidget(self.status_label)
         
-        # 添加底部提示
+        # 添加底部提示 - 改为浅灰色文本
         hint_label = QLabel("请稍后")
         hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hint_label.setStyleSheet("font-size: 12px; color: rgba(255, 255, 255, 130);")
+        hint_label.setStyleSheet("font-size: 12px; color: #888888;")
         layout.addWidget(hint_label)
         
         # 添加弹性空间

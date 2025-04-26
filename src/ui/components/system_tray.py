@@ -7,10 +7,12 @@ from PyQt6.QtCore import Qt, QSize, pyqtSignal, QObject, QTimer
 try:
     from core.logger import get_logger
     from ui.components.toast_notification import show_info
+    from version import get_version_string, APP_NAME
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
     from ui.components.toast_notification import show_info
+    from version import get_version_string, APP_NAME
 
 class SystemTrayIcon(QSystemTrayIcon):
     """系统托盘图标
@@ -50,7 +52,7 @@ class SystemTrayIcon(QSystemTrayIcon):
         self._setup_event_handlers()
         
         # 设置工具提示
-        self.setToolTip("GestroKey 手势控制工具")
+        self.setToolTip(f"{APP_NAME} 手势控制工具")
         self.logger.info("系统托盘图标初始化完成")
     
     def _create_menu(self):
@@ -172,15 +174,14 @@ class SystemTrayIcon(QSystemTrayIcon):
     
     def _show_about(self):
         """显示关于信息"""
-        from version import get_version_string
-        show_info(None, f"关于 GestroKey\n\n{get_version_string()}\n\n一款鼠标手势工具")
+        show_info(None, f"关于 {APP_NAME}\n\n{get_version_string()}\n\n一款鼠标手势工具")
     
     def update_drawing_state(self, is_active):
         """更新绘制状态，同步更新菜单项文本"""
         self.drawing_active = is_active
         self.toggle_action.setText("停止监听" if is_active else "开始监听")
         # 更新工具提示
-        self.setToolTip(f"GestroKey {'(监听中)' if is_active else '(已停止)'}")
+        self.setToolTip(f"{APP_NAME} {'(监听中)' if is_active else '(已停止)'}")
         self.logger.debug(f"更新托盘图标状态: {'监听中' if is_active else '已停止'}")
 
 def get_system_tray(parent=None):

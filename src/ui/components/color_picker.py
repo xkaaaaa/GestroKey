@@ -11,11 +11,13 @@ try:
     from core.logger import get_logger
     from ui.components.button import AnimatedButton
     from ui.components.slider import AnimatedSlider
+    from version import APP_NAME
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
     from core.logger import get_logger
     from ui.components.button import AnimatedButton
     from ui.components.slider import AnimatedSlider
+    from version import APP_NAME
 
 class ColorSwatch(QWidget):
     """颜色样本组件，用于显示单一颜色"""
@@ -825,7 +827,7 @@ class AnimatedColorPicker(QWidget):
         parent = self.parent()
         while parent:
             # 检查窗口是否是顶级窗口或主窗口
-            if isinstance(parent, QWidget) and (parent.isWindow() or parent.objectName() == "GestroKeyApp"):
+            if isinstance(parent, QWidget) and (parent.isWindow() or parent.objectName() == f"{APP_NAME}App"):
                 return parent
             parent = parent.parent()
         
@@ -898,7 +900,7 @@ if __name__ == "__main__":
     layout = QVBoxLayout(window)
     
     # 添加标题
-    title = QLabel("GestroKey 色彩选择器")
+    title = QLabel(f"{APP_NAME} 色彩选择器")
     title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title.setStyleSheet("font-size: 18pt; font-weight: bold; margin: 10px;")
     layout.addWidget(title)

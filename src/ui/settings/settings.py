@@ -2,62 +2,65 @@ import os
 import json
 import sys
 import logging
+import time
+import winreg
+import getpass
 
 try:
     from core.logger import get_logger
-    from version import APP_NAME  # 导入应用名称
+    from version import APP_NAME, AUTHOR  # 导入应用名称和作者名
 except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from core.logger import get_logger
-    from version import APP_NAME
+    from version import APP_NAME, AUTHOR
 
 # 添加导入Windows注册表操作模块
 import winreg
 
+# 单例模式的设置管理器
+_settings_instance = None
+
 class Settings:
-    """设置管理器，负责保存和加载用户设置"""
+    """设置管理器，负责加载、保存和管理应用程序设置"""
     
     def __init__(self):
+        """初始化设置管理器"""
         self.logger = get_logger("Settings")
-        self.DEFAULT_SETTINGS = self._load_default_settings()
-        self.settings = self.DEFAULT_SETTINGS.copy()
-        self.saved_settings = {}  # 用于存储最后一次保存的设置
+        self.settings = self._load_default_settings()
         self.settings_file = self._get_settings_file_path()
         self.has_unsaved_changes = False
+        self.saved_settings = None  # 用于保存最后一次成功保存的设置
+        
+        # 加载设置
         self.load()
     
     def _load_default_settings(self):
         """加载默认设置"""
-        default_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
-                                           "default_settings.json")
-        # 默认设置，无论何种情况下都会使用这些值作为备选
-        default_values = {
-            "pen_width": 3,
-            "pen_color": [0, 120, 255]
-        }
-        
         try:
+            # 从默认设置文件加载
+            default_settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'default_settings.json')
+            
             if os.path.exists(default_settings_path):
                 with open(default_settings_path, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                 self.logger.info(f"已从 {default_settings_path} 加载默认设置")
                 return settings
             else:
-                self.logger.warning(f"默认设置文件 {default_settings_path} 不存在，使用内置默认值")
-                return default_values
+                self.logger.error(f"默认设置文件 {default_settings_path} 不存在")
+                raise FileNotFoundError(f"默认设置文件不存在: {default_settings_path}")
         except Exception as e:
-            self.logger.error(f"加载默认设置失败: {e}，使用内置默认值")
-            return default_values
+            self.logger.error(f"加载默认设置失败: {e}")
+            raise
         
     def _get_settings_file_path(self):
         """获取设置文件路径"""
         if sys.platform.startswith('win'):
             # Windows系统使用用户文档目录
             user_dir = os.path.expanduser("~")
-            config_dir = os.path.join(user_dir, ".gestrokey", "config")
+            config_dir = os.path.join(user_dir, f".{AUTHOR}", APP_NAME.lower(), "config")
         else:
             # 其他系统默认使用home目录
-            config_dir = os.path.join(os.path.expanduser("~"), ".gestrokey", "config")
+            config_dir = os.path.join(os.path.expanduser("~"), f".{AUTHOR}", APP_NAME.lower(), "config")
         
         # 确保配置目录存在
         os.makedirs(config_dir, exist_ok=True)
@@ -85,9 +88,7 @@ class Settings:
                 self.save()  # 保存默认设置
         except Exception as e:
             self.logger.error(f"加载设置失败: {e}")
-            # 出错时使用默认设置并尝试保存
-            self.settings = self.DEFAULT_SETTINGS.copy()
-            self.save()
+            raise
     
     def save(self):
         """保存设置到文件"""
@@ -131,22 +132,27 @@ class Settings:
     def reset_to_default(self):
         """重置为默认设置"""
         self.logger.info("重置为默认设置")
-        if self.settings != self.DEFAULT_SETTINGS:
-            self.settings = self.DEFAULT_SETTINGS.copy()
-            self.has_unsaved_changes = True
-            
-        # 保存设置并更新saved_settings
-        success = self.save()
-        if success:
-            self.saved_settings = self.settings.copy()
-            self.has_unsaved_changes = False
-            
-            # 确保开机自启动设置为关闭状态
-            if self.is_autostart_enabled():
-                self.set_autostart(False)
-                self.logger.info("重置为默认设置时已关闭开机自启动")
+        try:
+            default_settings = self._load_default_settings()
+            if self.settings != default_settings:
+                self.settings = default_settings
+                self.has_unsaved_changes = True
                 
-        return success
+            # 保存设置并更新saved_settings
+            success = self.save()
+            if success:
+                self.saved_settings = self.settings.copy()
+                self.has_unsaved_changes = False
+                
+                # 确保开机自启动设置为关闭状态
+                if self.is_autostart_enabled():
+                    self.set_autostart(False)
+                    self.logger.info("重置为默认设置时已关闭开机自启动")
+                    
+            return success
+        except Exception as e:
+            self.logger.error(f"重置为默认设置失败: {e}")
+            return False
         
     def has_changes(self):
         """检查是否有未保存的更改"""
