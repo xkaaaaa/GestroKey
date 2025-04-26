@@ -7,10 +7,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
     inputs:
-      reason:
-        description: '触发原因'
+      skip_build:
+        description: '跳过实际编译过程 (true/false)'
         required: false
-        default: '手动触发构建'
+        default: 'false'
+        type: boolean
 
 jobs:
   # 手动触发的Nuitka编译工作流
@@ -36,10 +37,39 @@ jobs:
           pip install nuitka
           pip install -r requirements.txt
           
-          # 安装ImageMagick
-          choco install imagemagick -y
+          # 仅在不跳过构建时安装Nuitka和ImageMagick
+          if ('${{ github.event.inputs.skip_build }}' -ne 'true') {
+            pip install nuitka
+            # 安装ImageMagick
+            choco install imagemagick -y
+          }
+
+      - name: 模拟编译过程
+        if: github.event.inputs.skip_build == 'true'
+        run: |
+          Write-Host "执行模拟编译流程..."
+          
+          # 1. 创建必要的目录结构
+          New-Item -ItemType Directory -Force -Path "dist/GestroKey-windows/assets/images" | Out-Null
+          New-Item -ItemType Directory -Force -Path "dist/GestroKey-windows/core" | Out-Null
+          New-Item -ItemType Directory -Force -Path "dist/GestroKey-windows/ui" | Out-Null
+          
+          # 2. 创建一些模拟文件
+          "// 模拟主程序" | Out-File -FilePath "dist/GestroKey-windows/main.exe" -Encoding utf8
+          "// 模拟配置文件" | Out-File -FilePath "dist/GestroKey-windows/config.json" -Encoding utf8
+          
+          # 3. 复制必要的目录
+          if (Test-Path -Path "src/assets") { Copy-Item -Path "src/assets" -Destination "dist/GestroKey-windows/assets" -Recurse -Force }
+          if (Test-Path -Path "src/core") { Copy-Item -Path "src/core" -Destination "dist/GestroKey-windows/core" -Recurse -Force }
+          if (Test-Path -Path "src/ui") { Copy-Item -Path "src/ui" -Destination "dist/GestroKey-windows/ui" -Recurse -Force }
+          
+          # 4. 打包成zip文件用于Release
+          Compress-Archive -Path "dist/GestroKey-windows/*" -DestinationPath "dist/GestroKey-windows.zip" -Force
+          
+          Write-Host "模拟编译完成，生成的文件位于 dist/GestroKey-windows.zip"
 
       - name: 构建应用程序
+        if: github.event.inputs.skip_build != 'true'
         run: |
           # 1. 准备图标
           New-Item -ItemType Directory -Force -Path src/assets/images | Out-Null
@@ -151,5 +181,6 @@ jobs:
             GestroKey ${{ steps.version_info.outputs.VERSION }} ${{ steps.version_info.outputs.VERSION_TYPE }}
             
             由GitHub Actions自动构建于 ${{ github.event.repository.updated_at }}
+            ${{ github.event.inputs.skip_build == 'true' && '(快速构建 - 跳过编译)' || '(完整构建)' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
