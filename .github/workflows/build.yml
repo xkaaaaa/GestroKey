@@ -40,11 +40,28 @@ jobs:
 
       - name: 转换SVG到ICO
         run: |
+          # 确保目标文件夹存在
+          New-Item -ItemType Directory -Force -Path src/assets/images | Out-Null
+          
+          # 检查SVG文件是否存在
           if (-not (Test-Path -Path src/assets/images/icon.svg)) {
               Write-Error "缺少SVG图标文件: src/assets/images/icon.svg"
               exit 1
           }
-          magick convert src/assets/images/icon.svg -define icon:auto-resize=256,128,64,48,32,16 -background none src/assets/images/icon.ico -verbose
+          
+          # 使用更新的magick命令语法
+          magick src/assets/images/icon.svg -background none -resize 256x256 icon-256.png
+          magick src/assets/images/icon.svg -background none -resize 128x128 icon-128.png
+          magick src/assets/images/icon.svg -background none -resize 64x64 icon-64.png
+          magick src/assets/images/icon.svg -background none -resize 48x48 icon-48.png
+          magick src/assets/images/icon.svg -background none -resize 32x32 icon-32.png
+          magick src/assets/images/icon.svg -background none -resize 16x16 icon-16.png
+          
+          # 合并所有PNG为一个ICO文件
+          magick icon-256.png icon-128.png icon-64.png icon-48.png icon-32.png icon-16.png src/assets/images/icon.ico
+          
+          # 清理临时文件
+          Remove-Item icon-*.png
 
       - name: 使用Nuitka编译
         run: |
