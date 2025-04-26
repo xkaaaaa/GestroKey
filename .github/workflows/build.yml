@@ -69,7 +69,7 @@ jobs:
           powershell Compress-Archive -Path main.dist -DestinationPath GestroKey-windows.zip
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: GestroKey-windows
           path: dist/GestroKey-windows.zip
