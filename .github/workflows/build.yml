@@ -76,28 +76,63 @@ jobs:
       - name: 读取版本信息
         id: version_info
         run: |
-          # 读取版本号和版本类型
-          $version = python -c "from src.version import VERSION; print(VERSION)"
-          $version_type = python -c "from src.version import CURRENT_VERSION_TYPE, VERSION_TYPE_RELEASE, VERSION_TYPE_PREVIEW, VERSION_TYPE_DEVELOPMENT; print(CURRENT_VERSION_TYPE)"
+          # 创建一个临时Python脚本来读取版本信息并避免编码问题
+          $script = @'
+          import sys
+          from src.version import VERSION, CURRENT_VERSION_TYPE, VERSION_TYPE_RELEASE, VERSION_TYPE_PREVIEW, VERSION_TYPE_DEVELOPMENT
+          
+          # 输出版本号
+          print(VERSION)
+          
+          # 将中文版本类型转换为英文以避免编码问题
+          if CURRENT_VERSION_TYPE == "未发布版":
+              print("development")
+          elif CURRENT_VERSION_TYPE == "预览版":
+              print("preview")
+          elif CURRENT_VERSION_TYPE == "正式版":
+              print("release")
+          else:
+              print("unknown")
+          '@
+          
+          # 将脚本保存到临时文件
+          $script | Out-File -Encoding utf8 temp_version_script.py
+          
+          # 执行脚本并读取输出
+          $version = python temp_version_script.py | Select-Object -First 1
+          $version_type = python temp_version_script.py | Select-Object -Skip 1 -First 1
+          
+          # 删除临时脚本
+          Remove-Item temp_version_script.py
           
           # 输出版本信息供后续步骤使用
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          echo "VERSION_TYPE=$version_type" >> $env:GITHUB_OUTPUT
           
-          # 根据版本类型判断要创建的release名称和是否为预览版
-          if ($version_type -eq "未发布版") {
+          # 根据英文版本类型判断要创建的release名称和是否为预览版
+          if ($version_type -eq "development") {
+            echo "VERSION_TYPE=Development Version" >> $env:GITHUB_OUTPUT
             echo "RELEASE_NAME=latest" >> $env:GITHUB_OUTPUT
             echo "IS_PRERELEASE=true" >> $env:GITHUB_OUTPUT
-          } elseif ($version_type -eq "预览版") {
+          } elseif ($version_type -eq "preview") {
+            echo "VERSION_TYPE=Preview Version" >> $env:GITHUB_OUTPUT
             echo "RELEASE_NAME=$version" >> $env:GITHUB_OUTPUT
             echo "IS_PRERELEASE=true" >> $env:GITHUB_OUTPUT
           } else {
+            echo "VERSION_TYPE=Release Version" >> $env:GITHUB_OUTPUT
             echo "RELEASE_NAME=$version" >> $env:GITHUB_OUTPUT
             echo "IS_PRERELEASE=false" >> $env:GITHUB_OUTPUT
           }
 
+      - name: 检查latest标签是否存在
+        id: check_tag
+        uses: mukunku/tag-exists-action@v1.4.0
+        with:
+          tag: latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: 删除已存在的latest发布
-        if: always()
+        if: steps.check_tag.outputs.exists == 'true'
         uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
           delete_release: true
