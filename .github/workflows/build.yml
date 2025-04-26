@@ -296,7 +296,7 @@ EOF
             cp src/assets/images/icon.png dist/deb-package/usr/share/icons/hicolor/256x256/apps/gestrokey.png
             
             # 创建启动器 - 修复heredoc
-            cat > dist/deb-package/usr/share/applications/gestrokey.desktop << 'EOF'
+            cat > dist/deb-package/usr/share/applications/gestrokey.desktop << EOF
 [Desktop Entry]
 Type=Application
 Name=GestroKey
@@ -307,7 +307,7 @@ Categories=Utility;
 EOF
             
             # 创建控制文件 - 修复heredoc
-            cat > dist/deb-package/DEBIAN/control << 'EOF'
+            cat > dist/deb-package/DEBIAN/control << EOF
 Package: gestrokey
 Version: ${{ needs.get-version.outputs.version }}
 Section: utils
