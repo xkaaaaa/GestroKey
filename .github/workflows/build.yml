@@ -34,6 +34,15 @@ jobs:
       is_prerelease: ${{ steps.version_info.outputs.IS_PRERELEASE }}
       release_name: ${{ steps.version_info.outputs.RELEASE_NAME }}
       repo_url: ${{ steps.version_info.outputs.REPO_URL }}
+      enable_packaging: ${{ steps.package_config.outputs.ENABLE_PACKAGING }}
+      package_windows: ${{ steps.package_config.outputs.PACKAGE_WINDOWS }}
+      package_macos: ${{ steps.package_config.outputs.PACKAGE_MACOS }}
+      package_linux: ${{ steps.package_config.outputs.PACKAGE_LINUX }}
+      package_standalone: ${{ steps.package_config.outputs.PACKAGE_STANDALONE }}
+      package_portable: ${{ steps.package_config.outputs.PACKAGE_PORTABLE }}
+      packager_windows: ${{ steps.package_config.outputs.PACKAGER_WINDOWS }}
+      packager_macos: ${{ steps.package_config.outputs.PACKAGER_MACOS }}
+      packager_linux: ${{ steps.package_config.outputs.PACKAGER_LINUX }}
     
     steps:
       - name: 检出代码
@@ -51,8 +60,6 @@ jobs:
           cat << EOF > temp_version_script.py
           import sys
           from src.version import VERSION, CURRENT_VERSION_TYPE, VERSION_TYPE_RELEASE, VERSION_TYPE_PREVIEW, VERSION_TYPE_DEVELOPMENT, REPO_URL
-          from src.version import ENABLE_PACKAGING, PACKAGE_WINDOWS, PACKAGE_MACOS, PACKAGE_LINUX, PACKAGE_STANDALONE, PACKAGE_PORTABLE
-          from src.version import PACKAGER_WINDOWS, PACKAGER_MACOS, PACKAGER_LINUX
           
           # 输出版本号
           print(VERSION)
@@ -69,17 +76,6 @@ jobs:
               
           # 输出仓库URL
           print(REPO_URL)
-          
-          # 输出打包配置
-          print(ENABLE_PACKAGING)
-          print(PACKAGE_WINDOWS)
-          print(PACKAGE_MACOS)
-          print(PACKAGE_LINUX)
-          print(PACKAGE_STANDALONE)
-          print(PACKAGE_PORTABLE)
-          print(PACKAGER_WINDOWS)
-          print(PACKAGER_MACOS)
-          print(PACKAGER_LINUX)
           EOF
           
           # 执行脚本并读取输出
@@ -87,15 +83,6 @@ jobs:
           version="${outputs[0]}"
           version_type="${outputs[1]}"
           repo_url="${outputs[2]}"
-          enable_packaging="${outputs[3]}"
-          package_windows="${outputs[4]}"
-          package_macos="${outputs[5]}"
-          package_linux="${outputs[6]}"
-          package_standalone="${outputs[7]}"
-          package_portable="${outputs[8]}"
-          packager_windows="${outputs[9]}"
-          packager_macos="${outputs[10]}"
-          packager_linux="${outputs[11]}"
           
           # 删除临时脚本
           rm temp_version_script.py
@@ -103,17 +90,6 @@ jobs:
           # 输出版本信息供后续步骤使用
           echo "VERSION=$version" >> $GITHUB_OUTPUT
           echo "REPO_URL=$repo_url" >> $GITHUB_OUTPUT
-          
-          # 输出打包配置
-          echo "ENABLE_PACKAGING=$enable_packaging" >> $GITHUB_OUTPUT
-          echo "PACKAGE_WINDOWS=$package_windows" >> $GITHUB_OUTPUT
-          echo "PACKAGE_MACOS=$package_macos" >> $GITHUB_OUTPUT
-          echo "PACKAGE_LINUX=$package_linux" >> $GITHUB_OUTPUT
-          echo "PACKAGE_STANDALONE=$package_standalone" >> $GITHUB_OUTPUT
-          echo "PACKAGE_PORTABLE=$package_portable" >> $GITHUB_OUTPUT
-          echo "PACKAGER_WINDOWS=$packager_windows" >> $GITHUB_OUTPUT
-          echo "PACKAGER_MACOS=$packager_macos" >> $GITHUB_OUTPUT
-          echo "PACKAGER_LINUX=$packager_linux" >> $GITHUB_OUTPUT
           
           # 根据英文版本类型判断要创建的release名称和是否为预览版
           if [ "$version_type" = "development" ]; then
@@ -130,16 +106,74 @@ jobs:
             echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: 读取打包配置
+        id: package_config
+        run: |
+          # 创建临时脚本读取打包配置
+          cat << EOF > temp_package_script.py
+          from src.version import ENABLE_PACKAGING, PACKAGE_WINDOWS, PACKAGE_MACOS, PACKAGE_LINUX
+          from src.version import PACKAGE_STANDALONE, PACKAGE_PORTABLE
+          from src.version import PACKAGER_WINDOWS, PACKAGER_MACOS, PACKAGER_LINUX
+          
+          # 输出打包控制选项
+          print("true" if ENABLE_PACKAGING else "false")
+          print("true" if PACKAGE_WINDOWS else "false")
+          print("true" if PACKAGE_MACOS else "false")
+          print("true" if PACKAGE_LINUX else "false")
+          print("true" if PACKAGE_STANDALONE else "false")
+          print("true" if PACKAGE_PORTABLE else "false")
+          print(PACKAGER_WINDOWS)
+          print(PACKAGER_MACOS)
+          print(PACKAGER_LINUX)
+          EOF
+          
+          # 执行脚本并读取输出
+          IFS=$'\n' read -d '' -ra outputs < <(python temp_package_script.py && printf '\0')
+          
+          # 输出配置信息供后续步骤使用
+          echo "ENABLE_PACKAGING=${outputs[0]}" >> $GITHUB_OUTPUT
+          echo "PACKAGE_WINDOWS=${outputs[1]}" >> $GITHUB_OUTPUT
+          echo "PACKAGE_MACOS=${outputs[2]}" >> $GITHUB_OUTPUT
+          echo "PACKAGE_LINUX=${outputs[3]}" >> $GITHUB_OUTPUT
+          echo "PACKAGE_STANDALONE=${outputs[4]}" >> $GITHUB_OUTPUT
+          echo "PACKAGE_PORTABLE=${outputs[5]}" >> $GITHUB_OUTPUT
+          echo "PACKAGER_WINDOWS=${outputs[6]}" >> $GITHUB_OUTPUT
+          echo "PACKAGER_MACOS=${outputs[7]}" >> $GITHUB_OUTPUT
+          echo "PACKAGER_LINUX=${outputs[8]}" >> $GITHUB_OUTPUT
+          
+          # 删除临时脚本
+          rm temp_package_script.py
+
   # 使用矩阵构建不同平台和格式的包
   build:
     name: 构建 ${{ matrix.os }} ${{ matrix.package-type }}
     runs-on: ${{ matrix.os }}
     needs: get-version
+    if: needs.get-version.outputs.enable_packaging == 'true'
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         package-type: [standalone, portable]
+        exclude:
+          - os: windows-latest
+            package-type: standalone
+            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+          - os: windows-latest
+            package-type: portable
+            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+          - os: ubuntu-latest
+            package-type: standalone
+            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+          - os: ubuntu-latest
+            package-type: portable
+            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+          - os: macos-latest
+            package-type: standalone
+            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+          - os: macos-latest
+            package-type: portable
+            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_portable != 'true' }}
     
     steps:
       - name: 检出代码
@@ -244,9 +278,9 @@ jobs:
             exit 1
           fi
 
-      # 构建多文件便携版 - Windows
-      - name: 构建便携版 - Windows
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest'
+      # 构建多文件便携版 - Windows (Nuitka)
+      - name: 构建便携版 - Windows (Nuitka)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
           python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
@@ -254,9 +288,20 @@ jobs:
           Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
           Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
 
-      # 构建多文件便携版 - Linux
-      - name: 构建便携版 - Linux
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest'
+      # 构建多文件便携版 - Windows (PyInstaller)
+      - name: 构建便携版 - Windows (PyInstaller)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'pyinstaller'
+        shell: pwsh
+        run: |
+          pip install pyinstaller
+          pyinstaller --name=GestroKey --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icon.ico src/main.py
+          mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
+          Copy-Item -Path dist/GestroKey/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
+          Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+
+      # 构建多文件便携版 - Linux (Nuitka)
+      - name: 构建便携版 - Linux (Nuitka)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
           python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
@@ -264,9 +309,20 @@ jobs:
           cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
           cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
 
+      # 构建多文件便携版 - Linux (PyInstaller)
+      - name: 构建便携版 - Linux (PyInstaller)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'pyinstaller'
+        shell: bash
+        run: |
+          pip install pyinstaller
+          pyinstaller --name=GestroKey --windowed --noconfirm --add-data="src/assets:assets" --add-data="src/ui/settings/default_settings.json:ui/settings" --add-data="src/ui/gestures/default_gestures.json:ui/gestures" src/main.py
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+          cp -r dist/GestroKey/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
+          cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+
       # 构建多文件便携版 - macOS (使用PyInstaller)
       - name: 构建便携版 - macOS
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest'
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'pyinstaller'
         shell: bash
         run: |
           # 创建spec文件
@@ -346,25 +402,44 @@ jobs:
           cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
 
       # 构建单文件版本 - Windows
-      - name: 构建单文件版 - Windows
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest'
+      - name: 构建单文件版 - Windows (Nuitka)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
           python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           Move-Item -Path dist/main.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
 
+      # 构建单文件版本 - Windows (PyInstaller)
+      - name: 构建单文件版 - Windows (PyInstaller)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'pyinstaller'
+        shell: pwsh
+        run: |
+          pip install pyinstaller
+          pyinstaller --name=GestroKey --onefile --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icon.ico src/main.py
+          Move-Item -Path dist/GestroKey.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
+
       # 构建单文件版本 - Linux
-      - name: 构建单文件版 - Linux
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest'
+      - name: 构建单文件版 - Linux (Nuitka)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
           python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
           chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
 
+      # 构建单文件版本 - Linux (PyInstaller)
+      - name: 构建单文件版 - Linux (PyInstaller)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'pyinstaller'
+        shell: bash
+        run: |
+          pip install pyinstaller
+          pyinstaller --name=GestroKey --onefile --windowed --noconfirm --add-data="src/assets:assets" --add-data="src/ui/settings/default_settings.json:ui/settings" --add-data="src/ui/gestures/default_gestures.json:ui/gestures" src/main.py
+          mv dist/GestroKey "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+
       # 构建单文件版本 - macOS (使用PyInstaller)
       - name: 构建单文件版 - macOS
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest'
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'pyinstaller'
         shell: bash
         run: |
           # 创建spec文件
@@ -513,6 +588,7 @@ jobs:
     name: 创建版本发布
     runs-on: ubuntu-latest
     needs: [get-version, build]
+    if: always() && needs.get-version.outputs.enable_packaging == 'true'
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
