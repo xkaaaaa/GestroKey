@@ -153,27 +153,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        package-type: [standalone, portable]
-        exclude:
+        include:
+          # Windows构建
           - os: windows-latest
             package-type: standalone
-            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+            if: ${{ needs.get-version.outputs.package_windows == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
           - os: windows-latest
             package-type: portable
-            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+            if: ${{ needs.get-version.outputs.package_windows == 'true' && needs.get-version.outputs.package_portable == 'true' }}
+          # Linux构建
           - os: ubuntu-latest
             package-type: standalone
-            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+            if: ${{ needs.get-version.outputs.package_linux == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
           - os: ubuntu-latest
             package-type: portable
-            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+            if: ${{ needs.get-version.outputs.package_linux == 'true' && needs.get-version.outputs.package_portable == 'true' }}
+          # macOS构建
           - os: macos-latest
             package-type: standalone
-            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+            if: ${{ needs.get-version.outputs.package_macos == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
           - os: macos-latest
             package-type: portable
-            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+            if: ${{ needs.get-version.outputs.package_macos == 'true' && needs.get-version.outputs.package_portable == 'true' }}
     
     steps:
       - name: 检出代码
