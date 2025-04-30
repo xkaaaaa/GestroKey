@@ -34,6 +34,15 @@ jobs:
       is_prerelease: ${{ steps.version_info.outputs.IS_PRERELEASE }}
       release_name: ${{ steps.version_info.outputs.RELEASE_NAME }}
       repo_url: ${{ steps.version_info.outputs.REPO_URL }}
+      enable_packaging: ${{ steps.packaging_config.outputs.ENABLE_PACKAGING }}
+      package_windows: ${{ steps.packaging_config.outputs.PACKAGE_WINDOWS }}
+      package_macos: ${{ steps.packaging_config.outputs.PACKAGE_MACOS }}
+      package_linux: ${{ steps.packaging_config.outputs.PACKAGE_LINUX }}
+      package_standalone: ${{ steps.packaging_config.outputs.PACKAGE_STANDALONE }}
+      package_portable: ${{ steps.packaging_config.outputs.PACKAGE_PORTABLE }}
+      packager_windows: ${{ steps.packaging_config.outputs.PACKAGER_WINDOWS }}
+      packager_macos: ${{ steps.packaging_config.outputs.PACKAGER_MACOS }}
+      packager_linux: ${{ steps.packaging_config.outputs.PACKAGER_LINUX }}
     
     steps:
       - name: 检出代码
@@ -97,16 +106,69 @@ jobs:
             echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: 读取打包配置
+        id: packaging_config
+        run: |
+          # 创建临时脚本读取打包配置
+          cat << EOF > temp_packaging_script.py
+          import sys
+          from src.version import ENABLE_PACKAGING, PACKAGE_WINDOWS, PACKAGE_MACOS, PACKAGE_LINUX
+          from src.version import PACKAGE_STANDALONE, PACKAGE_PORTABLE
+          from src.version import PACKAGER_WINDOWS, PACKAGER_MACOS, PACKAGER_LINUX
+          
+          # 输出打包控制选项
+          print("ENABLE_PACKAGING={}".format(str(ENABLE_PACKAGING).lower()))
+          print("PACKAGE_WINDOWS={}".format(str(PACKAGE_WINDOWS).lower()))
+          print("PACKAGE_MACOS={}".format(str(PACKAGE_MACOS).lower()))
+          print("PACKAGE_LINUX={}".format(str(PACKAGE_LINUX).lower()))
+          print("PACKAGE_STANDALONE={}".format(str(PACKAGE_STANDALONE).lower()))
+          print("PACKAGE_PORTABLE={}".format(str(PACKAGE_PORTABLE).lower()))
+          
+          # 输出打包工具选择
+          print("PACKAGER_WINDOWS={}".format(PACKAGER_WINDOWS))
+          print("PACKAGER_MACOS={}".format(PACKAGER_MACOS))
+          print("PACKAGER_LINUX={}".format(PACKAGER_LINUX))
+          EOF
+          
+          # 执行脚本并输出结果到GITHUB_OUTPUT
+          python temp_packaging_script.py >> $GITHUB_OUTPUT
+          
+          # 删除临时脚本
+          rm temp_packaging_script.py
+
   # 使用矩阵构建不同平台和格式的包
   build:
     name: 构建 ${{ matrix.os }} ${{ matrix.package-type }}
     runs-on: ${{ matrix.os }}
     needs: get-version
+    if: needs.get-version.outputs.enable_packaging == 'true'
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         package-type: [standalone, portable]
+        exclude:
+          # 根据配置排除Windows
+          - os: windows-latest
+            package-type: standalone
+            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+          - os: windows-latest
+            package-type: portable
+            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+          # 根据配置排除macOS
+          - os: macos-latest
+            package-type: standalone
+            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+          - os: macos-latest
+            package-type: portable
+            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+          # 根据配置排除Linux
+          - os: ubuntu-latest
+            package-type: standalone
+            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+          - os: ubuntu-latest
+            package-type: portable
+            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_portable != 'true' }}
     
     steps:
       - name: 检出代码
@@ -157,14 +219,25 @@ jobs:
             mkdir -p src/assets/images
           }
           if (Test-Path -Path src/assets/images/icon.svg) {
-            magick src/assets/images/icon.svg -background none -resize 256x256 icon-256.png
-            magick src/assets/images/icon.svg -background none -resize 128x128 icon-128.png
-            magick src/assets/images/icon.svg -background none -resize 64x64 icon-64.png
-            magick src/assets/images/icon.svg -background none -resize 48x48 icon-48.png
-            magick src/assets/images/icon.svg -background none -resize 32x32 icon-32.png
-            magick src/assets/images/icon.svg -background none -resize 16x16 icon-16.png
-            magick icon-256.png icon-128.png icon-64.png icon-48.png icon-32.png icon-16.png src/assets/images/icon.ico
-            Remove-Item icon-*.png
+            # 创建临时目录存放中间文件
+            mkdir -Force -Path temp_icons
+            
+            # 使用-transparent white确保透明度正确保留
+            magick convert src/assets/images/icon.svg -background transparent -resize 256x256 temp_icons/icon-256.png
+            magick convert src/assets/images/icon.svg -background transparent -resize 128x128 temp_icons/icon-128.png
+            magick convert src/assets/images/icon.svg -background transparent -resize 64x64 temp_icons/icon-64.png
+            magick convert src/assets/images/icon.svg -background transparent -resize 48x48 temp_icons/icon-48.png
+            magick convert src/assets/images/icon.svg -background transparent -resize 32x32 temp_icons/icon-32.png
+            magick convert src/assets/images/icon.svg -background transparent -resize 16x16 temp_icons/icon-16.png
+            
+            # 验证图像是否有透明通道
+            magick identify -verbose temp_icons/icon-256.png | Select-String -Pattern "Alpha" -Quiet
+            
+            # 使用convert命令确保正确生成包含透明度的ico文件
+            magick convert temp_icons/icon-256.png temp_icons/icon-128.png temp_icons/icon-64.png temp_icons/icon-48.png temp_icons/icon-32.png temp_icons/icon-16.png -colors 256 src/assets/images/icon.ico
+            
+            # 清理临时文件
+            Remove-Item -Recurse -Force temp_icons
           } else {
             Write-Error "缺少图标文件: src/assets/images/icon.svg"
             exit 1
@@ -211,25 +284,168 @@ jobs:
             exit 1
           fi
 
-      # 构建多文件便携版 - Windows
-      - name: 构建便携版 - Windows
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest'
+      # 构建多文件便携版 - Windows (Nuitka)
+      - name: 构建便携版 - Windows (Nuitka)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
           python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
-          mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
-          Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
-          Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+          
+          # 创建便携版目录
+          mkdir -Force -Path "dist/portable-temp"
+          Copy-Item -Path dist/main.dist/* -Destination "dist/portable-temp/" -Recurse
+          
+          # 直接压缩文件内容(而非文件夹)
+          cd dist/portable-temp
+          Compress-Archive -Path * -DestinationPath "../GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+          cd ../..
 
-      # 构建多文件便携版 - Linux
-      - name: 构建便携版 - Linux
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest'
+      # 构建多文件便携版 - Windows (PyInstaller)
+      - name: 构建便携版 - Windows (PyInstaller)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'pyinstaller'
+        shell: pwsh
+        run: |
+          # 安装PyInstaller
+          pip install pyinstaller
+          
+          # 创建spec文件
+          @"
+          # -*- mode: python ; coding: utf-8 -*-
+          
+          a = Analysis(
+              ['src/main.py'],
+              pathex=[],
+              binaries=[],
+              datas=[
+                  ('src/assets', 'assets'),
+                  ('src/ui/settings/default_settings.json', 'ui/settings'),
+                  ('src/ui/gestures/default_gestures.json', 'ui/gestures')
+              ],
+              hiddenimports=[],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=[],
+              excludes=[],
+              noarchive=False,
+          )
+          
+          pyz = PYZ(a.pure)
+          
+          exe = EXE(
+              pyz,
+              a.scripts,
+              [],
+              exclude_binaries=True,
+              name='GestroKey',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              console=False,
+              disable_windowed_traceback=False,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+              icon='src/assets/images/icon.ico',
+          )
+          
+          coll = COLLECT(
+              exe,
+              a.binaries,
+              a.datas,
+              strip=False,
+              upx=True,
+              upx_exclude=[],
+              name='GestroKey',
+          )
+          "@ | Out-File -FilePath GestroKey.spec -Encoding UTF8
+          
+          # 使用PyInstaller构建
+          pyinstaller GestroKey.spec
+          
+          # 直接压缩PyInstaller生成的文件
+          cd dist/GestroKey
+          Compress-Archive -Path * -DestinationPath "../GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+          cd ../..
+
+      # 构建多文件便携版 - Linux (Nuitka)
+      - name: 构建便携版 - Linux (Nuitka)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
           python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
-          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
-          cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
-          cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+          
+          # 直接从dist/main.dist目录打包，避免嵌套
+          cd dist/main.dist
+          tar -czvf "../GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" *
+          cd ../..
+
+      # 构建多文件便携版 - Linux (PyInstaller)
+      - name: 构建便携版 - Linux (PyInstaller)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'pyinstaller'
+        shell: bash
+        run: |
+          # 安装PyInstaller
+          pip install pyinstaller
+          
+          # 创建spec文件
+          cat > GestroKey.spec << EOF
+          # -*- mode: python ; coding: utf-8 -*-
+          
+          a = Analysis(
+              ['src/main.py'],
+              pathex=[],
+              binaries=[],
+              datas=[
+                  ('src/assets', 'assets'),
+                  ('src/ui/settings/default_settings.json', 'ui/settings'),
+                  ('src/ui/gestures/default_gestures.json', 'ui/gestures')
+              ],
+              hiddenimports=[],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=[],
+              excludes=[],
+              noarchive=False,
+          )
+          
+          pyz = PYZ(a.pure)
+          
+          exe = EXE(
+              pyz,
+              a.scripts,
+              [],
+              exclude_binaries=True,
+              name='GestroKey',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              console=False,
+              disable_windowed_traceback=False,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+          )
+          
+          coll = COLLECT(
+              exe,
+              a.binaries,
+              a.datas,
+              strip=False,
+              upx=True,
+              upx_exclude=[],
+              name='GestroKey',
+          )
+          EOF
+          
+          # 使用PyInstaller构建
+          pyinstaller GestroKey.spec
+          
+          # 直接打包生成的文件，避免嵌套
+          cd dist/GestroKey
+          tar -czvf "../GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" *
+          cd ../..
 
       # 构建多文件便携版 - macOS (使用PyInstaller)
       - name: 构建便携版 - macOS
@@ -307,30 +523,207 @@ jobs:
           # 使用PyInstaller构建
           pyinstaller GestroKey.spec
           
-          # 打包
-          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
-          cp -r dist/GestroKey.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
-          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
+          # macOS情况特殊，需要打包.app文件
+          cd dist
+          zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" GestroKey.app
+          cd ..
 
-      # 构建单文件版本 - Windows
-      - name: 构建单文件版 - Windows
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest'
+      # 构建单文件版本 - Windows (Nuitka)
+      - name: 构建单文件版 - Windows (Nuitka)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
           python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           Move-Item -Path dist/main.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
 
-      # 构建单文件版本 - Linux
-      - name: 构建单文件版 - Linux
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest'
+      # 构建单文件版本 - Windows (PyInstaller)
+      - name: 构建单文件版 - Windows (PyInstaller)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'pyinstaller'
+        shell: pwsh
+        run: |
+          # 安装PyInstaller
+          pip install pyinstaller
+          
+          # 创建spec文件
+          @"
+          # -*- mode: python ; coding: utf-8 -*-
+          
+          a = Analysis(
+              ['src/main.py'],
+              pathex=[],
+              binaries=[],
+              datas=[
+                  ('src/assets', 'assets'),
+                  ('src/ui/settings/default_settings.json', 'ui/settings'),
+                  ('src/ui/gestures/default_gestures.json', 'ui/gestures')
+              ],
+              hiddenimports=[],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=[],
+              excludes=[],
+              noarchive=False,
+          )
+          
+          pyz = PYZ(a.pure)
+          
+          exe = EXE(
+              pyz,
+              a.scripts,
+              a.binaries,
+              a.datas,
+              [],
+              name='GestroKey',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              upx_exclude=[],
+              runtime_tmpdir=None,
+              console=False,
+              disable_windowed_traceback=False,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+              icon='src/assets/images/icon.ico',
+          )
+          "@ | Out-File -FilePath GestroKey_onefile.spec -Encoding UTF8
+          
+          # 使用PyInstaller构建
+          pyinstaller GestroKey_onefile.spec
+          
+          # 重命名
+          Move-Item -Path dist/GestroKey.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
+
+      # 构建单文件版本 - Linux (Nuitka)
+      - name: 构建单文件版 - Linux (Nuitka)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
           python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
           chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
 
-      # 构建单文件版本 - macOS (使用PyInstaller)
-      - name: 构建单文件版 - macOS
+      # 构建单文件版本 - Linux (PyInstaller)
+      - name: 构建单文件版 - Linux (PyInstaller)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'pyinstaller'
+        shell: bash
+        run: |
+          # 安装PyInstaller
+          pip install pyinstaller
+          
+          # 创建spec文件
+          cat > GestroKey_onefile.spec << EOF
+          # -*- mode: python ; coding: utf-8 -*-
+          
+          a = Analysis(
+              ['src/main.py'],
+              pathex=[],
+              binaries=[],
+              datas=[
+                  ('src/assets', 'assets'),
+                  ('src/ui/settings/default_settings.json', 'ui/settings'),
+                  ('src/ui/gestures/default_gestures.json', 'ui/gestures')
+              ],
+              hiddenimports=[],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=[],
+              excludes=[],
+              noarchive=False,
+          )
+          
+          pyz = PYZ(a.pure)
+          
+          exe = EXE(
+              pyz,
+              a.scripts,
+              a.binaries,
+              a.datas,
+              [],
+              name='GestroKey',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              upx_exclude=[],
+              runtime_tmpdir=None,
+              console=False,
+              disable_windowed_traceback=False,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+          )
+          EOF
+          
+          # 使用PyInstaller构建
+          pyinstaller GestroKey_onefile.spec
+          
+          # 重命名和设置权限
+          mv dist/GestroKey "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+
+      # 模拟构建便携版（跳过实际编译）- Windows
+      - name: 模拟构建便携版（跳过实际编译）- Windows
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          echo "跳过编译过程，创建Windows便携版虚拟包..."
+          mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
+          "模拟构建" | Out-File -FilePath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/README.txt"
+          Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
+
+      # 模拟构建便携版（跳过实际编译）- Linux
+      - name: 模拟构建便携版（跳过实际编译）- Linux
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建Linux便携版虚拟包..."
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/README.txt"
+          cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+
+      # 模拟构建便携版（跳过实际编译）- macOS
+      - name: 模拟构建便携版（跳过实际编译）- macOS
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建macOS便携版虚拟包..."
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/README.txt"
+          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
+
+      # 模拟构建单文件版（跳过实际编译）- Windows
+      - name: 模拟构建单文件版（跳过实际编译）- Windows
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          echo "跳过编译过程，创建Windows单文件版虚拟包..."
+          mkdir -Force -Path dist
+          "模拟构建" | Out-File -FilePath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
+
+      # 模拟构建单文件版（跳过实际编译）- Linux
+      - name: 模拟构建单文件版（跳过实际编译）- Linux
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建Linux单文件版虚拟包..."
+          mkdir -p dist
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
+
+      # 模拟构建单文件版（跳过实际编译）- macOS
+      - name: 模拟构建单文件版（跳过实际编译）- macOS
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "跳过编译过程，创建macOS单文件版虚拟包..."
+          mkdir -p dist
+          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+
+      # 构建单文件版本 - macOS (PyInstaller)
+      - name: 构建单文件版 - macOS (PyInstaller)
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest'
         shell: bash
         run: |
@@ -398,69 +791,10 @@ jobs:
           # 使用PyInstaller构建
           pyinstaller GestroKey_onefile.spec
           
-          # 打包
-          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-          cp -r dist/GestroKey.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone/GestroKey.app"
-          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-
-      # 模拟构建便携版（跳过实际编译）- Windows
-      - name: 模拟构建便携版（跳过实际编译）- Windows
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          echo "跳过编译过程，创建Windows便携版虚拟包..."
-          mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
-          "模拟构建" | Out-File -FilePath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/README.txt"
-          Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
-
-      # 模拟构建便携版（跳过实际编译）- Linux
-      - name: 模拟构建便携版（跳过实际编译）- Linux
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'ubuntu-latest'
-        shell: bash
-        run: |
-          echo "跳过编译过程，创建Linux便携版虚拟包..."
-          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
-          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/README.txt"
-          cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
-
-      # 模拟构建便携版（跳过实际编译）- macOS
-      - name: 模拟构建便携版（跳过实际编译）- macOS
-        if: matrix.package-type == 'portable' && github.event.inputs.skip_build == 'true' && matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          echo "跳过编译过程，创建macOS便携版虚拟包..."
-          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
-          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/README.txt"
-          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
-
-      # 模拟构建单文件版（跳过实际编译）- Windows
-      - name: 模拟构建单文件版（跳过实际编译）- Windows
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          echo "跳过编译过程，创建Windows单文件版虚拟包..."
-          mkdir -Force -Path dist
-          "模拟构建" | Out-File -FilePath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
-
-      # 模拟构建单文件版（跳过实际编译）- Linux
-      - name: 模拟构建单文件版（跳过实际编译）- Linux
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'ubuntu-latest'
-        shell: bash
-        run: |
-          echo "跳过编译过程，创建Linux单文件版虚拟包..."
-          mkdir -p dist
-          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
-          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
-
-      # 模拟构建单文件版（跳过实际编译）- macOS
-      - name: 模拟构建单文件版（跳过实际编译）- macOS
-        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build == 'true' && matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          echo "跳过编译过程，创建macOS单文件版虚拟包..."
-          mkdir -p dist
-          echo "模拟构建" > "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          # 直接打包app文件
+          cd dist
+          zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" GestroKey.app
+          cd ..
 
       # 上传构建产物
       - name: 上传构建产物
