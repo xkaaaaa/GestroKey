@@ -7,7 +7,7 @@
 import datetime
 
 # 版本信息
-VERSION = "0.0.1"
+VERSION = "0.0.1-beta.1"
 APP_NAME = "GestroKey"
 APP_DESCRIPTION = "一款手势控制工具"
 BUILD_DATE = datetime.datetime.now().strftime("%Y-%m-%d")

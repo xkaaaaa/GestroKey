@@ -147,29 +147,30 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         package-type: [standalone, portable]
-        exclude:
-          # 根据配置排除Windows
+        include:
+          # 为每个组合添加条件标志
           - os: windows-latest
             package-type: standalone
-            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+            should_build: ${{ needs.get-version.outputs.package_windows == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
           - os: windows-latest
             package-type: portable
-            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_portable != 'true' }}
-          # 根据配置排除macOS
+            should_build: ${{ needs.get-version.outputs.package_windows == 'true' && needs.get-version.outputs.package_portable == 'true' }}
           - os: macos-latest
             package-type: standalone
-            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+            should_build: ${{ needs.get-version.outputs.package_macos == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
           - os: macos-latest
             package-type: portable
-            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_portable != 'true' }}
-          # 根据配置排除Linux
+            should_build: ${{ needs.get-version.outputs.package_macos == 'true' && needs.get-version.outputs.package_portable == 'true' }}
           - os: ubuntu-latest
             package-type: standalone
-            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
+            should_build: ${{ needs.get-version.outputs.package_linux == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
           - os: ubuntu-latest
             package-type: portable
-            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+            should_build: ${{ needs.get-version.outputs.package_linux == 'true' && needs.get-version.outputs.package_portable == 'true' }}
     
+    # 跳过不需要构建的组合
+    if: ${{ matrix.should_build != 'false' }}
+
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
