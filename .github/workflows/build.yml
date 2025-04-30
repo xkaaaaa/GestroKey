@@ -205,12 +205,68 @@ jobs:
           # 删除临时脚本
           rm temp_package_script.py
 
+  # 添加自动化测试任务
+  run-tests:
+    name: 运行自动化测试
+    runs-on: ubuntu-latest
+    needs: [check-changes, get-version]
+    if: needs.check-changes.outputs.should_build == 'true'
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: 安装测试依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-mock coverage-badge anybadge
+      
+      - name: 运行测试并收集覆盖率
+        run: |
+          pytest tests --cov=src --cov-report=xml --cov-report=html --verbose
+      
+      - name: 生成覆盖率报告
+        run: |
+          coverage report
+          coverage xml
+          
+          # 生成覆盖率徽章
+          coverage_value=$(python -c "import xml.etree.ElementTree as ET; print(ET.parse('coverage.xml').getroot().get('line-rate'))")
+          coverage_percentage=$(python -c "print(round(float($coverage_value) * 100))")
+          
+          echo "代码覆盖率: $coverage_percentage%"
+          
+          # 生成覆盖率徽章
+          anybadge --value=$coverage_percentage --file=coverage-badge.svg --label=coverage --color=green:90 yellow:70 orange:50 red:0
+      
+      - name: 上传覆盖率报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            htmlcov/
+            coverage.xml
+            coverage-badge.svg
+          retention-days: 7
+          
+      - name: 总结测试结果
+        run: |
+          echo "测试已完成，所有测试都通过"
+          echo "代码覆盖率报告已生成，可在构建产物中查看"
+
   # 使用矩阵构建不同平台和格式的包
   build:
     name: 构建 ${{ matrix.os }} ${{ matrix.package-type }}
     runs-on: ${{ matrix.os }}
-    needs: get-version
-    if: needs.get-version.outputs.enable_packaging == 'true'
+    needs: [get-version, run-tests, code-quality, security-scan]
+    if: needs.get-version.outputs.enable_packaging == 'true' && always() && needs.run-tests.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -246,11 +302,64 @@ jobs:
         with:
           python-version: '3.10'
           cache: 'pip'
+          
+      # 缓存优化 - 保存pip下载的包
+      - name: 缓存pip包
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ${{ env.pythonLocation }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      # 缓存优化 - Nuitka编译缓存
+      - name: 缓存Nuitka编译
+        uses: actions/cache@v3
+        if: contains(fromJSON('["nuitka"]'), needs.get-version.outputs.packager_windows) || contains(fromJSON('["nuitka"]'), needs.get-version.outputs.packager_linux)
+        with:
+          path: |
+            ~/.cache/Nuitka
+            ~/.cache/ccache
+          key: ${{ runner.os }}-nuitka-${{ hashFiles('src/**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-
+            
+      # 缓存优化 - PyInstaller编译缓存
+      - name: 缓存PyInstaller
+        uses: actions/cache@v3
+        if: contains(fromJSON('["pyinstaller"]'), needs.get-version.outputs.packager_windows) || contains(fromJSON('["pyinstaller"]'), needs.get-version.outputs.packager_linux) || matrix.os == 'macos-latest'
+        with:
+          path: |
+            ~/.cache/PyInstaller
+          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('src/**/*.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+            
+      # 优化 - 安装ccache用于编译加速
+      - name: 安装ccache (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            sudo apt-get update
+            sudo apt-get install -y ccache
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            brew install ccache
+          fi
+          echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
+          
+      # 优化 - 配置ccache (Linux/macOS)
+      - name: 配置ccache (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          ccache -M 500M
+          ccache -s
 
       - name: 安装依赖
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka
+          pip install nuitka setuptools wheel
           pip install -r requirements.txt
           
       # 为macOS安装PyInstaller
@@ -676,9 +785,10 @@ jobs:
           # 根据版本类型确定上一个版本标签
           version_type="${{ needs.get-version.outputs.version_type }}"
           current_tag="${{ needs.get-version.outputs.release_name }}"
+          current_version="${{ needs.get-version.outputs.version }}"
           
           # 获取所有标签并按版本排序
-          all_tags=$(git tag -l | grep -v "latest" | sort -V)
+          all_tags=$(git tag -l | grep -v "latest" | grep -v "999.999.999-latest" | sort -V)
           
           # 根据版本类型查找上一个版本标签
           if [[ "$version_type" == "Development Version" ]]; then
@@ -696,7 +806,8 @@ jobs:
           if [[ -z "$previous_tag" || "$previous_tag" == "$current_tag" ]]; then
             echo "没有找到上一个版本标签，跳过更新日志生成"
             echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-            echo "该版本为首个发布版本，无更新日志。" >> $GITHUB_OUTPUT
+            echo "<div align='center'><h2>🎉 首次发布</h2></div>" >> $GITHUB_OUTPUT
+            echo "<p>这是GestroKey的首个版本，无更新日志。</p>" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -704,40 +815,68 @@ jobs:
           echo "当前版本：$current_tag，上一版本：$previous_tag"
           
           # 获取提交记录
-          commits=$(git log --pretty=format:"%s" $previous_tag..HEAD)
+          commits=$(git log --pretty=format:"%h|%an|%at|%s" $previous_tag..HEAD)
           
-          # 初始化三个部分的内容
+          # 初始化各类别的内容
           new_features=""
           fixes=""
           improvements=""
+          others=""
+          
+          # 获取时间
+          current_date=$(date "+%Y-%m-%d")
           
           # 解析提交信息
           while IFS= read -r commit; do
-            if [[ "$commit" =~ ^新增：(.+) ]]; then
-              new_features="${new_features}- ${BASH_REMATCH[1]}\n"
-            elif [[ "$commit" =~ ^修复：(.+) ]]; then
-              fixes="${fixes}- ${BASH_REMATCH[1]}\n"
-            elif [[ "$commit" =~ ^改进：(.+) ]]; then
-              improvements="${improvements}- ${BASH_REMATCH[1]}\n"
+            # 分解提交信息
+            hash=$(echo "$commit" | cut -d'|' -f1)
+            author=$(echo "$commit" | cut -d'|' -f2)
+            timestamp=$(echo "$commit" | cut -d'|' -f3)
+            message=$(echo "$commit" | cut -d'|' -f4)
+            
+            # 格式化日期
+            commit_date=$(date -d @$timestamp "+%Y-%m-%d")
+            
+            # 提交链接
+            commit_link="[\`${hash:0:7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${hash})"
+            
+            # 根据提交消息类型分类
+            if [[ "$message" =~ ^新增：(.+) ]]; then
+              content="${BASH_REMATCH[1]}"
+              new_features="${new_features}- **${content}** ${commit_link} - *${commit_date}*\n"
+            elif [[ "$message" =~ ^修复：(.+) ]]; then
+              content="${BASH_REMATCH[1]}"
+              fixes="${fixes}- **${content}** ${commit_link} - *${commit_date}*\n"
+            elif [[ "$message" =~ ^改进：(.+) ]]; then
+              content="${BASH_REMATCH[1]}"
+              improvements="${improvements}- **${content}** ${commit_link} - *${commit_date}*\n"
+            else
+              others="${others}- ${message} ${commit_link} - *${commit_date}*\n"
             fi
           done <<< "$commits"
           
-          # 生成更新日志
-          changelog="## 更新日志\n\n"
+          # 生成美观的更新日志
+          changelog="<div align='center'><h2>📋 更新日志</h2></div>\n\n"
+          changelog="${changelog}<p align='right'><i>发布于: ${current_date}</i></p>\n\n"
+          changelog="${changelog}<p>版本 <b>${current_version}</b> 相比 <b>${previous_tag}</b> 的变更：</p>\n\n"
           
           if [[ -n "$new_features" ]]; then
-            changelog="${changelog}### 新增功能\n\n${new_features}\n"
+            changelog="${changelog}<details open>\n<summary><h3>✨ 新增功能</h3></summary>\n\n${new_features}\n</details>\n\n"
           fi
           
           if [[ -n "$fixes" ]]; then
-            changelog="${changelog}### 问题修复\n\n${fixes}\n"
+            changelog="${changelog}<details open>\n<summary><h3>🐛 问题修复</h3></summary>\n\n${fixes}\n</details>\n\n"
           fi
           
           if [[ -n "$improvements" ]]; then
-            changelog="${changelog}### 功能改进\n\n${improvements}\n"
+            changelog="${changelog}<details open>\n<summary><h3>⚡ 功能改进</h3></summary>\n\n${improvements}\n</details>\n\n"
           fi
           
-          if [[ "$new_features" == "" && "$fixes" == "" && "$improvements" == "" ]]; then
+          if [[ -n "$others" ]]; then
+            changelog="${changelog}<details>\n<summary><h3>🔄 其它变更</h3></summary>\n\n${others}\n</details>\n\n"
+          fi
+          
+          if [[ "$new_features" == "" && "$fixes" == "" && "$improvements" == "" && "$others" == "" ]]; then
             changelog="${changelog}*本次版本更新未包含符合格式要求的提交信息*\n"
           fi
           
@@ -860,3 +999,85 @@ jobs:
           body: ${{ steps.generate_table.outputs.DESCRIPTION }}
           prerelease: ${{ needs.get-version.outputs.is_prerelease }}
           files: artifacts/*
+
+  # 代码质量检查任务
+  code-quality:
+    name: 代码质量检查
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.should_build == 'true'
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: 安装质量检查工具
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pylint black isort
+      
+      - name: 运行flake8检查
+        run: |
+          flake8 src tests --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 src tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: 运行pylint检查
+        run: |
+          pylint --disable=all --enable=unused-import,unused-variable,unused-argument src
+          
+      - name: 检查代码格式
+        run: |
+          black --check src tests
+          isort --check-only --profile black src tests
+          
+      - name: 总结代码质量检查
+        run: |
+          echo "代码质量检查完成"
+
+  # 依赖安全扫描任务
+  security-scan:
+    name: 依赖安全扫描
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.should_build == 'true'
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: 安装安全扫描工具
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+      
+      - name: 扫描依赖漏洞
+        run: |
+          safety check -r requirements.txt --full-report || echo "安全检查发现潜在问题，但允许继续"
+      
+      - name: 运行代码安全扫描
+        run: |
+          bandit -r src -f txt -o bandit_results.txt || echo "代码安全扫描发现潜在问题，但允许继续"
+          
+      - name: 上传扫描结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            bandit_results.txt
+          retention-days: 7
+          
+      - name: 总结安全扫描
+        run: |
+          echo "安全扫描完成，详细结果请查看构建产物"
