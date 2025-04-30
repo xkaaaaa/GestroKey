@@ -105,6 +105,13 @@ jobs:
           cat reports/safety.txt >> reports/safety.md
           echo '```' >> reports/safety.md
   
+      # 上传代码质量报告
+      - name: 上传代码质量报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-reports
+          path: reports/
+  
   test:
     name: 自动化测试
     runs-on: ubuntu-latest
