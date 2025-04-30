@@ -124,6 +124,12 @@ jobs:
           pip install nuitka
           pip install -r requirements.txt
           
+      # 为macOS安装PyInstaller
+      - name: macOS - 安装PyInstaller
+        if: matrix.os == 'macos-latest'
+        run: |
+          pip install pyinstaller
+          
       # Windows特定安装
       - name: Windows - 安装工具
         if: matrix.os == 'windows-latest'
@@ -225,14 +231,85 @@ jobs:
           cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
           cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
 
-      # 构建多文件便携版 - macOS
+      # 构建多文件便携版 - macOS (使用PyInstaller)
       - name: 构建便携版 - macOS
         if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest'
         shell: bash
         run: |
-          python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --macos-create-app-bundle --macos-app-icon=src/assets/images/icon.icns --output-dir=dist --assume-yes-for-downloads src/main.py
+          # 创建spec文件
+          cat > GestroKey.spec << EOF
+          # -*- mode: python ; coding: utf-8 -*-
+          
+          a = Analysis(
+              ['src/main.py'],
+              pathex=[],
+              binaries=[],
+              datas=[
+                  ('src/assets', 'assets'),
+                  ('src/ui/settings/default_settings.json', 'ui/settings'),
+                  ('src/ui/gestures/default_gestures.json', 'ui/gestures')
+              ],
+              hiddenimports=[],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=[],
+              excludes=[],
+              noarchive=False,
+          )
+          
+          pyz = PYZ(a.pure)
+          
+          exe = EXE(
+              pyz,
+              a.scripts,
+              [],
+              exclude_binaries=True,
+              name='GestroKey',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              console=False,
+              disable_windowed_traceback=False,
+              argv_emulation=True,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+              icon='src/assets/images/icon.icns',
+          )
+          
+          coll = COLLECT(
+              exe,
+              a.binaries,
+              a.datas,
+              strip=False,
+              upx=True,
+              upx_exclude=[],
+              name='GestroKey',
+          )
+          
+          app = BUNDLE(
+              coll,
+              name='GestroKey.app',
+              icon='src/assets/images/icon.icns',
+              bundle_identifier=None,
+              info_plist={
+                  'NSHighResolutionCapable': 'True',
+                  'CFBundleShortVersionString': '${{ needs.get-version.outputs.version }}',
+                  'CFBundleVersion': '${{ needs.get-version.outputs.version }}',
+                  'CFBundleName': 'GestroKey',
+                  'CFBundleDisplayName': 'GestroKey',
+                  'CFBundleExecutable': 'GestroKey',
+              },
+          )
+          EOF
+          
+          # 使用PyInstaller构建
+          pyinstaller GestroKey.spec
+          
+          # 打包
           mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
-          cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
+          cp -r dist/GestroKey.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
           cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
 
       # 构建单文件版本 - Windows
@@ -252,17 +329,78 @@ jobs:
           mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
           chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
 
-      # 构建单文件版本 - macOS
+      # 构建单文件版本 - macOS (使用PyInstaller)
       - name: 构建单文件版 - macOS
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest'
         shell: bash
         run: |
-          # macOS需要创建app bundle才能正常工作
-          python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --macos-create-app-bundle --macos-app-icon=src/assets/images/icon.icns --output-dir=dist --assume-yes-for-downloads src/main.py
+          # 创建spec文件
+          cat > GestroKey_onefile.spec << EOF
+          # -*- mode: python ; coding: utf-8 -*-
           
-          # 创建dmg包
+          a = Analysis(
+              ['src/main.py'],
+              pathex=[],
+              binaries=[],
+              datas=[
+                  ('src/assets', 'assets'),
+                  ('src/ui/settings/default_settings.json', 'ui/settings'),
+                  ('src/ui/gestures/default_gestures.json', 'ui/gestures')
+              ],
+              hiddenimports=[],
+              hookspath=[],
+              hooksconfig={},
+              runtime_hooks=[],
+              excludes=[],
+              noarchive=False,
+          )
+          
+          pyz = PYZ(a.pure)
+          
+          exe = EXE(
+              pyz,
+              a.scripts,
+              a.binaries,
+              a.datas,
+              [],
+              name='GestroKey',
+              debug=False,
+              bootloader_ignore_signals=False,
+              strip=False,
+              upx=True,
+              upx_exclude=[],
+              runtime_tmpdir=None,
+              console=False,
+              disable_windowed_traceback=False,
+              argv_emulation=True,
+              target_arch=None,
+              codesign_identity=None,
+              entitlements_file=None,
+              icon='src/assets/images/icon.icns',
+          )
+          
+          app = BUNDLE(
+              exe,
+              name='GestroKey.app',
+              icon='src/assets/images/icon.icns',
+              bundle_identifier=None,
+              info_plist={
+                  'NSHighResolutionCapable': 'True',
+                  'CFBundleShortVersionString': '${{ needs.get-version.outputs.version }}',
+                  'CFBundleVersion': '${{ needs.get-version.outputs.version }}',
+                  'CFBundleName': 'GestroKey',
+                  'CFBundleDisplayName': 'GestroKey',
+                  'CFBundleExecutable': 'GestroKey',
+              },
+          )
+          EOF
+          
+          # 使用PyInstaller构建
+          pyinstaller GestroKey_onefile.spec
+          
+          # 打包
           mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-          cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone/GestroKey.app"
+          cp -r dist/GestroKey.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone/GestroKey.app"
           cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
 
       # 模拟构建便携版（跳过实际编译）- Windows
