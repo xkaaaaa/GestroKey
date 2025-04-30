@@ -807,9 +807,9 @@ jobs:
           
       # 当发布正式版或预览版时删除latest标签
       - name: 删除latest标签
-        if: needs.get-version.outputs.version_type != 'Development Version'
+        if: needs.get-version.outputs.version_type == 'Development Version'
         run: |
-          echo "发布正式版或预览版，删除latest标签"
+          echo "发布开发版，删除并重新创建latest标签"
           
           # 检查latest标签是否存在
           if git ls-remote --tags origin | grep -q "refs/tags/latest"; then
@@ -819,7 +819,7 @@ jobs:
             # 删除远程标签
             git push --delete origin latest || echo "远程标签latest不存在或无法删除"
           else
-            echo "标签latest不存在，无需删除"
+            echo "标签latest不存在，将创建新标签"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -839,6 +839,7 @@ jobs:
 
       # 创建Release
       - name: 创建Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           name: ${{ needs.get-version.outputs.release_name }}
@@ -846,3 +847,26 @@ jobs:
           body: ${{ steps.generate_table.outputs.DESCRIPTION }}
           prerelease: ${{ needs.get-version.outputs.is_prerelease }}
           files: artifacts/*
+          
+      # 当使用开发版本时，再次创建latest标签，确保它是最后创建的
+      - name: 创建latest标签和Release
+        if: needs.get-version.outputs.version_type == 'Development Version'
+        run: |
+          # 先删除本地latest标签，如果有的话
+          git tag -d latest || true
+          
+          # 创建新的latest标签指向当前提交
+          git tag -a latest -m "Latest development version"
+          
+          # 推送latest标签
+          git push -f origin latest
+          
+          # 创建或更新latest Release
+          gh release create latest --title "Latest Development Build" --notes "这是最新的开发版本构建，基于 ${{ needs.get-version.outputs.version }}" --prerelease --target ${{ github.ref_name }} || gh release edit latest --title "Latest Development Build" --notes "这是最新的开发版本构建，基于 ${{ needs.get-version.outputs.version }}" --prerelease
+          
+          # 上传构建产物到latest Release
+          for file in artifacts/*; do
+            gh release upload latest "$file" --clobber
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
