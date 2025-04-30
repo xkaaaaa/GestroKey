@@ -24,10 +24,71 @@ permissions:
   pull-requests: read
 
 jobs:
+  # 检查提交内容，判断是否需要打包
+  check-changes:
+    name: 检查代码变更
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check_py_changes.outputs.changed }}
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整的提交历史
+      
+      - name: 获取上次打包标签
+        id: last_tag
+        run: |
+          # 获取所有标签并按时间排序
+          tags=$(git tag --sort=-creatordate)
+          latest_tag=$(echo "$tags" | grep -v "^latest$" | head -n 1)
+          
+          if [ -z "$latest_tag" ]; then
+            # 如果没有标签，则设置一个初始的SHA
+            echo "LAST_TAG=$(git rev-list --max-parents=0 HEAD)" >> $GITHUB_OUTPUT
+            echo "没有找到之前的标签，将从首次提交开始检查"
+          else
+            echo "LAST_TAG=$latest_tag" >> $GITHUB_OUTPUT
+            echo "使用最近的标签: $latest_tag"
+          fi
+      
+      - name: 检查是否修改了.py文件
+        id: check_py_changes
+        run: |
+          # 获取上次发布后修改的文件列表
+          files_changed=$(git diff --name-only ${{ steps.last_tag.outputs.LAST_TAG }}..HEAD)
+          
+          # 检查是否有.py文件被修改
+          py_changed=false
+          while IFS= read -r file; do
+            if [[ "$file" == *.py ]]; then
+              py_changed=true
+              echo "发现修改的Python文件: $file"
+              break
+            fi
+          done <<< "$files_changed"
+          
+          # 如果工作流是手动触发的，并且不是要求跳过构建，那么继续构建
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.skip_build }}" != "true" ]]; then
+            echo "手动触发工作流，继续构建"
+            py_changed=true
+          fi
+          
+          echo "changed=$py_changed" >> $GITHUB_OUTPUT
+          
+          if [ "$py_changed" == "true" ]; then
+            echo "检测到Python文件变更，将执行打包流程"
+          else
+            echo "未检测到Python文件变更，跳过打包流程"
+          fi
+
   # 读取版本信息作为独立任务
   get-version:
     name: 读取版本信息
     runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.should_build == 'true'
     outputs:
       version: ${{ steps.version_info.outputs.VERSION }}
       version_type: ${{ steps.version_info.outputs.VERSION_TYPE }}
@@ -592,8 +653,8 @@ jobs:
   release:
     name: 创建版本发布
     runs-on: ubuntu-latest
-    needs: [get-version, build]
-    if: always() && needs.get-version.outputs.enable_packaging == 'true'
+    needs: [get-version, build, check-changes]
+    if: always() && needs.check-changes.outputs.should_build == 'true' && needs.get-version.outputs.enable_packaging == 'true'
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -741,6 +802,25 @@ jobs:
           # 删除远程标签
           git tag -d ${{ needs.get-version.outputs.release_name }} || echo "本地标签不存在"
           git push --delete origin ${{ needs.get-version.outputs.release_name }} || echo "远程标签不存在或无法删除"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      # 当发布正式版或预览版时删除latest标签
+      - name: 删除latest标签
+        if: needs.get-version.outputs.version_type != 'Development Version'
+        run: |
+          echo "发布正式版或预览版，删除latest标签"
+          
+          # 检查latest标签是否存在
+          if git ls-remote --tags origin | grep -q "refs/tags/latest"; then
+            # 删除GitHub Release
+            gh release delete latest --yes || echo "Release latest不存在或无法删除"
+            
+            # 删除远程标签
+            git push --delete origin latest || echo "远程标签latest不存在或无法删除"
+          else
+            echo "标签latest不存在，无需删除"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
