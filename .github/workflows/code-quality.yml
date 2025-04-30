@@ -70,6 +70,7 @@ jobs:
           # 提取Pylint评分
           score=$(grep -oP 'Your code has been rated at \K[0-9.]+' reports/pylint.txt || echo "0.0")
           echo "PYLINT_SCORE=$score" >> $GITHUB_ENV
+          echo "pylint_score=$score" >> $GITHUB_OUTPUT
       
       # 类型检查
       - name: 执行MyPy类型检查
@@ -144,6 +145,12 @@ jobs:
           EOF
           fi
           
+          # 创建src目录（如果不存在）
+          if [ ! -d "src" ]; then
+            mkdir -p src
+            echo "# 占位模块" > src/__init__.py
+          fi
+          
           # 生成覆盖率报告
           echo "### 单元测试结果和代码覆盖率" > reports/coverage.md
           python -m pytest tests/ --cov=src --cov-report=term --cov-report=xml:reports/coverage.xml -v | tee reports/pytest.txt
@@ -151,6 +158,7 @@ jobs:
           # 提取测试统计信息
           total_tests=$(grep -oP 'collected \K[0-9]+' reports/pytest.txt || echo "0")
           echo "TOTAL_TESTS=$total_tests" >> $GITHUB_ENV
+          echo "total_tests=$total_tests" >> $GITHUB_OUTPUT
           
           # 添加测试结果到报告
           echo '```' >> reports/coverage.md
@@ -164,11 +172,23 @@ jobs:
         id: coverage_badge
         run: |
           # 提取覆盖率数值
-          coverage=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('reports/coverage.xml'); root = tree.getroot(); print(root.attrib['line-rate'])")
-          coverage_pct=$(python -c "print(round(float('${coverage}') * 100, 2))")
+          if [ -f "reports/coverage.xml" ]; then
+            coverage=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('reports/coverage.xml'); root = tree.getroot(); print(root.attrib['line-rate'])")
+            coverage_pct=$(python -c "print(round(float('${coverage}') * 100, 2))")
+          else
+            coverage_pct="0.00"
+          fi
           
           echo "代码覆盖率: ${coverage_pct}%" >> reports/coverage.md
           echo "COVERAGE=$coverage_pct" >> $GITHUB_ENV
+          echo "coverage=$coverage_pct" >> $GITHUB_OUTPUT
+          
+      # 上传测试报告
+      - name: 上传测试报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/
   
   changelog:
     name: 更新日志格式化
@@ -204,54 +224,124 @@ jobs:
           echo "### 功能改进" >> reports/changelog.md
           git log --pretty=format:"- %s (%ad)" --date=short | grep -i "^改进：\|^improve:\|^enhancement:" | head -10 >> reports/changelog.md || true
           echo "" >> reports/changelog.md
+      
+      # 上传更新日志报告
+      - name: 上传更新日志报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-reports
+          path: reports/
   
   report:
     name: 生成综合报告
     runs-on: ubuntu-latest
     needs: [code-quality, test, changelog]
+    outputs:
+      pylint_score: ${{ steps.set_outputs.outputs.pylint_score }}
+      coverage: ${{ steps.set_outputs.outputs.coverage }}
+      total_tests: ${{ steps.set_outputs.outputs.total_tests }}
     
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
       
-      - name: 下载所有报告
+      - name: 下载代码质量报告
         uses: actions/download-artifact@v4
         with:
-          path: all-reports
+          name: code-quality-reports
+          path: reports/code-quality
       
-      - name: 合并报告
-        run: |
-          mkdir -p reports
+      - name: 下载测试报告
+        uses: actions/download-artifact@v4
+        with:
+          name: test-reports
+          path: reports/test
           
-          # 创建综合报告
-          cat << EOF > reports/quality-report.md
+      - name: 下载更新日志报告
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog-reports
+          path: reports/changelog
+      
+      # 设置输出变量
+      - name: 获取报告数据
+        id: set_outputs
+        run: |
+          mkdir -p reports/merged
+          
+          # 读取Pylint分数
+          if [ -f "reports/code-quality/pylint.txt" ]; then
+            PYLINT_SCORE=$(grep -oP 'Your code has been rated at \K[0-9.]+' reports/code-quality/pylint.txt || echo "0.0")
+          else
+            PYLINT_SCORE="0.0"
+          fi
+          
+          # 读取测试数据
+          if [ -f "reports/test/pytest.txt" ]; then
+            TOTAL_TESTS=$(grep -oP 'collected \K[0-9]+' reports/test/pytest.txt || echo "0")
+          else
+            TOTAL_TESTS="0"
+          fi
+          
+          # 读取覆盖率数据
+          if [ -f "reports/test/coverage.xml" ]; then
+            COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('reports/test/coverage.xml'); root = tree.getroot(); print(round(float(root.attrib['line-rate']) * 100, 2))" 2>/dev/null || echo "0.00")
+          else
+            COVERAGE="0.00"
+          fi
+          
+          # 设置输出变量
+          echo "pylint_score=$PYLINT_SCORE" >> $GITHUB_OUTPUT
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "total_tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+          
+          # 合并报告
+          cat << EOF > reports/merged/quality-report.md
           # GestroKey 代码质量与测试报告
           
           生成时间: $(date '+%Y-%m-%d %H:%M:%S %Z')
           
           ## 代码质量检查
           
-          - Pylint 得分: ${{ env.PYLINT_SCORE || '未获取' }}/10
-          - 代码覆盖率: ${{ env.COVERAGE || '未获取' }}%
-          - 测试用例总数: ${{ env.TOTAL_TESTS || '未获取' }}
+          - Pylint 得分: ${PYLINT_SCORE}/10
+          - 代码覆盖率: ${COVERAGE}%
+          - 测试用例总数: ${TOTAL_TESTS}
           
           ## 检查结果汇总
           
           EOF
           
-          # 将各个报告合并到一起
-          if [ -d "all-reports" ]; then
-            find all-reports -type f -name "*.md" -exec cat {} \; >> reports/quality-report.md
-          else
-            echo "无法找到报告文件" >> reports/quality-report.md
+          # 合并各个报告到一个文件
+          if [ -f "reports/code-quality/pylint.md" ]; then
+            cat reports/code-quality/pylint.md >> reports/merged/quality-report.md
+            echo "" >> reports/merged/quality-report.md
+          fi
+          
+          if [ -f "reports/test/coverage.md" ]; then
+            cat reports/test/coverage.md >> reports/merged/quality-report.md
+            echo "" >> reports/merged/quality-report.md
+          fi
+          
+          if [ -f "reports/test/mypy.md" ]; then
+            cat reports/test/mypy.md >> reports/merged/quality-report.md
+            echo "" >> reports/merged/quality-report.md
+          fi
+          
+          if [ -f "reports/code-quality/bandit.md" ]; then
+            cat reports/code-quality/bandit.md >> reports/merged/quality-report.md
+            echo "" >> reports/merged/quality-report.md
+          fi
+          
+          if [ -f "reports/changelog/changelog.md" ]; then
+            cat reports/changelog/changelog.md >> reports/merged/quality-report.md
           fi
       
       # 上传综合报告
-      - name: 上传报告
+      - name: 上传综合报告
         uses: actions/upload-artifact@v4
         with:
           name: code-quality-report
-          path: reports/quality-report.md
+          path: reports/merged/quality-report.md
       
       # 保存所有单独报告
       - name: 保存所有报告
@@ -270,9 +360,9 @@ jobs:
           cat << EOF > pr-comment.md
           ## 代码质量检查结果
           
-          - Pylint 得分: ${{ env.PYLINT_SCORE || '未获取' }}/10
-          - 代码覆盖率: ${{ env.COVERAGE || '未获取' }}%
-          - 测试用例: ${{ env.TOTAL_TESTS || '未获取' }}
+          - Pylint 得分: ${{ steps.set_outputs.outputs.pylint_score }}/10
+          - 代码覆盖率: ${{ steps.set_outputs.outputs.coverage }}%
+          - 测试用例: ${{ steps.set_outputs.outputs.total_tests }}
           
           详细报告已作为工作流运行结果上传。
           EOF
