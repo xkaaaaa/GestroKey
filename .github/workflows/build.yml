@@ -483,6 +483,8 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史记录以便获取所有标签和提交
 
       - name: 下载所有构建产物
         uses: actions/download-artifact@v4
@@ -493,32 +495,117 @@ jobs:
       - name: 列出所有文件
         run: find artifacts -type f | sort
 
-      - name: 生成下载链接表格
+      - name: 获取提交记录并生成更新日志
+        id: generate_changelog
+        run: |
+          # 根据版本类型确定上一个版本标签
+          version_type="${{ needs.get-version.outputs.version_type }}"
+          current_tag="${{ needs.get-version.outputs.release_name }}"
+          
+          # 获取所有标签并按版本排序
+          all_tags=$(git tag -l | grep -v "latest" | sort -V)
+          
+          # 根据版本类型查找上一个版本标签
+          if [[ "$version_type" == "Development Version" ]]; then
+            # 未发布版：目前最新的版本
+            previous_tag=$(echo "$all_tags" | tail -n 1)
+          elif [[ "$version_type" == "Preview Version" ]]; then
+            # 预览版：除latest外的最新版本
+            previous_tag=$(echo "$all_tags" | grep -v "$current_tag" | tail -n 1)
+          else
+            # 发行版：上一个发行版
+            previous_tag=$(echo "$all_tags" | grep -v "preview" | grep -v "$current_tag" | tail -n 1)
+          fi
+          
+          # 如果没有找到上一个版本标签，则不生成更新日志
+          if [[ -z "$previous_tag" || "$previous_tag" == "$current_tag" ]]; then
+            echo "没有找到上一个版本标签，跳过更新日志生成"
+            echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+            echo "该版本为首个发布版本，无更新日志。" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "当前版本：$current_tag，上一版本：$previous_tag"
+          
+          # 获取提交记录
+          commits=$(git log --pretty=format:"%s" $previous_tag..HEAD)
+          
+          # 初始化三个部分的内容
+          new_features=""
+          fixes=""
+          improvements=""
+          
+          # 解析提交信息
+          while IFS= read -r commit; do
+            if [[ "$commit" =~ ^新增：(.+) ]]; then
+              new_features="${new_features}- ${BASH_REMATCH[1]}\n"
+            elif [[ "$commit" =~ ^修复：(.+) ]]; then
+              fixes="${fixes}- ${BASH_REMATCH[1]}\n"
+            elif [[ "$commit" =~ ^改进：(.+) ]]; then
+              improvements="${improvements}- ${BASH_REMATCH[1]}\n"
+            fi
+          done <<< "$commits"
+          
+          # 生成更新日志
+          changelog="## 更新日志\n\n"
+          
+          if [[ -n "$new_features" ]]; then
+            changelog="${changelog}### 新增功能\n\n${new_features}\n"
+          fi
+          
+          if [[ -n "$fixes" ]]; then
+            changelog="${changelog}### 问题修复\n\n${fixes}\n"
+          fi
+          
+          if [[ -n "$improvements" ]]; then
+            changelog="${changelog}### 功能改进\n\n${improvements}\n"
+          fi
+          
+          if [[ "$new_features" == "" && "$fixes" == "" && "$improvements" == "" ]]; then
+            changelog="${changelog}*本次版本更新未包含符合格式要求的提交信息*\n"
+          fi
+          
+          # 输出更新日志给后续步骤使用
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$changelog" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 生成下载链接表格和说明
         id: generate_table
         run: |
-          # 生成包含下载链接的表格
-          echo "# GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}" > release_table.md
-          echo "" >> release_table.md
-          echo "## 下载链接" >> release_table.md
-          echo "" >> release_table.md
-          echo "| 操作系统 | 单文件版 | 便携版 |" >> release_table.md
-          echo "|---------|---------|-------|" >> release_table.md
-          echo "| Windows | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip) |" >> release_table.md
-          echo "| macOS   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip) |" >> release_table.md
-          echo "| Linux   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone) | [TAR.GZ压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz) |" >> release_table.md
-          echo "" >> release_table.md
-          echo "## 系统要求" >> release_table.md
-          echo "" >> release_table.md
-          echo "- **Windows**: Windows 10/11 64位" >> release_table.md
-          echo "- **macOS**: macOS 11.0+ (Big Sur及更高版本)" >> release_table.md
-          echo "- **Linux**: 主流桌面发行版 (Ubuntu 20.04+, Fedora 36+, Debian 11+)" >> release_table.md
-          echo "" >> release_table.md
-          echo "## 更新说明" >> release_table.md
-          echo "" >> release_table.md
-          echo "此版本由GitHub Actions自动构建于 ${{ github.event.repository.updated_at }}" >> release_table.md
+          # 生成包含下载链接和更新日志的完整内容
+          echo "# GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}" > release_description.md
+          echo "" >> release_description.md
+          echo "## 下载链接" >> release_description.md
+          echo "" >> release_description.md
+          echo "| 操作系统 | 单文件版 | 便携版 |" >> release_description.md
+          echo "|---------|---------|-------|" >> release_description.md
+          echo "| Windows | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip) |" >> release_description.md
+          echo "| macOS   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone) | [ZIP压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip) |" >> release_description.md
+          echo "| Linux   | [独立可执行文件](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone) | [TAR.GZ压缩包](${{ needs.get-version.outputs.repo_url }}/releases/download/${{ needs.get-version.outputs.release_name }}/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz) |" >> release_description.md
+          echo "" >> release_description.md
           
-          echo "TABLE_CONTENT<<EOF" >> $GITHUB_OUTPUT
-          cat release_table.md >> $GITHUB_OUTPUT
+          # 添加系统要求
+          echo "## 系统要求" >> release_description.md
+          echo "" >> release_description.md
+          echo "- **Windows**: Windows 10/11 64位" >> release_description.md
+          echo "- **macOS**: macOS 11.0+ (Big Sur及更高版本)" >> release_description.md
+          echo "- **Linux**: 主流桌面发行版 (Ubuntu 20.04+, Fedora 36+, Debian 11+)" >> release_description.md
+          echo "" >> release_description.md
+          
+          # 添加更新日志
+          echo -e "${{ steps.generate_changelog.outputs.CHANGELOG }}" >> release_description.md
+          
+          # 添加构建信息
+          echo "" >> release_description.md
+          echo "---" >> release_description.md
+          echo "" >> release_description.md
+          echo "此版本由GitHub Actions自动构建于 $(date '+%Y-%m-%d %H:%M:%S %Z')" >> release_description.md
+          
+          # 输出完整内容给后续步骤使用
+          echo "DESCRIPTION<<EOF" >> $GITHUB_OUTPUT
+          cat release_description.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       # 检查标签是否存在
@@ -562,6 +649,6 @@ jobs:
         with:
           name: ${{ needs.get-version.outputs.release_name }}
           tag_name: ${{ needs.get-version.outputs.release_name }}
-          body: ${{ steps.generate_table.outputs.TABLE_CONTENT }}
+          body: ${{ steps.generate_table.outputs.DESCRIPTION }}
           prerelease: ${{ needs.get-version.outputs.is_prerelease }}
           files: artifacts/*
