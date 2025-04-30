@@ -155,7 +155,7 @@ jobs:
           # 根据英文版本类型判断要创建的release名称和是否为预览版
           if [ "$version_type" = "development" ]; then
             echo "VERSION_TYPE=Development Version" >> $GITHUB_OUTPUT
-            echo "RELEASE_NAME=latest" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=999.999.999-latest" >> $GITHUB_OUTPUT
             echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
           elif [ "$version_type" = "preview" ]; then
             echo "VERSION_TYPE=Preview Version" >> $GITHUB_OUTPUT
@@ -749,8 +749,16 @@ jobs:
       - name: 生成下载链接表格和说明
         id: generate_table
         run: |
-          # 生成包含下载链接和更新日志的完整内容
-          echo "# GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}" > release_description.md
+          # 根据版本类型设置不同的标题
+          if [[ "${{ needs.get-version.outputs.version_type }}" == "Development Version" ]]; then
+            echo "# 🚧 GestroKey 最新开发构建 (未发布版本)" > release_description.md
+            echo "" >> release_description.md
+            echo "**版本号:** ${{ needs.get-version.outputs.version }}" >> release_description.md
+            echo "**警告:** 此版本为自动构建的最新开发版本，可能包含不稳定功能和已知问题" >> release_description.md
+          else
+            echo "# GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}" > release_description.md
+          fi
+          
           echo "" >> release_description.md
           echo "## 下载链接" >> release_description.md
           echo "" >> release_description.md
@@ -807,19 +815,25 @@ jobs:
           
       # 当发布正式版或预览版时删除latest标签
       - name: 删除latest标签
-        if: needs.get-version.outputs.version_type == 'Development Version'
+        if: needs.get-version.outputs.version_type != 'Development Version'
         run: |
-          echo "发布开发版，删除并重新创建latest标签"
+          echo "发布正式版或预览版，删除latest标签"
           
           # 检查latest标签是否存在
-          if git ls-remote --tags origin | grep -q "refs/tags/latest"; then
+          if git ls-remote --tags origin | grep -q "refs/tags/999.999.999-latest"; then
             # 删除GitHub Release
-            gh release delete latest --yes || echo "Release latest不存在或无法删除"
+            gh release delete 999.999.999-latest --yes || echo "Release latest不存在或无法删除"
             
             # 删除远程标签
-            git push --delete origin latest || echo "远程标签latest不存在或无法删除"
+            git push --delete origin 999.999.999-latest || echo "远程标签latest不存在或无法删除"
           else
-            echo "标签latest不存在，将创建新标签"
+            # 兼容性检查：也尝试删除旧的latest标签
+            if git ls-remote --tags origin | grep -q "refs/tags/latest"; then
+              gh release delete latest --yes || echo "Release latest不存在或无法删除"
+              git push --delete origin latest || echo "远程标签latest不存在或无法删除"
+            else
+              echo "标签latest不存在，无需删除"
+            fi
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -839,7 +853,6 @@ jobs:
 
       # 创建Release
       - name: 创建Release
-        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           name: ${{ needs.get-version.outputs.release_name }}
@@ -847,26 +860,3 @@ jobs:
           body: ${{ steps.generate_table.outputs.DESCRIPTION }}
           prerelease: ${{ needs.get-version.outputs.is_prerelease }}
           files: artifacts/*
-          
-      # 当使用开发版本时，再次创建latest标签，确保它是最后创建的
-      - name: 创建latest标签和Release
-        if: needs.get-version.outputs.version_type == 'Development Version'
-        run: |
-          # 先删除本地latest标签，如果有的话
-          git tag -d latest || true
-          
-          # 创建新的latest标签指向当前提交
-          git tag -a latest -m "Latest development version"
-          
-          # 推送latest标签
-          git push -f origin latest
-          
-          # 创建或更新latest Release
-          gh release create latest --title "Latest Development Build" --notes "这是最新的开发版本构建，基于 ${{ needs.get-version.outputs.version }}" --prerelease --target ${{ github.ref_name }} || gh release edit latest --title "Latest Development Build" --notes "这是最新的开发版本构建，基于 ${{ needs.get-version.outputs.version }}" --prerelease
-          
-          # 上传构建产物到latest Release
-          for file in artifacts/*; do
-            gh release upload latest "$file" --clobber
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
