@@ -22,7 +22,7 @@ permissions:
   packages: read
   issues: read
   pull-requests: read
-  workflows: write
+  actions: write
 
 jobs:
   # 检查提交内容，判断是否需要打包
