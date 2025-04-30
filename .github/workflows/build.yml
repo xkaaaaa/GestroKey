@@ -147,30 +147,29 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
         package-type: [standalone, portable]
-        include:
-          # 为每个组合添加条件标志
+        exclude:
+          # 根据配置排除Windows
           - os: windows-latest
             package-type: standalone
-            should_build: ${{ needs.get-version.outputs.package_windows == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
+            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
           - os: windows-latest
             package-type: portable
-            should_build: ${{ needs.get-version.outputs.package_windows == 'true' && needs.get-version.outputs.package_portable == 'true' }}
+            ${{ needs.get-version.outputs.package_windows != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+          # 根据配置排除macOS
           - os: macos-latest
             package-type: standalone
-            should_build: ${{ needs.get-version.outputs.package_macos == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
+            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
           - os: macos-latest
             package-type: portable
-            should_build: ${{ needs.get-version.outputs.package_macos == 'true' && needs.get-version.outputs.package_portable == 'true' }}
+            ${{ needs.get-version.outputs.package_macos != 'true' || needs.get-version.outputs.package_portable != 'true' }}
+          # 根据配置排除Linux
           - os: ubuntu-latest
             package-type: standalone
-            should_build: ${{ needs.get-version.outputs.package_linux == 'true' && needs.get-version.outputs.package_standalone == 'true' }}
+            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_standalone != 'true' }}
           - os: ubuntu-latest
             package-type: portable
-            should_build: ${{ needs.get-version.outputs.package_linux == 'true' && needs.get-version.outputs.package_portable == 'true' }}
+            ${{ needs.get-version.outputs.package_linux != 'true' || needs.get-version.outputs.package_portable != 'true' }}
     
-    # 跳过不需要构建的组合
-    if: ${{ matrix.should_build != 'false' }}
-
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -220,25 +219,14 @@ jobs:
             mkdir -p src/assets/images
           }
           if (Test-Path -Path src/assets/images/icon.svg) {
-            # 创建临时目录存放中间文件
-            mkdir -Force -Path temp_icons
-            
-            # 使用-transparent white确保透明度正确保留
-            magick convert src/assets/images/icon.svg -background transparent -resize 256x256 temp_icons/icon-256.png
-            magick convert src/assets/images/icon.svg -background transparent -resize 128x128 temp_icons/icon-128.png
-            magick convert src/assets/images/icon.svg -background transparent -resize 64x64 temp_icons/icon-64.png
-            magick convert src/assets/images/icon.svg -background transparent -resize 48x48 temp_icons/icon-48.png
-            magick convert src/assets/images/icon.svg -background transparent -resize 32x32 temp_icons/icon-32.png
-            magick convert src/assets/images/icon.svg -background transparent -resize 16x16 temp_icons/icon-16.png
-            
-            # 验证图像是否有透明通道
-            magick identify -verbose temp_icons/icon-256.png | Select-String -Pattern "Alpha" -Quiet
-            
-            # 使用convert命令确保正确生成包含透明度的ico文件
-            magick convert temp_icons/icon-256.png temp_icons/icon-128.png temp_icons/icon-64.png temp_icons/icon-48.png temp_icons/icon-32.png temp_icons/icon-16.png -colors 256 src/assets/images/icon.ico
-            
-            # 清理临时文件
-            Remove-Item -Recurse -Force temp_icons
+            magick src/assets/images/icon.svg -background none -resize 256x256 icon-256.png
+            magick src/assets/images/icon.svg -background none -resize 128x128 icon-128.png
+            magick src/assets/images/icon.svg -background none -resize 64x64 icon-64.png
+            magick src/assets/images/icon.svg -background none -resize 48x48 icon-48.png
+            magick src/assets/images/icon.svg -background none -resize 32x32 icon-32.png
+            magick src/assets/images/icon.svg -background none -resize 16x16 icon-16.png
+            magick icon-256.png icon-128.png icon-64.png icon-48.png icon-32.png icon-16.png src/assets/images/icon.ico
+            Remove-Item icon-*.png
           } else {
             Write-Error "缺少图标文件: src/assets/images/icon.svg"
             exit 1
@@ -291,15 +279,9 @@ jobs:
         shell: pwsh
         run: |
           python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
-          
-          # 创建便携版目录
-          mkdir -Force -Path "dist/portable-temp"
-          Copy-Item -Path dist/main.dist/* -Destination "dist/portable-temp/" -Recurse
-          
-          # 直接压缩文件内容(而非文件夹)
-          cd dist/portable-temp
-          Compress-Archive -Path * -DestinationPath "../GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
-          cd ../..
+          mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
+          Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
+          Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
 
       # 构建多文件便携版 - Windows (PyInstaller)
       - name: 构建便携版 - Windows (PyInstaller)
@@ -364,10 +346,10 @@ jobs:
           # 使用PyInstaller构建
           pyinstaller GestroKey.spec
           
-          # 直接压缩PyInstaller生成的文件
-          cd dist/GestroKey
-          Compress-Archive -Path * -DestinationPath "../GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
-          cd ../..
+          # 打包
+          mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
+          Copy-Item -Path dist/GestroKey/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
+          Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
 
       # 构建多文件便携版 - Linux (Nuitka)
       - name: 构建便携版 - Linux (Nuitka)
@@ -375,11 +357,9 @@ jobs:
         shell: bash
         run: |
           python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
-          
-          # 直接从dist/main.dist目录打包，避免嵌套
-          cd dist/main.dist
-          tar -czvf "../GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" *
-          cd ../..
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+          cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
+          cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
 
       # 构建多文件便携版 - Linux (PyInstaller)
       - name: 构建便携版 - Linux (PyInstaller)
@@ -443,10 +423,10 @@ jobs:
           # 使用PyInstaller构建
           pyinstaller GestroKey.spec
           
-          # 直接打包生成的文件，避免嵌套
-          cd dist/GestroKey
-          tar -czvf "../GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" *
-          cd ../..
+          # 打包
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
+          cp -r dist/GestroKey/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
+          cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
 
       # 构建多文件便携版 - macOS (使用PyInstaller)
       - name: 构建便携版 - macOS
@@ -524,10 +504,10 @@ jobs:
           # 使用PyInstaller构建
           pyinstaller GestroKey.spec
           
-          # macOS情况特殊，需要打包.app文件
-          cd dist
-          zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" GestroKey.app
-          cd ..
+          # 打包
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
+          cp -r dist/GestroKey.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
+          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
 
       # 构建单文件版本 - Windows (Nuitka)
       - name: 构建单文件版 - Windows (Nuitka)
@@ -792,10 +772,10 @@ jobs:
           # 使用PyInstaller构建
           pyinstaller GestroKey_onefile.spec
           
-          # 直接打包app文件
-          cd dist
-          zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" GestroKey.app
-          cd ..
+          # 打包
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          cp -r dist/GestroKey.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone/GestroKey.app"
+          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
 
       # 上传构建产物
       - name: 上传构建产物
