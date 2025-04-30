@@ -29,15 +29,27 @@ jobs:
     name: 检查代码变更
     runs-on: ubuntu-latest
     outputs:
-      should_build: ${{ steps.check_py_changes.outputs.changed }}
+      should_build: ${{ steps.check_manual.outputs.changed == 'true' || steps.check_py_changes.outputs.changed == 'true' }}
     
     steps:
+      - name: 手动触发检查
+        id: check_manual
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "是手动触发的工作流，将执行完整流程"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: 检出代码
+        if: steps.check_manual.outputs.changed != 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # 获取完整的提交历史
       
       - name: 获取上次打包标签
+        if: steps.check_manual.outputs.changed != 'true'
         id: last_tag
         run: |
           # 获取所有标签并按时间排序
@@ -54,8 +66,16 @@ jobs:
           fi
       
       - name: 检查是否修改了.py文件
+        if: steps.check_manual.outputs.changed != 'true'
         id: check_py_changes
         run: |
+          # 如果是手动触发的工作流，直接返回true
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "手动触发工作流，继续构建"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
           # 获取上次发布后修改的文件列表
           files_changed=$(git diff --name-only ${{ steps.last_tag.outputs.LAST_TAG }}..HEAD)
           
@@ -78,7 +98,7 @@ jobs:
           echo "changed=$py_changed" >> $GITHUB_OUTPUT
           
           if [ "$py_changed" == "true" ]; then
-            echo "检测到Python文件变更，将执行打包流程"
+            echo "检测到Python文件变更或手动触发，将执行打包流程"
           else
             echo "未检测到Python文件变更，跳过打包流程"
           fi
