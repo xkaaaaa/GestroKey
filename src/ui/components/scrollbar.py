@@ -426,4 +426,4 @@ if __name__ == "__main__":
     # 显示窗口
     window.show()
     
-    sys.exit(app.exec()) 
+    sys.exit(app.exec())

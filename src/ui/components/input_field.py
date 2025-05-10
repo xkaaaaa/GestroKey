@@ -1704,4 +1704,4 @@ if __name__ == "__main__":
     window.resize(700, 550)  # 增加窗口大小以适应更多内容
     window.show()
     
-    sys.exit(app.exec()) 
+    sys.exit(app.exec())

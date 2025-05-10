@@ -1466,4 +1466,4 @@ if __name__ == "__main__":
     
     exit_code = app.exec()
     logger.info(f"测试结束，退出码: {exit_code}")
-    sys.exit(exit_code) 
+    sys.exit(exit_code)

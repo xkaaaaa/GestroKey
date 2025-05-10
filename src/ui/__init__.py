@@ -15,4 +15,4 @@ except ImportError:
 # 导出模块
 from ui.splash_screen import SplashScreen
 
-__version__ = VERSION 
+__version__ = VERSION

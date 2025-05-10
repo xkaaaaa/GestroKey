@@ -152,4 +152,4 @@ if __name__ == "__main__":
     try:
         1/0
     except Exception as e:
-        logger.exception(f"发生异常: {e}") 
+        logger.exception(f"发生异常: {e}")

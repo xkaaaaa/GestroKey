@@ -683,4 +683,4 @@ if __name__ == "__main__":
     except Exception as e:
         # 获取一个独立的日志记录器记录主程序异常
         error_logger = get_logger("MainError")
-        error_logger.exception(f"主程序发生未捕获的异常: {e}") 
+        error_logger.exception(f"主程序发生未捕获的异常: {e}")

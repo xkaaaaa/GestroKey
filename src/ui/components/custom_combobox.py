@@ -835,4 +835,4 @@ if __name__ == "__main__":
     layout.addWidget(comboBox)
     
     window.show()
-    sys.exit(app.exec()) 
+    sys.exit(app.exec())

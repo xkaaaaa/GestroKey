@@ -542,4 +542,4 @@ settings_manager = Settings()
 
 def get_settings():
     """获取设置管理器实例"""
-    return settings_manager 
+    return settings_manager

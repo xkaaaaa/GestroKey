@@ -1253,4 +1253,4 @@ if __name__ == "__main__":
     main_layout.addWidget(info)
     
     window.show()
-    sys.exit(app.exec()) 
+    sys.exit(app.exec())

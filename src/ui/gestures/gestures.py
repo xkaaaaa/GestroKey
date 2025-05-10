@@ -501,4 +501,4 @@ gesture_library = GestureLibrary()
 
 def get_gesture_library():
     """获取手势库管理器实例"""
-    return gesture_library 
+    return gesture_library

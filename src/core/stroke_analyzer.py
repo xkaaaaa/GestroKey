@@ -241,4 +241,4 @@ class StrokeAnalyzer:
         if len(parts) == 1:
             return f"单一{parts[0]}方向"
         else:
-            return f"先{parts[0]}后{'再'.join(parts[1:])}" 
+            return f"先{parts[0]}后{'再'.join(parts[1:])}"

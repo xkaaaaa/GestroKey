@@ -392,4 +392,4 @@ if __name__ == "__main__":
     # 测试不存在的手势
     print("测试执行不存在的手势...")
     result = executor.execute_gesture("上-上-上")
-    print(f"执行结果: {'成功' if result else '失败'}") 
+    print(f"执行结果: {'成功' if result else '失败'}")
