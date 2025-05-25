@@ -41,13 +41,11 @@ from PyQt6.QtWidgets import (
 
 try:
     from core.logger import get_logger
-    from ui.components.button import AnimatedButton
     from ui.components.slider import AnimatedSlider
     from version import APP_NAME
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
     from core.logger import get_logger
-    from ui.components.button import AnimatedButton
     from ui.components.slider import AnimatedSlider
     from version import APP_NAME
 
@@ -631,13 +629,13 @@ class ColorDialogPanel(QDialog):
         button_layout.setSpacing(10)
 
         # 应用按钮
-        self.apply_button = AnimatedButton("应用", primary_color=[52, 152, 219])
-        self.apply_button.setMinimumHeight(35)
+        self.apply_button = QPushButton("应用")
+        self.apply_button.setStyleSheet("background-color: rgb(52,152,219); color:white; border-radius:4px; height:32px;")
         self.apply_button.clicked.connect(self.onApply)
 
         # 取消按钮
-        self.cancel_button = AnimatedButton("取消", primary_color=[149, 165, 166])
-        self.cancel_button.setMinimumHeight(35)
+        self.cancel_button = QPushButton("取消")
+        self.cancel_button.setStyleSheet("background-color: rgb(149,165,166); color:white; border-radius:4px; height:32px;")
         self.cancel_button.clicked.connect(self.reject)
 
         button_layout.addWidget(self.apply_button)

@@ -21,9 +21,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+# 导入PyQtWidgetForge库中的按钮组件
+from PyQtWidgetForge.widgets import ForgeButton
+
 try:
     from core.logger import get_logger
-    from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
     from ui.components.custom_combobox import CustomComboBox
     from ui.components.dialog import (  # 导入自定义对话框组件
@@ -45,7 +47,6 @@ try:
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
     from core.logger import get_logger
-    from ui.components.button import AnimatedButton
     from ui.components.card import CardWidget
     from ui.components.custom_combobox import CustomComboBox
     from ui.components.dialog import (  # 导入自定义对话框组件
@@ -276,16 +277,14 @@ class GesturesPage(QWidget):
         buttons_layout.setContentsMargins(0, 5, 0, 5)
 
         # 添加新手势按钮
-        self.add_button = AnimatedButton("添加新手势", primary_color=[46, 204, 113])
-        self.add_button.setMinimumSize(100, 36)  # 设置最小尺寸而不是固定尺寸
+        self.add_button = ForgeButton("添加新手势", emphasized=True)
         self.add_button.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
         self.add_button.clicked.connect(self.addNewGesture)
 
         # 重置按钮
-        self.reset_button = AnimatedButton("重置为默认", primary_color=[108, 117, 125])
-        self.reset_button.setMinimumSize(100, 36)  # 设置最小尺寸而不是固定尺寸
+        self.reset_button = ForgeButton("重置为默认")
         self.reset_button.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
@@ -300,8 +299,7 @@ class GesturesPage(QWidget):
         save_layout = QHBoxLayout()
         save_layout.setContentsMargins(0, 5, 0, 0)
 
-        self.save_button = AnimatedButton("保存更改", primary_color=[52, 152, 219])
-        self.save_button.setMinimumSize(100, 50)  # 设置最小尺寸而不是固定尺寸
+        self.save_button = ForgeButton("保存更改", emphasized=True)
         self.save_button.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
@@ -444,28 +442,14 @@ class GesturesPage(QWidget):
         for pos, (dir_name, symbol) in directions.items():
             if dir_name == "删除":
                 # 删除按钮使用红色主题
-                btn = AnimatedButton(
-                    text=symbol,
-                    primary_color=[231, 76, 60],  # 红色
-                    hover_color=[192, 57, 43],  # 深红色
-                    text_color=[255, 255, 255],  # 白色文本
-                    border_radius=5,
-                    min_width=40,
-                    min_height=40,
-                )
+                btn = ForgeButton(symbol, rounded=True)
+                btn.setFixedSize(40,40)
                 btn.setToolTip(dir_name)
                 btn.clicked.connect(self.remove_last_direction)
             else:
                 # 方向按钮使用蓝色主题
-                btn = AnimatedButton(
-                    text=symbol,
-                    primary_color=[52, 152, 219],  # 蓝色
-                    hover_color=[41, 128, 185],  # 深蓝色
-                    text_color=[255, 255, 255],  # 白色文本
-                    border_radius=5,
-                    min_width=40,
-                    min_height=40,
-                )
+                btn = ForgeButton(symbol, rounded=True)
+                btn.setFixedSize(40,40)
                 btn.setToolTip(dir_name)
                 # 使用lambda捕获当前方向
                 btn.clicked.connect(lambda checked, d=dir_name: self.add_direction(d))
@@ -512,15 +496,13 @@ class GesturesPage(QWidget):
         form_layout.addLayout(action_value_layout)
 
         # 先定义按钮
-        self.delete_button = AnimatedButton("删除手势", primary_color=[231, 76, 60])
-        self.delete_button.setMinimumSize(120, 36)
+        self.delete_button = ForgeButton("删除手势", level="danger")
         self.delete_button.setSizePolicy(
             QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
         )
         self.delete_button.clicked.connect(self.deleteGesture)
 
-        self.clear_button = AnimatedButton("清空表单", primary_color=[149, 165, 166])
-        self.clear_button.setMinimumSize(120, 36)
+        self.clear_button = ForgeButton("清空表单")
         self.clear_button.setSizePolicy(
             QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
         )

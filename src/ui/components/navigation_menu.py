@@ -1231,15 +1231,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # 使用Fusion样式以获得更好的跨平台一致性
 
-    # 导入AnimatedButton类，只在测试代码中需要
-    try:
-        from ui.components.button import AnimatedButton
-    except ImportError:
-        sys.path.append(
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-        )
-        from ui.components.button import AnimatedButton
-
     # 主窗口
     window = QWidget()
     window.setWindowTitle("SideNavigationMenu 示例")
