@@ -10,13 +10,17 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QSizePolicy,
+    QSpacerItem,
     QVBoxLayout,
     QWidget,
+    QPushButton,
 )
+
+# 导入PyQtWidgetForge库中的按钮组件
+from PyQtWidgetForge.widgets import ForgeButton
 
 from core.drawer import DrawingManager
 from core.logger import get_logger
-from ui.components.button import AnimatedButton  # 导入自定义动画按钮
 from ui.components.dialog import show_dialog  # 导入自定义对话框组件
 from ui.components.navigation_menu import SideNavigationMenu  # 导入导航菜单组件
 from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
@@ -359,11 +363,7 @@ class GestroKeyApp(QMainWindow):
         status_layout.setContentsMargins(10, 5, 10, 5)  # 设置适当的边距
 
         # 使用自定义动画按钮替换标准按钮
-        self.exit_button = AnimatedButton("退出程序", primary_color=[220, 53, 69])  # 红色按钮
-        self.exit_button.setMinimumSize(120, 36)  # 设置最小尺寸，而不是固定尺寸
-        self.exit_button.setSizePolicy(
-            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
-        )
+        self.exit_button = ForgeButton("退出程序", level="danger")
         self.exit_button.clicked.connect(self.close)
 
         self.version_label = QLabel(get_version_string())

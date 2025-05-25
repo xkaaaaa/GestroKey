@@ -21,13 +21,16 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QVBoxLayout,
     QWidget,
+    QPushButton,
 )
+
+# 导入PyQtWidgetForge库中的按钮组件
+from PyQtWidgetForge.widgets import ForgeButton
 
 try:
     from core.drawer import DrawingManager
     from core.logger import get_logger
     from core.system_monitor import SystemMonitor, format_bytes
-    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.card import CardWidget  # 导入自定义卡片组件
     from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
     from version import APP_NAME  # 导入应用名称
@@ -36,7 +39,6 @@ except ImportError:
     from core.drawer import DrawingManager
     from core.logger import get_logger
     from core.system_monitor import SystemMonitor, format_bytes
-    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.card import CardWidget  # 导入自定义卡片组件
     from ui.components.system_tray import get_system_tray  # 导入系统托盘图标
     from version import APP_NAME  # 导入应用名称
@@ -214,13 +216,8 @@ class ConsolePage(QWidget):
         layout.addWidget(self.status_label)
 
         # 使用单个按钮，根据状态切换文本和颜色
-        self.action_button = AnimatedButton(
-            "开始绘制", primary_color=[41, 128, 185]
-        )  # 初始为蓝色"开始绘制"按钮
-        self.action_button.setMinimumSize(150, 40)
-        self.action_button.setSizePolicy(
-            QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed
-        )
+        # 使用InfoButton，它支持动态改变样式级别
+        self.action_button = ForgeButton("开始绘制", emphasized=True)
         self.action_button.clicked.connect(self.toggle_drawing)
         layout.addWidget(self.action_button, 0, Qt.AlignmentFlag.AlignCenter)
 
@@ -378,7 +375,9 @@ class ConsolePage(QWidget):
                 self.status_label.setText("绘制中 - 使用鼠标右键进行绘制")
                 # 切换按钮为"停止绘制"，并改为红色
                 self.action_button.setText("停止绘制")
-                self.action_button.set_primary_color([220, 53, 69])  # 红色
+                # 使用InfoButton的set_level方法设置为危险级别
+                self.action_button.set_level("danger")
+                self.action_button.set_emphasized(False)
                 self.is_drawing_active = True
 
                 # 更新托盘图标状态
@@ -401,9 +400,11 @@ class ConsolePage(QWidget):
 
                 if success:
                     self.status_label.setText("准备就绪")
-                    # 切换按钮为"开始绘制"，并改为蓝色
+                    # 切换按钮为"开始绘制"，并改为默认样式
                     self.action_button.setText("开始绘制")
-                    self.action_button.set_primary_color([41, 128, 185])  # 蓝色
+                    # 恢复为默认级别
+                    self.action_button.set_level(None)
+                    self.action_button.set_emphasized(True)
                     self.is_drawing_active = False
 
                     # 更新托盘图标状态

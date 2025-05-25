@@ -20,10 +20,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+# 导入PyQtWidgetForge库中的按钮组件
+from PyQtWidgetForge.widgets import ForgeButton
+
 try:
     from core.logger import get_logger
     from ui.components.animated_tooltip import wrap_widget_with_tooltip  # 导入自定义工具提示组件
-    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.checkbox import AnimatedCheckBox  # 导入自定义动画复选框
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.dialog import (
@@ -46,7 +48,6 @@ except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
     from core.logger import get_logger
     from ui.components.animated_tooltip import wrap_widget_with_tooltip  # 导入自定义工具提示组件
-    from ui.components.button import AnimatedButton  # 导入自定义动画按钮
     from ui.components.checkbox import AnimatedCheckBox  # 导入自定义动画复选框
     from ui.components.color_picker import AnimatedColorPicker  # 导入自定义色彩选择器
     from ui.components.dialog import (
@@ -132,15 +133,11 @@ class SettingsPage(QWidget):
         buttons_layout = QHBoxLayout(buttons_widget)
         buttons_layout.setContentsMargins(10, 10, 10, 10)
 
-        # 使用自定义动画按钮替换标准按钮
-        reset_button = AnimatedButton("重置为默认设置", primary_color=[108, 117, 125])  # 灰色
-        reset_button.setMinimumSize(140, 36)  # 设置最小大小而不是固定大小
-        reset_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        # 使用PyQtWidgetForge库按钮替换标准按钮
+        reset_button = ForgeButton("重置为默认设置")
         reset_button.clicked.connect(self.reset_settings)
 
-        save_button = AnimatedButton("保存设置", primary_color=[41, 128, 185])  # 蓝色
-        save_button.setMinimumSize(120, 36)  # 设置最小大小而不是固定大小
-        save_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        save_button = ForgeButton("保存设置", emphasized=True)
         save_button.clicked.connect(self.save_settings)
 
         buttons_layout.addWidget(reset_button)

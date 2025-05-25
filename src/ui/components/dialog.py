@@ -49,13 +49,11 @@ from PyQt6.QtWidgets import (
 
 try:
     from core.logger import get_logger  # 导入日志工具
-    from ui.components.button import AnimatedButton  # 导入按钮组件
 except ImportError:
     import os
 
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
     from core.logger import get_logger
-    from ui.components.button import AnimatedButton
 
 # --- 配置 ---
 CONFIG = {
@@ -304,7 +302,9 @@ class MessageDialog(QWidget):  # 对话框组件
                 ):
                     button_color = self.custom_button_colors[button_text]
 
-                btn = AnimatedButton(button_text, primary_color=button_color)
+                btn = QPushButton(button_text)
+                # 应用基本样式：背景色为按钮颜色，白字，圆角，固定高度
+                btn.setStyleSheet(f"background-color: {button_color}; color: white; border-radius: {CONFIG['radius_button']}px; height: 32px;")
                 btn.clicked.connect(
                     lambda checked, text=button_text: self.handle_button_click(text)
                 )
