@@ -176,7 +176,7 @@ jobs:
           # 根据英文版本类型判断要创建的release名称和是否为预览版
           if [ "$version_type" = "development" ]; then
             echo "VERSION_TYPE=Development Version" >> $GITHUB_OUTPUT
-            echo "RELEASE_NAME=999.999.999-latest" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=latest" >> $GITHUB_OUTPUT
             echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
           elif [ "$version_type" = "preview" ]; then
             echo "VERSION_TYPE=Preview Version" >> $GITHUB_OUTPUT
@@ -789,8 +789,7 @@ jobs:
             echo "构建时间: $(date '+%Y-%m-%d %H:%M:%S')" >> release_description.md
           else
             # 正式版和预览版保持原有格式
-            echo "# GestroKey ${{ needs.get-version.outputs.version }} ${{ needs.get-version.outputs.version_type }}" > release_description.md
-            echo "" >> release_description.md
+            echo "" > release_description.md
             echo "## 下载链接" >> release_description.md
             echo "" >> release_description.md
             echo "| 操作系统 | 单文件版 | 便携版 |" >> release_description.md
@@ -852,12 +851,12 @@ jobs:
           echo "发布正式版或预览版，删除latest标签"
           
           # 检查latest标签是否存在
-          if git ls-remote --tags origin | grep -q "refs/tags/999.999.999-latest"; then
+          if git ls-remote --tags origin | grep -q "refs/tags/latest"; then
             # 删除GitHub Release
-            gh release delete 999.999.999-latest --yes || echo "Release latest不存在或无法删除"
+            gh release delete latest --yes || echo "Release latest不存在或无法删除"
             
             # 删除远程标签
-            git push --delete origin 999.999.999-latest || echo "远程标签latest不存在或无法删除"
+            git push --delete origin latest || echo "远程标签latest不存在或无法删除"
           else
             # 兼容性检查：也尝试删除旧的latest标签
             if git ls-remote --tags origin | grep -q "refs/tags/latest"; then

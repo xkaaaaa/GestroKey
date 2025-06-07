@@ -33,9 +33,14 @@ jobs:
       - name: 生成变动文件列表并打包
         run: |
           git diff --name-only > changed_files.txt
-          # 若无变动文件则创建占位
-          if [ ! -s changed_files.txt ]; then echo "no changes" > changed_files.txt; fi
-          tar -czf changed-files-${{ github.sha }}.tar.gz -T changed_files.txt
+          if [ -s changed_files.txt ]; then
+            echo "Detected file changes,打包中..."
+            tar -czf changed-files-${{ github.sha }}.tar.gz -T changed_files.txt
+          else
+            echo "未发现格式化改动，生成空占位文件。"
+            echo "no changes" > no_changes.txt
+            tar -czf changed-files-${{ github.sha }}.tar.gz no_changes.txt
+          fi
 
       - name: 上传变动文件包
         uses: actions/upload-artifact@v4
