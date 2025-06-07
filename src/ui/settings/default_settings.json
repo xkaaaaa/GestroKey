@@ -1,0 +1,10 @@
+{
+    "brush": {
+        "pen_width": 7,
+        "pen_color": [0, 120, 255]
+    },
+    "app": {
+        "show_exit_dialog": true,
+        "default_close_action": "minimize"
+    }
+} 
