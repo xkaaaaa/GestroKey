@@ -188,12 +188,13 @@ class GesturesPage(QWidget):
         sorted_gestures = sorted(gestures.items(), key=lambda x: x[1].get('id', 0))
 
         for name, data in sorted_gestures:
+            gesture_id = data.get('id', 0)
             direction = data.get('direction', '')
             action = data.get('action', {})
             shortcut = action.get('value', '')
             
-            # 创建列表项
-            item_text = f"{name} ({direction}) → {shortcut}"
+            # 创建列表项，显示编号
+            item_text = f"{gesture_id}. {name} ({direction}) → {shortcut}"
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, name)  # 存储手势名称
             self.gesture_list.addItem(item)
@@ -315,19 +316,31 @@ class GesturesPage(QWidget):
             return False
 
         try:
-            # 如果是新手势或改名了
-            if not self.current_gesture_name or name != self.current_gesture_name:
+            # 如果是新手势
+            if not self.current_gesture_name:
                 # 检查名称是否已存在
                 if self.gesture_library.get_gesture(name):
                     QMessageBox.warning(self, "错误", f"手势名称 '{name}' 已存在")
                     return False
-
-                # 如果是改名，删除旧的
-                if self.current_gesture_name:
-                    self.gesture_library.remove_gesture(self.current_gesture_name)
-
-            # 添加或更新手势
-            success = self.gesture_library.add_gesture(name, direction, 'shortcut', shortcut)
+                
+                # 添加新手势
+                success = self.gesture_library.add_gesture(name, direction, 'shortcut', shortcut)
+            else:
+                # 修改现有手势 - 通过ID更新
+                current_gesture = self.gesture_library.get_gesture(self.current_gesture_name)
+                if not current_gesture:
+                    QMessageBox.critical(self, "错误", "找不到当前手势")
+                    return False
+                
+                gesture_id = current_gesture.get('id')
+                if gesture_id is None:
+                    QMessageBox.critical(self, "错误", "当前手势没有有效的ID")
+                    return False
+                
+                # 通过ID更新手势的所有属性
+                success = self.gesture_library.update_gesture_by_id(
+                    gesture_id, name, direction, 'shortcut', shortcut
+                )
             
             if success:
                 # 更新状态
