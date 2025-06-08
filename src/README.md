@@ -382,7 +382,6 @@ print("手势库已保存")
   - 手势名称输入框
   - 快捷键输入框
   - 手势路径绘制组件（支持可视化绘制和显示）
-  - 相似度阈值设置
   - 新建、清空表单、撤销按钮
 
 **使用方法**：
@@ -543,6 +542,7 @@ drawing_widget.show()
 - 支持的设置项：
   - `pen_width`：笔尖粗细，范围1-20像素
   - `pen_color`：笔尖颜色，RGB格式数组
+  - `gesture.similarity_threshold`：手势相似度阈值，范围0.0-1.0，默认0.70
 
 **使用方法**：
 ```python
@@ -613,6 +613,7 @@ settings.set_autostart(False)  # 禁用
   - 应用设置组：
     - 开机自启动选项（QCheckBox）
     - 退出行为设置（QCheckBox和QRadioButton）
+    - 手势相似度阈值设置（QDoubleSpinBox）
 - 底部：操作按钮区域
   - 重置设置按钮
   - 应用设置按钮

@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSpinBox,
+    QDoubleSpinBox,
     QVBoxLayout,
     QWidget,
     QFormLayout,
@@ -179,6 +180,26 @@ class SettingsPage(QWidget):
         
         layout.addRow("默认关闭行为:", close_behavior_widget)
 
+        # 手势相似度阈值
+        threshold_layout = QHBoxLayout()
+        
+        self.threshold_spinbox = QDoubleSpinBox()
+        self.threshold_spinbox.setRange(0.0, 1.0)
+        self.threshold_spinbox.setSingleStep(0.05)
+        self.threshold_spinbox.setDecimals(2)
+        self.threshold_spinbox.setValue(0.7)
+        self.threshold_spinbox.setMinimumWidth(80)
+        self.threshold_spinbox.setToolTip("手势识别的相似度阈值，值越高要求越严格")
+        self.threshold_spinbox.valueChanged.connect(self._on_threshold_changed)
+        
+        threshold_layout.addWidget(self.threshold_spinbox)
+        threshold_layout.addStretch()
+        
+        threshold_widget = QWidget()
+        threshold_widget.setLayout(threshold_layout)
+        
+        layout.addRow("手势相似度阈值:", threshold_widget)
+
         return group
 
     def _create_button_layout(self):
@@ -226,6 +247,10 @@ class SettingsPage(QWidget):
                 self.minimize_radio.setChecked(True)
             else:
                 self.exit_radio.setChecked(True)
+            
+            # 加载手势相似度阈值
+            threshold = self.settings.get("gesture.similarity_threshold", 0.70)
+            self.threshold_spinbox.setValue(threshold)
             
             self.logger.debug("设置已加载到界面")
             
@@ -291,6 +316,11 @@ class SettingsPage(QWidget):
         if not self.is_loading:
             self._mark_changed()
 
+    def _on_threshold_changed(self, value):
+        """手势相似度阈值变化"""
+        if not self.is_loading:
+            self._mark_changed()
+
     def _mark_changed(self):
         """标记设置已更改"""
         if not self.is_loading:
@@ -334,6 +364,14 @@ class SettingsPage(QWidget):
             
             if current_close_action != saved_close_action:
                 self.logger.debug(f"默认关闭行为有变化: {current_close_action} != {saved_close_action}")
+                return True
+            
+            # 检查手势相似度阈值
+            current_threshold = self.threshold_spinbox.value()
+            saved_threshold = self.settings.get("gesture.similarity_threshold", 0.70)
+            
+            if current_threshold != saved_threshold:
+                self.logger.debug(f"手势相似度阈值有变化: {current_threshold} != {saved_threshold}")
                 return True
             
             return False
@@ -397,6 +435,10 @@ class SettingsPage(QWidget):
             default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
             self.settings.set("app.default_close_action", default_close_action)
             
+            # 应用手势相似度阈值
+            threshold = self.threshold_spinbox.value()
+            self.settings.set("gesture.similarity_threshold", threshold)
+            
             self._update_button_states()
             QMessageBox.information(self, "成功", "设置已应用")
             
@@ -429,6 +471,10 @@ class SettingsPage(QWidget):
             
             default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
             self.settings.set("app.default_close_action", default_close_action)
+            
+            # 应用手势相似度阈值
+            threshold = self.threshold_spinbox.value()
+            self.settings.set("gesture.similarity_threshold", threshold)
             
             # 保存到文件
             success = self.settings.save()

@@ -176,19 +176,7 @@ class GesturesPage(QWidget):
         
         layout.addWidget(path_group)
 
-        # 相似度阈值设置
-        threshold_group = QGroupBox("相似度设置")
-        threshold_layout = QFormLayout(threshold_group)
-        
-        self.threshold_spinbox = QDoubleSpinBox()
-        self.threshold_spinbox.setRange(0.0, 1.0)
-        self.threshold_spinbox.setSingleStep(0.05)
-        self.threshold_spinbox.setDecimals(2)
-        self.threshold_spinbox.setValue(0.7)
-        self.threshold_spinbox.valueChanged.connect(self._on_threshold_changed)
-        threshold_layout.addRow("相似度阈值:", self.threshold_spinbox)
-        
-        layout.addWidget(threshold_group)
+
 
         # 操作按钮
         button_layout = QHBoxLayout()
@@ -208,9 +196,6 @@ class GesturesPage(QWidget):
         button_layout.addWidget(self.btn_undo)
 
         layout.addLayout(button_layout)
-
-        # 初始化相似度阈值
-        self._load_similarity_threshold()
 
         return panel
 
@@ -626,24 +611,7 @@ class GesturesPage(QWidget):
         self._on_form_changed()  # 触发表单变更检测
         self.logger.info(f"路径绘制完成，关键点数: {len(path.get('points', []))}")
     
-    def _on_threshold_changed(self, value):
-        """处理相似度阈值变更"""
-        try:
-            settings = get_settings()
-            settings.set("gesture.similarity_threshold", value)
-            self.logger.info(f"相似度阈值已更新为: {value}")
-        except Exception as e:
-            self.logger.error(f"保存相似度阈值失败: {e}")
-    
-    def _load_similarity_threshold(self):
-        """加载相似度阈值设置"""
-        try:
-            settings = get_settings()
-            threshold = settings.get("gesture.similarity_threshold", 0.70)
-            self.threshold_spinbox.setValue(threshold)
-        except Exception as e:
-            self.logger.error(f"加载相似度阈值失败: {e}")
-            self.threshold_spinbox.setValue(0.70)
+
 
 
 if __name__ == "__main__":
