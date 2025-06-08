@@ -306,21 +306,11 @@ jobs:
           if (-Not (Test-Path -Path "src/assets/images")) {
             mkdir -p src/assets/images
           }
-          if (Test-Path -Path src/assets/images/icon.svg) {
-            # 确保使用24位PNG格式并保留alpha通道
-            magick src/assets/images/icon.svg -background transparent -define png:color-type=6 -resize 256x256 icon-256.png
-            magick src/assets/images/icon.svg -background transparent -define png:color-type=6 -resize 128x128 icon-128.png
-            magick src/assets/images/icon.svg -background transparent -define png:color-type=6 -resize 64x64 icon-64.png
-            magick src/assets/images/icon.svg -background transparent -define png:color-type=6 -resize 48x48 icon-48.png
-            magick src/assets/images/icon.svg -background transparent -define png:color-type=6 -resize 32x32 icon-32.png
-            magick src/assets/images/icon.svg -background transparent -define png:color-type=6 -resize 16x16 icon-16.png
-            
-            # 使用转换后的PNG文件创建带透明度的ICO文件
-            magick convert icon-256.png icon-128.png icon-64.png icon-48.png icon-32.png icon-16.png -alpha on -background transparent src/assets/images/icon.ico
-            
-            Remove-Item icon-*.png
+          if (Test-Path -Path src/assets/images/icons/icon.ico) {
+            # 直接复制已准备好的ICO文件
+            Copy-Item -Path src/assets/images/icons/icon.ico -Destination src/assets/images/icon.ico
           } else {
-            Write-Error "缺少图标文件: src/assets/images/icon.svg"
+            Write-Error "缺少图标文件: src/assets/images/icons/icon.ico"
             exit 1
           }
 
@@ -331,23 +321,11 @@ jobs:
           if [ ! -d "src/assets/images" ]; then
             mkdir -p src/assets/images
           fi
-          if [ -f src/assets/images/icon.svg ]; then
-            # 创建正确的iconset目录
-            mkdir -p "iconset.iconset"
-            # 使用magick命令替代convert
-            for size in 16 32 64 128 256 512 1024; do
-              magick src/assets/images/icon.svg -background none -resize ${size}x${size} "iconset.iconset/icon_${size}x${size}.png"
-              # 为Retina显示创建@2x版本
-              if [ "$size" -le "512" ]; then
-                dsize=$((size*2))
-                magick src/assets/images/icon.svg -background none -resize ${dsize}x${dsize} "iconset.iconset/icon_${size}x${size}@2x.png"
-              fi
-            done
-            # 使用正确格式创建icns文件
-            iconutil -c icns -o src/assets/images/icon.icns "iconset.iconset"
-            rm -rf "iconset.iconset"
+          if [ -f src/assets/images/icons/icon.icns ]; then
+            # 直接复制已准备好的ICNS文件
+            cp src/assets/images/icons/icon.icns src/assets/images/icon.icns
           else
-            echo "缺少图标文件: src/assets/images/icon.svg"
+            echo "缺少图标文件: src/assets/images/icons/icon.icns"
             exit 1
           fi
 
@@ -358,10 +336,11 @@ jobs:
           if [ ! -d "src/assets/images" ]; then
             mkdir -p src/assets/images
           fi
-          if [ -f src/assets/images/icon.svg ]; then
-            convert -background none src/assets/images/icon.svg -resize 256x256 src/assets/images/icon.png
+          if [ -f src/assets/images/icons/icon.png ]; then
+            # 直接复制已准备好的PNG文件
+            cp src/assets/images/icons/icon.png src/assets/images/icon.png
           else
-            echo "缺少图标文件: src/assets/images/icon.svg"
+            echo "缺少图标文件: src/assets/images/icons/icon.png"
             exit 1
           fi
 
