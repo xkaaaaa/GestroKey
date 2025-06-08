@@ -365,14 +365,33 @@ class GestroKeyApp(QMainWindow):
         tab_widget = QWidget()
         tab_layout = QHBoxLayout(tab_widget)
         
+        # 创建带图标的选项卡按钮
+        assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images")
+        
         self.console_btn = QPushButton("控制台")
+        console_icon_path = os.path.join(assets_dir, "console.svg")
+        if os.path.exists(console_icon_path):
+            self.console_btn.setIcon(QIcon(console_icon_path))
         self.console_btn.clicked.connect(lambda: self.switch_page(0))
         
         self.gestures_btn = QPushButton("手势管理")
+        gestures_icon_path = os.path.join(assets_dir, "gestures.svg")
+        if os.path.exists(gestures_icon_path):
+            self.gestures_btn.setIcon(QIcon(gestures_icon_path))
         self.gestures_btn.clicked.connect(lambda: self.switch_page(1))
         
         self.settings_btn = QPushButton("设置")
+        settings_icon_path = os.path.join(assets_dir, "settings.svg")
+        if os.path.exists(settings_icon_path):
+            self.settings_btn.setIcon(QIcon(settings_icon_path))
         self.settings_btn.clicked.connect(lambda: self.switch_page(2))
+        
+        # 设置选项卡按钮样式
+        from PyQt6.QtCore import QSize
+        tab_buttons = [self.console_btn, self.gestures_btn, self.settings_btn]
+        for btn in tab_buttons:
+            btn.setMinimumHeight(40)
+            btn.setIconSize(QSize(20, 20))
         
         tab_layout.addWidget(self.console_btn)
         tab_layout.addWidget(self.gestures_btn)
