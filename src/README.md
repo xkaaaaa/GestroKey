@@ -347,33 +347,43 @@ print("手势库已保存")
 - `ui/gestures/drawing_widget.py`：手势绘制组件，提供手势路径的可视化绘制和显示功能
 
 **主要类和方法**：
-- `GestureContentWidget`：手势内容显示组件类
-  - `__init__(self, direction, action_type, action_value, parent=None)`：初始化手势内容组件
-  - `updateContent(self, direction, action_type, action_value)`：更新内容显示
-
 - `GesturesPage`：手势管理页面类
   - `__init__(self, parent=None)`：初始化手势管理页面
-  - `initUI(self)`：初始化UI组件和布局
-  - `createGestureCardsList(self, parent_widget)`：创建左侧手势卡片列表区域
-  - `createGestureEditor(self, parent_widget)`：创建右侧手势编辑区域
-  - `updateGestureCards(self, maintain_selected=True)`：更新手势卡片列表
-  - `onGestureCardClicked(self, card)`：处理手势卡片被点击事件
-  - `addNewGesture(self)`：添加新手势
-  - `deleteGesture(self)`：删除选中手势
-  - `resetGestures(self)`：重置手势库
-  - `saveGestureLibrary(self)`：保存手势库
-  - `add_direction(self, direction)`：添加方向到方向序列
-  - `remove_last_direction(self)`：移除最后一个方向
-  - `clearEditor(self)`：清空编辑区域
+  - `showEvent(self, event)`：页面显示时刷新按钮状态
+  - `_init_ui(self)`：初始化UI组件和布局
+  - `_create_gesture_list_panel(self)`：创建左侧手势列表面板
+  - `_create_gesture_editor_panel(self)`：创建右侧手势编辑面板
+  - `_load_gesture_list(self)`：加载并显示手势列表
+  - `_on_gesture_selected(self, item)`：处理手势选择事件
+  - `_load_gesture_to_editor(self, gesture_name)`：加载手势数据到编辑器
+  - `_auto_apply_changes(self)`：自动应用表单变更到手势库（不保存到文件）
+  - `_update_button_states(self)`：更新按钮启用状态
+  - `_new_gesture(self)`：创建新手势
+  - `_undo_changes(self)`：撤销当前修改
+  - `_clear_editor(self)`：清空编辑器
+  - `_delete_gesture(self)`：删除选中手势
+  - `_reset_gestures(self)`：重置手势库
+  - `_save_gestures(self)`：保存手势库到文件
   - `has_unsaved_changes(self)`：检查是否有未保存的更改
 
+**界面特性**：
+- **自动应用变更**：表单修改自动应用到手势库，无需手动保存
+- **实时列表更新**：右侧表单修改时，左侧列表实时更新显示所有要素
+- **智能按钮状态**：
+  - 撤销按钮：有表单变更时启用
+  - 保存手势库按钮：有手势库变更时启用
+  - 页面显示时自动刷新按钮状态
+
 **组件布局**：
-- 左侧：滚动区域，显示手势列表
-- 右侧：编辑区域，包含以下字段：
-  - 手势名称输入框（使用QLineEdit组件）
-  - 方向选择下拉菜单（使用QComboBox组件）
-  - 快捷键输入框（使用QLineEdit组件）
-  - 操作按钮组（使用QPushButton组件
+- 左侧：手势列表面板
+  - 手势列表（显示编号、名称、类型、快捷键）
+  - 添加新手势、删除手势、重置、保存手势库按钮
+- 右侧：手势编辑面板
+  - 手势名称输入框
+  - 快捷键输入框
+  - 手势路径绘制组件（支持可视化绘制和显示）
+  - 相似度阈值设置
+  - 新建、清空表单、撤销按钮
 
 **使用方法**：
 ```python
@@ -388,8 +398,8 @@ gestures_page = GesturesPage()
 # 编辑手势
 # 1. 点击左侧列表中的手势项
 # 2. 右侧编辑器会显示手势信息
-# 3. 修改名称、方向或快捷键
-# 4. 点击"保存修改"按钮
+# 3. 修改名称、快捷键或绘制新路径（自动应用到手势库）
+# 4. 左侧列表实时更新显示
 
 # 添加新手势
 gestures_page._add_new_gesture()    # 添加新手势（通过按钮触发）
@@ -397,8 +407,12 @@ gestures_page._add_new_gesture()    # 添加新手势（通过按钮触发）
 # 删除手势
 gestures_page._delete_gesture()     # 删除当前选中的手势
 
+# 撤销和清空
+gestures_page._undo_changes()       # 撤销当前修改
+gestures_page._clear_editor()       # 清空表单
+
 # 保存和重置
-gestures_page._save_gestures()      # 保存手势库
+gestures_page._save_gestures()      # 保存手势库到文件
 gestures_page._reset_gestures()     # 重置为默认手势库
 
 # 检查未保存更改
@@ -417,22 +431,16 @@ gestures_page = GesturesPage()
 
 # 访问编辑器组件
 name_input = gestures_page.edit_name            # QLineEdit组件
-direction_combo = gestures_page.combo_direction  # QComboBox组件
 shortcut_input = gestures_page.edit_shortcut    # QLineEdit组件
+drawing_widget = gestures_page.drawing_widget   # 手势绘制组件
 
-# 设置输入字段值
+# 设置输入字段值（会自动应用到手势库）
 name_input.setText("新手势名称")
-direction_combo.setCurrentText("右-下")  # 从预定义方向中选择
 shortcut_input.setText("Ctrl+C")
 
 # 读取输入字段值
 print(f"手势名称: {name_input.text()}")
-print(f"手势方向: {direction_combo.currentText()}")
 print(f"快捷键: {shortcut_input.text()}")
-
-# 获取可用方向列表
-available_directions = gestures_page.DIRECTIONS
-print(f"可用方向: {available_directions}")
 
 # 显示并运行应用程序
 gestures_page.show()
@@ -447,14 +455,13 @@ app.exec()
 **主要类和方法**：
 - `GestureDrawingWidget`：手势绘制组件类
   - `__init__(self, parent=None)`：初始化绘制组件
-  - `mousePressEvent(self, event)`：处理鼠标按下事件，开始绘制
+  - `mousePressEvent(self, event)`：处理鼠标按下事件，开始绘制（自动清除之前内容）
   - `mouseMoveEvent(self, event)`：处理鼠标移动事件，记录轨迹
-  - `mouseReleaseEvent(self, event)`：处理鼠标释放事件，完成绘制
+  - `mouseReleaseEvent(self, event)`：处理鼠标释放事件，完成绘制并自动使用路径
   - `paintEvent(self, event)`：绘制事件，负责显示手势路径
   - `_draw_formatted_path(self, painter, path)`：绘制格式化的手势路径
   - `_draw_direction_arrow(self, painter, start_point, end_point)`：绘制方向箭头
   - `clear_drawing(self)`：清除当前绘制内容
-  - `use_current_path(self)`：使用当前绘制的路径
   - `load_path(self, path)`：加载并显示指定的手势路径
 
 **可视化显示特性**：
@@ -478,11 +485,8 @@ from ui.gestures.drawing_widget import GestureDrawingWidget
 # 创建绘制组件实例
 drawing_widget = GestureDrawingWidget()
 
-# 连接路径完成信号
-drawing_widget.pathCompleted.connect(lambda path: print(f"绘制完成: {path}"))
-
-# 清除绘制内容
-drawing_widget.clear_drawing()
+# 连接路径完成信号（绘制完成后自动触发）
+drawing_widget.pathCompleted.connect(lambda path: print(f"绘制完成并自动使用: {path}"))
 
 # 加载现有手势路径进行显示
 gesture_path = {
@@ -496,9 +500,9 @@ drawing_widget.show()
 ```
 
 **绘制流程**：
-1. 用户在绘制区域按下左键开始绘制
+1. 用户在绘制区域按下左键开始绘制（自动清除之前的路径）
 2. 拖拽鼠标记录轨迹点，实时显示红色绘制线条
-3. 释放鼠标完成绘制，系统自动分析路径
+3. 释放鼠标完成绘制，系统自动分析路径并使用
 4. 格式化后的路径以蓝色显示，包含：
    - 绿色起点标识
    - 红色终点标识（根据路径类型调整大小）

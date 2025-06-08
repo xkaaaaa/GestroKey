@@ -37,49 +37,22 @@ class GestureDrawingWidget(QWidget):
         
     def initUI(self):
         """初始化UI"""
-        layout = QVBoxLayout()
-        
-        # 顶部说明标签
-        self.status_label = QLabel("在下方区域绘制手势（只能绘制一笔，新绘制会清除旧的）")
-        self.status_label.setStyleSheet("color: blue; font-size: 12px; padding: 5px;")
-        layout.addWidget(self.status_label)
-        
-        # 按钮区域
-        button_layout = QHBoxLayout()
-        
-        self.clear_button = QPushButton("清除")
-        self.clear_button.clicked.connect(self.clear_drawing)
-        
-        self.use_button = QPushButton("使用此路径")
-        self.use_button.clicked.connect(self.use_current_path)
-        self.use_button.setEnabled(False)
-        
-        button_layout.addWidget(self.clear_button)
-        button_layout.addWidget(self.use_button)
-        button_layout.addStretch()
-        
-        layout.addLayout(button_layout)
-        
-        # 绘图区域（使用widget自身）
-        layout.addStretch()
-        
-        self.setLayout(layout)
+        # 设置为简洁布局，无按钮无提示文字
+        self.setLayout(QVBoxLayout())
         
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.MouseButton.LeftButton and event.pos().y() > 60:
-            # 如果已有完成的路径，先清除
-            if self.completed_paths:
-                self.clear_drawing()
+        if event.button() == Qt.MouseButton.LeftButton:
+            # 每次新绘制都自动清除之前的内容
+            self.clear_drawing()
             
             self.drawing = True
             self.current_path = [event.pos()]
-            self.status_label.setText("正在绘制...")
             self.update()
             
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
-        if self.drawing and event.pos().y() > 60:
+        if self.drawing:
             self.current_path.append(event.pos())
             self.update()
             
@@ -94,17 +67,9 @@ class GestureDrawingWidget(QWidget):
                 
                 if formatted_path and formatted_path.get('points'):
                     self.completed_paths.append(formatted_path)
-                    points_count = len(formatted_path.get('points', []))
-                    connections_count = len(formatted_path.get('connections', []))
-                    self.status_label.setText(f"路径已格式化：{points_count}个关键点，{connections_count}条连接（自动缩放显示）")
-                    self.use_button.setEnabled(True)
-                    self.logger.info(f"格式化路径完成：{points_count}个关键点")
-                else:
-                    self.status_label.setText("路径格式化失败，请重新绘制")
-                    self.use_button.setEnabled(False)
-            else:
-                self.status_label.setText("绘制路径太短，请重新绘制")
-                self.use_button.setEnabled(False)
+                    # 自动使用此路径
+                    self.pathCompleted.emit(formatted_path)
+                    self.logger.info(f"自动使用格式化路径：{len(formatted_path.get('points', []))}个关键点")
             
             self.current_path = []
             self.update()
@@ -119,17 +84,11 @@ class GestureDrawingWidget(QWidget):
         for path in self.completed_paths:
             self._draw_formatted_path(painter, path)
         
-        # 绘制当前路径（红色）- 在绘制区域内
+        # 绘制当前路径（红色）
         if self.current_path:
             painter.setPen(QPen(QColor(255, 0, 0), 2))
-            # 确保绘制在合适的区域内（避免与按钮重叠）
             for i in range(len(self.current_path) - 1):
-                start_pos = self.current_path[i]
-                end_pos = self.current_path[i + 1]
-                
-                # 限制绘制区域，避免与顶部按钮重叠
-                if start_pos.y() > 60 and end_pos.y() > 60:
-                    painter.drawLine(start_pos, end_pos)
+                painter.drawLine(self.current_path[i], self.current_path[i + 1])
         
     def _draw_formatted_path(self, painter, path):
         """绘制格式化路径（自动缩放到最优大小）"""
@@ -288,27 +247,13 @@ class GestureDrawingWidget(QWidget):
         """清除绘制内容"""
         self.current_path = []
         self.completed_paths = []
-        self.use_button.setEnabled(False)
-        self.status_label.setText("在下方区域绘制手势（只能绘制一笔，新绘制会清除旧的）")
         self.update()
-        
-    def use_current_path(self):
-        """使用当前路径"""
-        if self.completed_paths:
-            # 使用最后一个完成的路径
-            path = self.completed_paths[-1]
-            self.pathCompleted.emit(path)
-            self.logger.info("发送格式化路径给手势管理界面")
         
     def load_path(self, path):
         """加载并显示指定路径（用于编辑现有手势）"""
         if path and path.get('points'):
             self.clear_drawing()  # 先清除现有内容
             self.completed_paths = [path]
-            self.use_button.setEnabled(True)
-            points_count = len(path.get('points', []))
-            connections_count = len(path.get('connections', []))
-            self.status_label.setText(f"已加载路径：{points_count}个关键点，{connections_count}条连接（自动缩放显示）")
             self.update()
         else:
             self.clear_drawing() 

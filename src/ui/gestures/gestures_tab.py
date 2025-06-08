@@ -63,7 +63,16 @@ class GesturesPage(QWidget):
         
         # 加载手势列表
         self._load_gesture_list()
+        
+        # 初始化按钮状态
+        self._update_button_states()
+        
         self.logger.info("手势管理页面初始化完成")
+
+    def showEvent(self, event):
+        """页面显示时刷新按钮状态"""
+        super().showEvent(event)
+        self._update_button_states()
 
     def _init_ui(self):
         """初始化用户界面"""
@@ -189,15 +198,14 @@ class GesturesPage(QWidget):
         self.btn_new.clicked.connect(self._new_gesture)
         button_layout.addWidget(self.btn_new)
 
-        self.btn_save_current = QPushButton("保存修改")
-        self.btn_save_current.clicked.connect(self._save_current_gesture)
-        self.btn_save_current.setEnabled(False)
-        button_layout.addWidget(self.btn_save_current)
+        self.btn_clear_form = QPushButton("清空表单")
+        self.btn_clear_form.clicked.connect(self._clear_editor)
+        button_layout.addWidget(self.btn_clear_form)
 
-        self.btn_cancel = QPushButton("取消")
-        self.btn_cancel.clicked.connect(self._cancel_edit)
-        self.btn_cancel.setEnabled(False)
-        button_layout.addWidget(self.btn_cancel)
+        self.btn_undo = QPushButton("撤销")
+        self.btn_undo.clicked.connect(self._undo_changes)
+        self.btn_undo.setEnabled(False)
+        button_layout.addWidget(self.btn_undo)
 
         layout.addLayout(button_layout)
 
@@ -243,17 +251,14 @@ class GesturesPage(QWidget):
 
         self.logger.info(f"选择手势: {gesture_name}")
         
-        # 如果有未保存的更改，询问是否保存
+        # 如果有未保存的更改，询问是否继续
         if self._has_form_changes():
             self.logger.info("检测到未保存的更改，显示确认对话框")
             result = QMessageBox.question(
-                self, "确认", "当前有未保存的更改，是否先保存？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                self, "确认", "当前有未保存的更改，是否继续切换？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if result == QMessageBox.StandardButton.Yes:
-                if not self._save_current_gesture():
-                    return  # 保存失败，不切换
-            elif result == QMessageBox.StandardButton.Cancel:
+            if result == QMessageBox.StandardButton.No:
                 return  # 取消切换
         else:
             self.logger.info("没有检测到未保存的更改，直接切换")
@@ -403,29 +408,89 @@ class GesturesPage(QWidget):
 
     def _on_form_changed(self):
         """表单内容发生变化"""
+        # 自动应用修改到手势库（不保存到文件）
+        self._auto_apply_changes()
         # 更新按钮状态
         self._update_button_states()
 
+    def _auto_apply_changes(self):
+        """自动应用表单变更到手势库（不保存到文件）"""
+        name = self.edit_name.text().strip()
+        shortcut = self.edit_shortcut.text().strip()
+        
+        # 验证基本输入
+        if not name or not shortcut or not self.current_path:
+            return
+            
+        try:
+            if not self.current_gesture_name:
+                # 新手势：检查名称是否已存在
+                if self.gesture_library.get_gesture(name):
+                    return  # 名称已存在，不自动创建
+                
+                # 创建新手势
+                success = self.gesture_library.add_gesture(name, self.current_path, 'shortcut', shortcut)
+                if success:
+                    self.current_gesture_name = name
+                    # 刷新列表显示
+                    self._load_gesture_list()
+                    self._select_gesture_in_list(name)
+                    self.logger.info(f"自动创建新手势: {name}")
+                    # 更新按钮状态（新手势创建后手势库有变更）
+                    self._update_button_states()
+            else:
+                # 现有手势：更新
+                current_gesture = self.gesture_library.get_gesture(self.current_gesture_name)
+                if not current_gesture:
+                    return
+                    
+                gesture_id = current_gesture.get('id')
+                if gesture_id is None:
+                    return
+                    
+                # 使用当前路径或保持原有路径
+                gesture_data = self.current_path if self.current_path else current_gesture.get('path')
+                
+                # 自动更新手势（不保存到文件）
+                self.gesture_library.update_gesture_by_id(
+                    gesture_id, name, gesture_data, 'shortcut', shortcut
+                )
+                
+                # 更新当前手势名称
+                old_name = self.current_gesture_name
+                self.current_gesture_name = name
+                
+                # 刷新列表显示（无论名称是否变化都要刷新，因为其他信息可能变化）
+                self._load_gesture_list()
+                self._select_gesture_in_list(name)
+                
+                self.logger.info(f"自动更新手势: {old_name} -> {name}")
+                # 更新按钮状态（手势更新后手势库有变更）
+                self._update_button_states()
+                    
+        except Exception as e:
+            self.logger.error(f"自动应用变更时出错: {e}")
+
     def _update_button_states(self):
         """更新按钮状态"""
-        has_selection = self.current_gesture_name is not None
-        has_changes = self._has_form_changes()
+        has_form_changes = self._has_form_changes()
+        has_library_changes = self.gesture_library.has_changes()
         
-        self.btn_save_current.setEnabled(has_changes and (has_selection or bool(self.edit_name.text().strip())))
-        self.btn_cancel.setEnabled(has_changes)
+        # 撤销按钮：有表单变更时启用
+        self.btn_undo.setEnabled(has_form_changes)
+        
+        # 保存手势库按钮：有手势库变更时启用
+        self.btn_save.setEnabled(has_library_changes)
 
     def _new_gesture(self):
         """创建新手势"""
-        # 如果有未保存的更改，询问是否保存
+        # 如果有未保存的更改，询问是否继续
         if self._has_form_changes():
             result = QMessageBox.question(
-                self, "确认", "当前有未保存的更改，是否先保存？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                self, "确认", "当前有未保存的更改，是否继续？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if result == QMessageBox.StandardButton.Yes:
-                if not self._save_current_gesture():
-                    return
-            elif result == QMessageBox.StandardButton.Cancel:
+            if result == QMessageBox.StandardButton.No:
                 return
 
         # 清空编辑器
@@ -447,79 +512,7 @@ class GesturesPage(QWidget):
         
         self.logger.debug(f"开始创建新手势: {new_name}")
 
-    def _save_current_gesture(self):
-        """保存当前手势"""
-        name = self.edit_name.text().strip()
-        shortcut = self.edit_shortcut.text().strip()
 
-        # 验证输入
-        if not name:
-            QMessageBox.warning(self, "错误", "手势名称不能为空")
-            return False
-
-        if not shortcut:
-            QMessageBox.warning(self, "错误", "快捷键不能为空")
-            return False
-
-        if not self.current_path:
-            QMessageBox.warning(self, "错误", "请先绘制手势路径")
-            return False
-
-        try:
-            # 如果是新手势
-            if not self.current_gesture_name:
-                # 检查名称是否已存在
-                if self.gesture_library.get_gesture(name):
-                    QMessageBox.warning(self, "错误", f"手势名称 '{name}' 已存在")
-                    return False
-                
-                # 使用路径数据
-                gesture_data = self.current_path
-                
-                # 添加新手势
-                success = self.gesture_library.add_gesture(name, gesture_data, 'shortcut', shortcut)
-            else:
-                # 修改现有手势 - 通过ID更新
-                current_gesture = self.gesture_library.get_gesture(self.current_gesture_name)
-                if not current_gesture:
-                    QMessageBox.critical(self, "错误", "找不到当前手势")
-                    return False
-                
-                gesture_id = current_gesture.get('id')
-                if gesture_id is None:
-                    QMessageBox.critical(self, "错误", "当前手势没有有效的ID")
-                    return False
-                
-                # 使用路径数据
-                gesture_data = self.current_path
-                
-                # 通过ID更新手势的所有属性
-                success = self.gesture_library.update_gesture_by_id(
-                    gesture_id, name, gesture_data, 'shortcut', shortcut
-                )
-            
-            if success:
-                # 更新状态
-                self.current_gesture_name = name
-                
-                # 刷新列表
-                self._load_gesture_list()
-                
-                # 重新选中当前手势
-                self._select_gesture_in_list(name)
-                
-                self._update_button_states()
-                QMessageBox.information(self, "成功", "手势已保存")
-                self.logger.info(f"手势已保存: {name}")
-                return True
-            else:
-                QMessageBox.critical(self, "错误", "保存手势失败")
-                return False
-
-        except Exception as e:
-            self.logger.error(f"保存手势时出错: {e}")
-            QMessageBox.critical(self, "错误", f"保存手势时出错: {str(e)}")
-            return False
 
     def _select_gesture_in_list(self, name):
         """在列表中选中指定手势"""
@@ -529,10 +522,10 @@ class GesturesPage(QWidget):
                 self.gesture_list.setCurrentItem(item)
                 break
 
-    def _cancel_edit(self):
-        """取消编辑"""
+    def _undo_changes(self):
+        """撤销当前的修改"""
         if self.current_gesture_name:
-            # 重新加载当前手势数据
+            # 重新加载当前手势数据，撤销所有修改
             self._load_gesture_to_editor(self.current_gesture_name)
         else:
             # 清空编辑器
@@ -573,6 +566,7 @@ class GesturesPage(QWidget):
                     self.logger.info(f"已删除手势: {self.current_gesture_name}")
                     self._clear_editor()
                     self._load_gesture_list()
+                    self._update_button_states()  # 更新按钮状态
                     QMessageBox.information(self, "成功", "手势已删除")
                 else:
                     QMessageBox.critical(self, "错误", "删除手势失败")
@@ -594,6 +588,7 @@ class GesturesPage(QWidget):
                 if success:
                     self._clear_editor()
                     self._load_gesture_list()
+                    self._update_button_states()  # 更新按钮状态
                     QMessageBox.information(self, "成功", "手势库已重置为默认设置")
                     self.logger.info("手势库已重置为默认")
                 else:
@@ -604,21 +599,10 @@ class GesturesPage(QWidget):
 
     def _save_gestures(self):
         """保存手势库到文件"""
-        # 如果有未保存的表单更改，先询问是否保存当前修改
-        if self._has_form_changes():
-            result = QMessageBox.question(
-                self, "确认", "当前有未保存的更改，是否先保存？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
-            )
-            if result == QMessageBox.StandardButton.Yes:
-                if not self._save_current_gesture():
-                    return
-            elif result == QMessageBox.StandardButton.Cancel:
-                return
-
         try:
             success = self.gesture_library.save()
             if success:
+                self._update_button_states()  # 更新按钮状态
                 QMessageBox.information(self, "成功", "手势库已保存")
                 self.logger.info("手势库已保存到文件")
             else:
