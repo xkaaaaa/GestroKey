@@ -190,18 +190,12 @@ class SettingsPage(QWidget):
         self.reset_button.setMinimumSize(120, 35)
         self.reset_button.clicked.connect(self._reset_settings)
         
-        self.apply_button = QPushButton("应用设置")
-        self.apply_button.setMinimumSize(100, 35)
-        self.apply_button.clicked.connect(self._apply_settings)
-        self.apply_button.setEnabled(False)
-        
         self.save_button = QPushButton("保存设置")
         self.save_button.setMinimumSize(100, 35)
         self.save_button.clicked.connect(self._save_settings)
 
         layout.addWidget(self.reset_button)
         layout.addStretch()
-        layout.addWidget(self.apply_button)
         layout.addWidget(self.save_button)
 
         return layout
@@ -302,12 +296,6 @@ class SettingsPage(QWidget):
         if not self.is_loading:
             self._update_button_states()
 
-    def _update_button_states(self):
-        """更新按钮状态"""
-        # 检查前端UI是否有未应用的更改
-        has_changes = self._has_frontend_changes() or self.settings.has_changes()
-        self.apply_button.setEnabled(has_changes)
-
     def _has_frontend_changes(self):
         """检查前端UI是否有未应用的更改"""
         try:
@@ -353,6 +341,12 @@ class SettingsPage(QWidget):
         except Exception as e:
             self.logger.error(f"检查前端更改时出错: {e}")
             return False
+
+    def _update_button_states(self):
+        """更新按钮状态"""
+        # 检查是否有未保存的更改
+        has_changes = self._has_frontend_changes() or self.settings.has_changes()
+        self.save_button.setEnabled(has_changes)
 
     def _apply_pen_settings_to_drawing_module(self, width, color):
         """实时应用画笔设置到绘制模块"""
@@ -410,13 +404,33 @@ class SettingsPage(QWidget):
             self.logger.error(f"应用设置失败: {e}")
             QMessageBox.critical(self, "错误", f"应用设置失败: {str(e)}")
 
+
+
     def _save_settings(self):
-        """保存设置到文件"""
+        """应用并保存设置到文件"""
         try:
-            # 如果有前端未应用的更改，先应用它们
-            if self._has_frontend_changes():
-                self._apply_settings()
+            # 先应用所有设置
+            thickness = self.thickness_slider.value()
+            color = self.color_preview.get_color()
+            self._apply_pen_settings_to_drawing_module(thickness, color)
             
+            is_autostart = self.autostart_checkbox.isChecked()
+            current_autostart = self.settings.is_autostart_enabled()
+            
+            if is_autostart != current_autostart:
+                success = self.settings.set_autostart(is_autostart)
+                if not success:
+                    QMessageBox.warning(self, "警告", "更新开机自启动设置失败")
+                    return
+            
+            # 应用应用设置
+            show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
+            self.settings.set("app.show_exit_dialog", show_exit_dialog)
+            
+            default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
+            self.settings.set("app.default_close_action", default_close_action)
+            
+            # 保存到文件
             success = self.settings.save()
             if success:
                 QMessageBox.information(self, "成功", "设置已保存")
