@@ -1,7 +1,13 @@
 {
     "复制": {
         "id": 1,
-        "direction": "右-下",
+        "path": {
+            "points": [[0, 0], [100, 0], [100, 100]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+C"
@@ -9,7 +15,13 @@
     },
     "粘贴": {
         "id": 2,
-        "direction": "下-右",
+        "path": {
+            "points": [[0, 0], [0, 100], [100, 100]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+V"
@@ -17,7 +29,12 @@
     },
     "剪切": {
         "id": 3,
-        "direction": "左-下",
+        "path": {
+            "points": [[100, 0], [0, 100]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+X"
@@ -25,7 +42,13 @@
     },
     "撤销": {
         "id": 4,
-        "direction": "左-上",
+        "path": {
+            "points": [[100, 100], [0, 100], [0, 0]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+Z"
@@ -33,7 +56,13 @@
     },
     "重做": {
         "id": 5,
-        "direction": "右-上",
+        "path": {
+            "points": [[0, 100], [100, 100], [100, 0]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+Y"
@@ -41,7 +70,14 @@
     },
     "保存": {
         "id": 6,
-        "direction": "下-左",
+        "path": {
+            "points": [[0, 100], [0, 0], [100, 0], [100, 100]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"},
+                {"from": 2, "to": 3, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+S"
@@ -49,7 +85,15 @@
     },
     "全选": {
         "id": 7,
-        "direction": "上-左",
+        "path": {
+            "points": [[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"},
+                {"from": 2, "to": 3, "type": "line"},
+                {"from": 3, "to": 4, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+A"
@@ -57,7 +101,13 @@
     },
     "新建": {
         "id": 8,
-        "direction": "上-右",
+        "path": {
+            "points": [[50, 0], [0, 100], [100, 100]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "Ctrl+N"
@@ -65,10 +115,18 @@
     },
     "刷新": {
         "id": 9,
-        "direction": "上-下",
+        "path": {
+            "points": [[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]],
+            "connections": [
+                {"from": 0, "to": 1, "type": "line"},
+                {"from": 1, "to": 2, "type": "line"},
+                {"from": 2, "to": 3, "type": "line"},
+                {"from": 3, "to": 4, "type": "line"}
+            ]
+        },
         "action": {
             "type": "shortcut",
             "value": "F5"
         }
     }
-} 
+}

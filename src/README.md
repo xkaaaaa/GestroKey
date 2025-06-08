@@ -20,7 +20,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
       - [2.1.3.2 设置选项卡](#2132-设置选项卡-uisettingssettings_tabpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 core/drawer.py](#31-coredrawerpy)
-  - [3.2 core/stroke_analyzer.py](#32-corestroke_analyzerpy)
+  - [3.2 core/path_analyzer.py](#32-corepath_analyzerpy)
   - [3.3 core/gesture_executor.py](#33-coregesture_executorpy)
   - [3.4 core/system_monitor.py](#34-coresystem_monitorpy)
   - [3.5 core/logger.py](#35-coreloggerpy)
@@ -42,7 +42,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
 src/
 ├── core/                    # 核心功能模块
 │   ├── drawer.py            # 绘画核心模块
-│   ├── stroke_analyzer.py   # 笔画分析模块
+│   ├── path_analyzer.py     # 路径分析模块
 │   ├── gesture_executor.py  # 手势执行模块
 │   ├── system_monitor.py    # 系统监测模块
 │   └── logger.py            # 日志记录模块
@@ -688,9 +688,9 @@ drawer.start()  # 此时可以使用鼠标右键进行绘制
 # 更新设置参数
 drawer.update_settings()
 
-# 获取最后一次绘制的方向
-direction = drawer.get_last_direction()
-print(f"最后绘制的方向: {direction}")
+# 获取最后一次绘制的信息
+info = drawer.get_last_direction()
+print(f"最后绘制的信息: {info}")
 
 # 停止绘制功能
 drawer.stop()
@@ -700,38 +700,36 @@ drawer.stop()
 1. 用户按下鼠标右键开始绘制
 2. 鼠标移动时捕获轨迹并绘制可见线条
 3. 用户释放鼠标右键停止绘制
-4. 系统分析轨迹识别方向
-5. 根据识别的方向执行匹配的手势动作
+4. 系统分析轨迹并格式化为路径数据
+5. 根据路径形状执行匹配的手势动作
 6. 绘制的线条缓慢淡出，提供视觉反馈
 
-#### 3.2 core/stroke_analyzer.py
+#### 3.2 core/path_analyzer.py
 
-**功能说明**：笔画分析模块，负责分析用户绘制的笔画轨迹，识别方向变化和绘制趋势。
+**功能说明**：路径分析模块，负责分析用户绘制的路径轨迹，将原始点数据转换为格式化路径，并计算路径相似度。
 
 **主要类和方法**：
-- `StrokeAnalyzer`：笔画分析器
-  - `analyze_direction(self, points)`：分析一系列点的方向变化
-  - `get_direction_description(self, direction_str)`：将方向字符串转换为人类可读的描述
-  - `_determine_direction(self, dx, dy)`：根据位移确定基本方向
-
-**方向常量**：
-- `UP`、`DOWN`、`LEFT`、`RIGHT`等八个基本方向
+- `PathAnalyzer`：路径分析器
+  - `format_raw_path(self, raw_points)`：将原始绘制点转换为格式化路径
+  - `calculate_similarity(self, path1, path2)`：计算两个路径的相似度
+  - `_extract_key_points(self, coords)`：提取路径的关键点，简化路径数据
+  - `_get_path_bbox(self, points)`：获取路径的边界框信息
 
 **使用方法**：
 ```python
-from core.stroke_analyzer import StrokeAnalyzer
+from core.path_analyzer import PathAnalyzer
 
-# 创建分析器
-analyzer = StrokeAnalyzer()
+# 创建路径分析器
+analyzer = PathAnalyzer()
 
-# 分析点序列
-points = [(100, 100, 0.5, 1.0, 1), (150, 100, 0.5, 1.1, 1), (200, 150, 0.5, 1.2, 1)]
-direction, stats = analyzer.analyze_direction(points)
-print(f"方向: {direction}")
+# 格式化原始绘制点
+raw_points = [(100, 100, 0.5, 1.0, 1), (150, 100, 0.5, 1.1, 1), (200, 150, 0.5, 1.2, 1)]
+formatted_path = analyzer.format_raw_path(raw_points)
+print(f"格式化路径: {formatted_path}")
 
-# 获取方向描述
-description = analyzer.get_direction_description(direction)
-print(f"描述: {description}")
+# 计算路径相似度
+similarity = analyzer.calculate_similarity(path1, path2)
+print(f"相似度: {similarity}")
 ```
 
 #### 3.3 core/gesture_executor.py

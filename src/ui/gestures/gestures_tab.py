@@ -16,15 +16,23 @@ from PyQt6.QtWidgets import (
     QWidget,
     QGroupBox,
     QFormLayout,
+    QDoubleSpinBox,
+    QTabWidget,
+    QDoubleSpinBox,
+    QTabWidget,
 )
 
 try:
     from core.logger import get_logger
     from ui.gestures.gestures import get_gesture_library
+    from ui.gestures.drawing_widget import GestureDrawingWidget
+    from ui.settings.settings import get_settings
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
     from core.logger import get_logger
     from ui.gestures.gestures import get_gesture_library
+    from ui.gestures.drawing_widget import GestureDrawingWidget
+    from ui.settings.settings import get_settings
 
 
 class GesturesPage(QWidget):
@@ -37,14 +45,6 @@ class GesturesPage(QWidget):
     4. 清晰的状态管理和错误处理
     """
 
-    # 支持的方向
-    DIRECTIONS = [
-        "上", "下", "左", "右",
-        "上-下", "下-上", "左-右", "右-左",
-        "上-左", "上-右", "下-左", "下-右",
-        "左-上", "左-下", "右-上", "右-下",
-    ]
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = get_logger("GesturesPage")
@@ -54,6 +54,9 @@ class GesturesPage(QWidget):
         
         # 当前选中的手势
         self.current_gesture_name = None
+        
+        # 当前绘制的路径
+        self.current_path = None
         
         # 初始化UI
         self._init_ui()
@@ -146,12 +149,6 @@ class GesturesPage(QWidget):
         self.edit_name.textChanged.connect(self._on_form_changed)
         form_layout.addRow("名称:", self.edit_name)
 
-        # 手势方向
-        self.combo_direction = QComboBox()
-        self.combo_direction.addItems(self.DIRECTIONS)
-        self.combo_direction.currentTextChanged.connect(self._on_form_changed)
-        form_layout.addRow("方向:", self.combo_direction)
-
         # 快捷键
         self.edit_shortcut = QLineEdit()
         self.edit_shortcut.setPlaceholderText("例如: Ctrl+C")
@@ -159,6 +156,30 @@ class GesturesPage(QWidget):
         form_layout.addRow("快捷键:", self.edit_shortcut)
 
         layout.addWidget(form_group)
+
+        # 路径绘制组件
+        path_group = QGroupBox("手势路径绘制")
+        path_layout = QVBoxLayout(path_group)
+        
+        self.drawing_widget = GestureDrawingWidget()
+        self.drawing_widget.pathCompleted.connect(self._on_path_completed)
+        path_layout.addWidget(self.drawing_widget)
+        
+        layout.addWidget(path_group)
+
+        # 相似度阈值设置
+        threshold_group = QGroupBox("相似度设置")
+        threshold_layout = QFormLayout(threshold_group)
+        
+        self.threshold_spinbox = QDoubleSpinBox()
+        self.threshold_spinbox.setRange(0.0, 1.0)
+        self.threshold_spinbox.setSingleStep(0.05)
+        self.threshold_spinbox.setDecimals(2)
+        self.threshold_spinbox.setValue(0.7)
+        self.threshold_spinbox.valueChanged.connect(self._on_threshold_changed)
+        threshold_layout.addRow("相似度阈值:", self.threshold_spinbox)
+        
+        layout.addWidget(threshold_group)
 
         # 操作按钮
         button_layout = QHBoxLayout()
@@ -179,7 +200,9 @@ class GesturesPage(QWidget):
         button_layout.addWidget(self.btn_cancel)
 
         layout.addLayout(button_layout)
-        layout.addStretch()
+
+        # 初始化相似度阈值
+        self._load_similarity_threshold()
 
         return panel
 
@@ -194,11 +217,18 @@ class GesturesPage(QWidget):
         for name, data in sorted_gestures:
             gesture_id = data.get('id', 0)
             direction = data.get('direction', '')
+            path = data.get('path')
             action = data.get('action', {})
             shortcut = action.get('value', '')
             
+            # 确定显示的手势类型
+            if path:
+                gesture_type = f"路径({len(path.get('points', []))}点)"
+            else:
+                gesture_type = f"方向({direction})"
+            
             # 创建列表项，显示编号
-            item_text = f"{gesture_id}. {name} ({direction}) → {shortcut}"
+            item_text = f"{gesture_id}. {name} ({gesture_type}) → {shortcut}"
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, name)  # 存储手势名称
             self.gesture_list.addItem(item)
@@ -211,8 +241,11 @@ class GesturesPage(QWidget):
         if not gesture_name:
             return
 
+        self.logger.info(f"选择手势: {gesture_name}")
+        
         # 如果有未保存的更改，询问是否保存
         if self._has_form_changes():
+            self.logger.info("检测到未保存的更改，显示确认对话框")
             result = QMessageBox.question(
                 self, "确认", "当前有未保存的更改，是否先保存？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
@@ -222,6 +255,8 @@ class GesturesPage(QWidget):
                     return  # 保存失败，不切换
             elif result == QMessageBox.StandardButton.Cancel:
                 return  # 取消切换
+        else:
+            self.logger.info("没有检测到未保存的更改，直接切换")
 
         # 加载手势数据到编辑器
         self._load_gesture_to_editor(gesture_name)
@@ -233,21 +268,38 @@ class GesturesPage(QWidget):
             self.logger.error(f"找不到手势: {gesture_name}")
             return
 
-        # 更新状态
-        self.current_gesture_name = gesture_name
+        self.logger.debug(f"开始加载手势到编辑器: {gesture_name}")
 
-        # 填充表单
-        self.edit_name.setText(gesture_name)
-        
-        direction = gesture_data.get('direction', '')
-        if direction in self.DIRECTIONS:
-            self.combo_direction.setCurrentText(direction)
-        else:
-            self.combo_direction.setCurrentIndex(0)
+        # 暂时断开信号连接，避免在加载数据时触发变更检测
+        self.edit_name.textChanged.disconnect()
+        self.edit_shortcut.textChanged.disconnect()
 
-        action = gesture_data.get('action', {})
-        shortcut = action.get('value', '')
-        self.edit_shortcut.setText(shortcut)
+        try:
+            # 更新状态
+            self.current_gesture_name = gesture_name
+
+            # 填充表单
+            self.edit_name.setText(gesture_name)
+            
+            # 加载路径（新格式）
+            path = gesture_data.get('path')
+            if path:
+                # 深度复制路径数据，避免引用问题
+                import copy
+                self.current_path = copy.deepcopy(path)
+                self.drawing_widget.load_path(self.current_path)
+            else:
+                self.drawing_widget.clear_drawing()
+                self.current_path = None
+
+            action = gesture_data.get('action', {})
+            shortcut = action.get('value', '')
+            self.edit_shortcut.setText(shortcut)
+
+        finally:
+            # 重新连接信号
+            self.edit_name.textChanged.connect(self._on_form_changed)
+            self.edit_shortcut.textChanged.connect(self._on_form_changed)
 
         # 更新按钮状态
         self._update_button_states()
@@ -260,39 +312,94 @@ class GesturesPage(QWidget):
         if not self.current_gesture_name:
             # 新手势，检查表单是否为空
             name = self.edit_name.text().strip()
-            direction = self.combo_direction.currentText()
             shortcut = self.edit_shortcut.text().strip()
             
-            # 如果表单不为空，则认为有更改
-            return bool(name or direction != self.DIRECTIONS[0] or shortcut)
+            # 只有当名称或快捷键不为空，或者有路径时，才认为有更改
+            # 方向的默认值不算作更改
+            result = bool(name or shortcut or self.current_path)
+            self.logger.info(f"新手势变更检测: 名称='{name}', 快捷键='{shortcut}', 路径={bool(self.current_path)}, 结果={result}")
+            return result
         
         # 现有手势，比较表单内容与手势库中的数据
         current_gesture = self.gesture_library.get_gesture(self.current_gesture_name)
         if not current_gesture:
+            self.logger.debug(f"找不到当前手势: {self.current_gesture_name}")
             return False
         
         # 获取表单当前值
         form_name = self.edit_name.text().strip()
-        form_direction = self.combo_direction.currentText()
         form_shortcut = self.edit_shortcut.text().strip()
         
         # 获取手势库中的值
         saved_name = self.current_gesture_name
-        saved_direction = current_gesture.get('direction', '')
         saved_action = current_gesture.get('action', {})
         saved_shortcut = saved_action.get('value', '')
         
-        # 比较是否有差异
-        has_changes = (
-            form_name != saved_name or
-            form_direction != saved_direction or
-            form_shortcut != saved_shortcut
-        )
+        # 检查路径是否有变化（深度比较）
+        saved_path = current_gesture.get('path')
+        path_changed = self._paths_different(self.current_path, saved_path)
         
-        if has_changes:
-            self.logger.debug(f"表单有变化: 名称 {form_name}!={saved_name}, 方向 {form_direction}!={saved_direction}, 快捷键 {form_shortcut}!={saved_shortcut}")
+        # 详细比较每个字段
+        name_changed = form_name != saved_name
+        shortcut_changed = form_shortcut != saved_shortcut
+        
+        # 比较是否有差异
+        has_changes = (name_changed or shortcut_changed or path_changed)
+        
+        self.logger.info(f"现有手势变更检测 '{self.current_gesture_name}':")
+        self.logger.info(f"  名称: '{form_name}' vs '{saved_name}' = {name_changed}")
+        self.logger.info(f"  快捷键: '{form_shortcut}' vs '{saved_shortcut}' = {shortcut_changed}")
+        self.logger.info(f"  路径变化: {path_changed}")
+        self.logger.info(f"  最终结果: {has_changes}")
         
         return has_changes
+
+    def _paths_different(self, path1, path2):
+        """比较两个路径是否不同（深度比较）"""
+        self.logger.debug(f"路径比较: path1={bool(path1)}, path2={bool(path2)}")
+        
+        # 如果都为空，则相同
+        if not path1 and not path2:
+            self.logger.debug("两个路径都为空，相同")
+            return False
+        
+        # 如果一个为空一个不为空，则不同
+        if bool(path1) != bool(path2):
+            self.logger.debug("一个路径为空一个不为空，不同")
+            return True
+        
+        # 都不为空，比较内容
+        if path1 and path2:
+            # 比较点数量
+            points1 = path1.get('points', [])
+            points2 = path2.get('points', [])
+            self.logger.debug(f"点数量比较: {len(points1)} vs {len(points2)}")
+            if len(points1) != len(points2):
+                self.logger.debug("点数量不同")
+                return True
+            
+            # 比较每个点
+            for i, (p1, p2) in enumerate(zip(points1, points2)):
+                if p1 != p2:
+                    self.logger.debug(f"点{i}不同: {p1} vs {p2}")
+                    return True
+            
+            # 比较连接数量
+            conn1 = path1.get('connections', [])
+            conn2 = path2.get('connections', [])
+            self.logger.debug(f"连接数量比较: {len(conn1)} vs {len(conn2)}")
+            if len(conn1) != len(conn2):
+                self.logger.debug("连接数量不同")
+                return True
+            
+            # 比较每个连接
+            for i, (c1, c2) in enumerate(zip(conn1, conn2)):
+                if c1 != c2:
+                    self.logger.debug(f"连接{i}不同: {c1} vs {c2}")
+                    return True
+        
+        self.logger.debug("路径完全相同")
+        return False
 
     def _on_form_changed(self):
         """表单内容发生变化"""
@@ -332,7 +439,6 @@ class GesturesPage(QWidget):
         
         new_name = f"{base_name}_{counter}"
         self.edit_name.setText(new_name)
-        self.combo_direction.setCurrentIndex(0)
         self.edit_shortcut.setText("Ctrl+C")
 
         # 设置状态
@@ -344,7 +450,6 @@ class GesturesPage(QWidget):
     def _save_current_gesture(self):
         """保存当前手势"""
         name = self.edit_name.text().strip()
-        direction = self.combo_direction.currentText()
         shortcut = self.edit_shortcut.text().strip()
 
         # 验证输入
@@ -356,6 +461,10 @@ class GesturesPage(QWidget):
             QMessageBox.warning(self, "错误", "快捷键不能为空")
             return False
 
+        if not self.current_path:
+            QMessageBox.warning(self, "错误", "请先绘制手势路径")
+            return False
+
         try:
             # 如果是新手势
             if not self.current_gesture_name:
@@ -364,8 +473,11 @@ class GesturesPage(QWidget):
                     QMessageBox.warning(self, "错误", f"手势名称 '{name}' 已存在")
                     return False
                 
+                # 使用路径数据
+                gesture_data = self.current_path
+                
                 # 添加新手势
-                success = self.gesture_library.add_gesture(name, direction, 'shortcut', shortcut)
+                success = self.gesture_library.add_gesture(name, gesture_data, 'shortcut', shortcut)
             else:
                 # 修改现有手势 - 通过ID更新
                 current_gesture = self.gesture_library.get_gesture(self.current_gesture_name)
@@ -378,9 +490,12 @@ class GesturesPage(QWidget):
                     QMessageBox.critical(self, "错误", "当前手势没有有效的ID")
                     return False
                 
+                # 使用路径数据
+                gesture_data = self.current_path
+                
                 # 通过ID更新手势的所有属性
                 success = self.gesture_library.update_gesture_by_id(
-                    gesture_id, name, direction, 'shortcut', shortcut
+                    gesture_id, name, gesture_data, 'shortcut', shortcut
                 )
             
             if success:
@@ -426,8 +541,11 @@ class GesturesPage(QWidget):
     def _clear_editor(self):
         """清空编辑器"""
         self.edit_name.clear()
-        self.combo_direction.setCurrentIndex(0)
         self.edit_shortcut.clear()
+        
+        # 清空路径
+        self.drawing_widget.clear_drawing()
+        self.current_path = None
         
         self.current_gesture_name = None
         self.btn_delete.setEnabled(False)
@@ -516,6 +634,32 @@ class GesturesPage(QWidget):
         result = form_has_changes or library_has_changes
         self.logger.debug(f"手势页面检查未保存更改: 表单变化={form_has_changes}, 库有变更={library_has_changes}, 结果={result}")
         return result
+    
+    def _on_path_completed(self, path):
+        """处理路径绘制完成事件"""
+        import copy
+        self.current_path = copy.deepcopy(path)
+        self._on_form_changed()  # 触发表单变更检测
+        self.logger.info(f"路径绘制完成，关键点数: {len(path.get('points', []))}")
+    
+    def _on_threshold_changed(self, value):
+        """处理相似度阈值变更"""
+        try:
+            settings = get_settings()
+            settings.set("gesture.similarity_threshold", value)
+            self.logger.info(f"相似度阈值已更新为: {value}")
+        except Exception as e:
+            self.logger.error(f"保存相似度阈值失败: {e}")
+    
+    def _load_similarity_threshold(self):
+        """加载相似度阈值设置"""
+        try:
+            settings = get_settings()
+            threshold = settings.get("gesture.similarity_threshold", 0.70)
+            self.threshold_spinbox.setValue(threshold)
+        except Exception as e:
+            self.logger.error(f"加载相似度阈值失败: {e}")
+            self.threshold_spinbox.setValue(0.70)
 
 
 if __name__ == "__main__":

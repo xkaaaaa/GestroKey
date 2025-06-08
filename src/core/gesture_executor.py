@@ -163,7 +163,7 @@ class GestureExecutor:
         self.logger.info("手势执行器初始化完成")
 
     def execute_gesture(self, direction):
-        """根据方向序列执行对应的手势动作"""
+        """根据方向序列执行对应的手势动作（向后兼容）"""
         if not direction or direction in ["无方向", "无明显方向"]:
             self.logger.debug("无法识别的方向序列，不执行任何动作")
             return False
@@ -188,6 +188,62 @@ class GestureExecutor:
             return False
 
         self.logger.info(f"识别到手势: {name}，方向: {direction}")
+
+        # 获取动作类型和值
+        action = gesture.get("action", {})
+        action_type = action.get("type")
+        action_value = action.get("value")
+
+        self.logger.debug(f"手势动作类型: {action_type}, 值: {action_value}")
+
+        if action_type == "shortcut":
+            return self._execute_shortcut(action_value)
+        else:
+            self.logger.warning(f"不支持的动作类型: {action_type}")
+            return False
+
+    def execute_gesture_by_path(self, drawn_path):
+        """根据绘制路径执行对应的手势动作
+        
+        Args:
+            drawn_path: 绘制的路径 {'points': [...], 'connections': [...]}
+            
+        Returns:
+            bool: 是否成功执行手势
+        """
+        if not drawn_path or not drawn_path.get('points'):
+            self.logger.debug("绘制路径为空，不执行任何动作")
+            return False
+
+        self.logger.info(f"准备根据路径执行手势，路径点数: {len(drawn_path.get('points', []))}")
+
+        # 检查手势库是否正确加载
+        if not self.gesture_library:
+            self.logger.error("手势库未正确加载，无法执行手势")
+            return False
+
+        # 检查键盘控制器是否正确加载
+        if not self.keyboard:
+            self.logger.error("键盘控制器未正确加载，无法执行手势")
+            return False
+
+        # 从设置中获取相似度阈值
+        try:
+            from ui.settings.settings import get_settings
+            settings = get_settings()
+            similarity_threshold = settings.get("gesture.similarity_threshold", 0.70)
+        except Exception as e:
+            self.logger.warning(f"无法获取相似度阈值设置，使用默认值0.70: {e}")
+            similarity_threshold = 0.70
+
+        # 查找匹配的手势
+        name, gesture, similarity = self.gesture_library.get_gesture_by_path(drawn_path, similarity_threshold)
+
+        if not gesture:
+            self.logger.info(f"未找到匹配的手势，最高相似度: {similarity:.3f}，阈值: {similarity_threshold}")
+            return False
+
+        self.logger.info(f"识别到手势: {name}，相似度: {similarity:.3f}")
 
         # 获取动作类型和值
         action = gesture.get("action", {})

@@ -6,5 +6,8 @@
     "app": {
         "show_exit_dialog": true,
         "default_close_action": "minimize"
+    },
+    "gesture": {
+        "similarity_threshold": 0.70
     }
 } 

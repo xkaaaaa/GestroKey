@@ -5,10 +5,12 @@ import sys
 
 try:
     from core.logger import get_logger
+    from core.path_analyzer import PathAnalyzer
     from version import APP_NAME, AUTHOR
 except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from core.logger import get_logger
+    from core.path_analyzer import PathAnalyzer
     from version import APP_NAME, AUTHOR
 
 
@@ -17,6 +19,7 @@ class GestureLibrary:
 
     def __init__(self):
         self.logger = get_logger("GestureLibrary")
+        self.path_analyzer = PathAnalyzer()
         self.DEFAULT_GESTURES = self._load_default_gestures()
 
         # 检查系统平台并调整默认手势快捷键格式
@@ -240,11 +243,9 @@ class GestureLibrary:
         """
         return self.saved_gestures if use_saved else self.gestures
 
-
-
     def get_gesture_by_direction(self, direction):
-        """根据方向序列获取匹配的手势"""
-        self.logger.debug(f"尝试查找方向为 {direction} 的手势")
+        """根据方向序列获取匹配的手势（向后兼容）"""
+        self.logger.debug(f"尝试查找方向为 {direction} 的手势（向后兼容模式）")
         # 从已保存的手势库中查找，而不是从当前可能未保存的手势库中查找
         for name, gesture in self.saved_gestures.items():
             if gesture.get("direction") == direction:
@@ -252,13 +253,65 @@ class GestureLibrary:
                 return name, gesture
         self.logger.debug(f"未找到匹配方向 {direction} 的手势")
         return None, None
+    
+    def get_gesture_by_path(self, drawn_path, similarity_threshold=0.70):
+        """根据绘制的路径获取匹配的手势
+        
+        Args:
+            drawn_path: 绘制的路径 {'points': [...], 'connections': [...]}
+            similarity_threshold: 相似度阈值
+            
+        Returns:
+            tuple: (手势名称, 手势数据, 相似度) 或 (None, None, 0.0)
+        """
+        if not drawn_path or not drawn_path.get('points'):
+            self.logger.debug("绘制路径为空")
+            return None, None, 0.0
+        
+        # 归一化绘制路径
+        normalized_drawn = self.path_analyzer.normalize_path_scale(drawn_path)
+        
+        best_match = None
+        best_similarity = 0.0
+        best_gesture = None
+        
+        self.logger.debug(f"开始路径匹配，相似度阈值: {similarity_threshold}")
+        
+        # 从已保存的手势库中查找
+        for name, gesture in self.saved_gestures.items():
+            # 检查手势是否有路径数据
+            gesture_path = gesture.get("path")
+            if not gesture_path:
+                # 如果没有路径数据，跳过这个手势（可能是旧格式）
+                continue
+            
+            # 归一化手势路径
+            normalized_gesture = self.path_analyzer.normalize_path_scale(gesture_path)
+            
+            # 计算相似度
+            similarity = self.path_analyzer.calculate_similarity(normalized_drawn, normalized_gesture)
+            
+            self.logger.debug(f"手势 '{name}' 相似度: {similarity:.3f}")
+            
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_match = name
+                best_gesture = gesture
+        
+        # 检查是否达到阈值
+        if best_similarity >= similarity_threshold:
+            self.logger.info(f"找到匹配手势: {best_match}，相似度: {best_similarity:.3f}")
+            return best_match, best_gesture, best_similarity
+        else:
+            self.logger.debug(f"没有手势达到相似度阈值 {similarity_threshold}，最高相似度: {best_similarity:.3f}")
+            return None, None, best_similarity
 
-    def add_gesture(self, name, direction, action_type, action_value, gesture_id=None):
+    def add_gesture(self, name, direction_or_path, action_type, action_value, gesture_id=None):
         """添加新手势
 
         Args:
             name: 手势名称
-            direction: 手势方向
+            direction_or_path: 手势方向字符串（旧格式）或路径字典（新格式）
             action_type: 动作类型
             action_value: 动作值
             gesture_id: 手势ID，如果不提供则自动生成
@@ -277,24 +330,34 @@ class GestureLibrary:
         # 新的手势数据
         new_gesture = {
             "id": gesture_id,
-            "direction": direction,
             "action": {"type": action_type, "value": action_value},
         }
+        
+        # 根据输入类型设置方向或路径
+        if isinstance(direction_or_path, dict) and 'points' in direction_or_path:
+            # 新格式：路径字典
+            new_gesture["path"] = direction_or_path
+            self.logger.info(
+                f"添加手势: {name}, ID: {gesture_id}, 路径点数: {len(direction_or_path.get('points', []))}, 动作: {action_type}:{action_value}"
+            )
+        else:
+            # 旧格式：方向字符串（向后兼容）
+            new_gesture["direction"] = direction_or_path
+            self.logger.info(
+                f"添加手势: {name}, ID: {gesture_id}, 方向: {direction_or_path}, 动作: {action_type}:{action_value}"
+            )
 
         # 添加手势
         self.gestures[name] = new_gesture
-        self.logger.info(
-            f"添加手势: {name}, ID: {gesture_id}, 方向: {direction}, 动作: {action_type}:{action_value}"
-        )
         return True
 
-    def update_gesture_by_id(self, gesture_id, name, direction, action_type, action_value):
+    def update_gesture_by_id(self, gesture_id, name, direction_or_path, action_type, action_value):
         """通过ID更新手势的所有属性
 
         Args:
             gesture_id: 手势ID
             name: 新的手势名称
-            direction: 新的手势方向
+            direction_or_path: 新的手势方向字符串（旧格式）或路径字典（新格式）
             action_type: 新的动作类型
             action_value: 新的动作值
 
@@ -322,9 +385,18 @@ class GestureLibrary:
         # 创建新的手势数据
         new_gesture = {
             "id": gesture_id,
-            "direction": direction,
             "action": {"type": action_type, "value": action_value},
         }
+        
+        # 根据输入类型设置方向或路径
+        if isinstance(direction_or_path, dict) and 'points' in direction_or_path:
+            # 新格式：路径字典
+            new_gesture["path"] = direction_or_path
+            log_info = f"路径点数: {len(direction_or_path.get('points', []))}"
+        else:
+            # 旧格式：方向字符串（向后兼容）
+            new_gesture["direction"] = direction_or_path
+            log_info = f"方向: {direction_or_path}"
         
         # 如果名称发生了变化，需要删除旧的键并添加新的键
         if name != old_name:
@@ -334,7 +406,7 @@ class GestureLibrary:
         self.gestures[name] = new_gesture
         
         self.logger.info(
-            f"通过ID更新手势: ID={gesture_id}, {old_name} -> {name}, 方向: {direction}, 动作: {action_type}:{action_value}"
+            f"通过ID更新手势: ID={gesture_id}, {old_name} -> {name}, {log_info}, 动作: {action_type}:{action_value}"
         )
         return True
 
@@ -458,8 +530,6 @@ class GestureLibrary:
 
             self.logger.error(traceback.format_exc())
             return False
-
-
 
     def has_changes(self):
         """检查是否有未保存的更改"""

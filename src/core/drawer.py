@@ -19,10 +19,10 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 
-# 导入笔画分析器
+# 导入路径分析器
 try:
     from logger import get_logger
-    from stroke_analyzer import StrokeAnalyzer
+    from path_analyzer import PathAnalyzer
 
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
     from core.gesture_executor import get_gesture_executor
@@ -31,7 +31,7 @@ try:
 except ImportError:
     from core.gesture_executor import get_gesture_executor
     from core.logger import get_logger
-    from core.stroke_analyzer import StrokeAnalyzer
+    from core.path_analyzer import PathAnalyzer
     from ui.gestures.gestures import get_gesture_library  # 从ui.gestures导入手势库
     from ui.settings.settings import get_settings
 
@@ -61,8 +61,8 @@ class TransparentDrawingOverlay(QWidget):
         self.current_line = []  # 当前正在绘制的线条
         self.current_stroke_id = 0  # 当前绘制的笔画ID
 
-        # 笔画分析器
-        self.stroke_analyzer = StrokeAnalyzer()
+        # 路径分析器
+        self.path_analyzer = PathAnalyzer()
 
         # 绘制效果控制
         self.pen_color = QColor(0, 120, 255, 255)  # 线条颜色，设置完全不透明
@@ -282,41 +282,20 @@ class TransparentDrawingOverlay(QWidget):
             self._batch_painter.end()
             self._batch_painter = None
 
-        # 保存当前线条并分析方向
+        # 保存当前线条并分析路径
         if self.current_line:
-            # 分析笔画方向
-            (
-                direction_sequence,
-                direction_details,
-            ) = self.stroke_analyzer.analyze_direction(self.current_line)
-            direction_description = self.stroke_analyzer.get_direction_description(
-                direction_sequence
-            )
-
-            # 记录本次绘制的点数据和方向
-            self._log_stroke_data(
-                self.current_line,
-                direction_sequence,
-                direction_description,
-                direction_details,
-            )
-
-            # 执行与方向匹配的手势动作
-            if direction_sequence and direction_sequence not in ["无方向", "无明显方向"]:
+            # 格式化绘制路径
+            formatted_path = self.path_analyzer.format_raw_path(self.current_line)
+            
+            # 执行与路径匹配的手势动作
+            if formatted_path and formatted_path.get('points'):
                 try:
                     gesture_executor = get_gesture_executor()
-
-                    # 执行手势
-                    result = gesture_executor.execute_gesture(direction_sequence)
+                    result = gesture_executor.execute_gesture_by_path(formatted_path)
                     if result:
-                        name = (
-                            gesture_executor.gesture_library.get_gesture_by_direction(
-                                direction_sequence
-                            )[0]
-                        )
-                        self.logger.info(
-                            f"成功执行手势: {direction_sequence} -> {name if name else '未知手势'}"
-                        )
+                        self.logger.info("成功执行基于路径的手势匹配")
+                    else:
+                        self.logger.debug("未找到匹配的路径手势")
                 except Exception as e:
                     self.logger.error(f"执行手势动作时出错: {e}")
                     self.logger.debug(f"详细错误: {traceback.format_exc()}")
@@ -337,55 +316,6 @@ class TransparentDrawingOverlay(QWidget):
         if self.fade_timer.isActive():
             self.fade_timer.stop()
         self.fade_timer.start()
-
-    def _log_stroke_data(
-        self,
-        stroke_data,
-        direction_sequence=None,
-        direction_description=None,
-        direction_details=None,
-    ):
-        """记录笔画数据到日志"""
-        if not stroke_data or len(stroke_data) < 2:
-            return
-
-        stroke_id = stroke_data[0][4]  # 获取笔画ID
-        point_count = len(stroke_data)
-        start_time = stroke_data[0][3]
-        end_time = stroke_data[-1][3]
-        duration = end_time - start_time
-
-        # 构建方向信息
-        direction_info = ""
-        if direction_sequence and direction_sequence not in ["无方向", "无明显方向"]:
-            direction_info = f", 方向: {direction_sequence}"
-            if direction_description:
-                direction_info += f" ({direction_description})"
-
-        # 计算统计数据 - 这部分计算可能较耗CPU，可以考虑在生产环境中完全移除
-        # 由于自定义Logger没有isEnabledFor方法，我们改为检查常规日志级别
-        try:
-            # 记录详细的统计数据
-            total_distance = 0
-            for i in range(1, len(stroke_data)):
-                x1, y1 = stroke_data[i - 1][0], stroke_data[i - 1][1]
-                x2, y2 = stroke_data[i][0], stroke_data[i][1]
-                total_distance += math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-
-            avg_speed = total_distance / duration if duration > 0 else 0
-
-            # 记录详细信息 - 使用debug方法，让日志系统自行决定是否记录
-            self.logger.debug(
-                f"笔画 #{stroke_id} 统计: 长度={total_distance:.1f}px, 速度={avg_speed:.1f}px/秒"
-            )
-        except Exception as e:
-            # 忽略统计计算过程中的错误
-            self.logger.debug(f"计算笔画统计数据时出错: {e}")
-
-        # 记录主要信息
-        self.logger.info(
-            f"笔画 #{stroke_id}: {point_count}点, {duration:.2f}秒{direction_info}"
-        )
 
     def fade_path(self):
         """实现基于时间的路径淡出效果"""
@@ -473,12 +403,12 @@ class TransparentDrawingOverlay(QWidget):
                 )
 
     def get_stroke_direction(self, stroke_id=None):
-        """获取指定笔画ID的方向，如不指定则获取最后一个笔画的方向"""
+        """获取指定笔画的基本信息，如不指定则获取最后一个笔画"""
         if not self.lines:
             return "无笔画数据"
 
         if stroke_id is None:
-            # 分析最后一个笔画
+            # 获取最后一个笔画
             stroke_data = self.lines[-1]
         else:
             # 查找匹配ID的笔画
@@ -489,8 +419,10 @@ class TransparentDrawingOverlay(QWidget):
                 return f"未找到ID为{stroke_id}的笔画"
             stroke_data = matching_strokes[0]
 
-        direction_sequence, _ = self.stroke_analyzer.analyze_direction(stroke_data)
-        return direction_sequence
+        # 返回笔画基本信息
+        if stroke_data:
+            return f"笔画#{stroke_data[0][4]}: {len(stroke_data)}个点"
+        return "无效的笔画数据"
 
 
 class DrawingManager:
@@ -729,7 +661,7 @@ class DrawingManager:
         return max(0.3, min(0.9, self.simulated_pressure))
 
     def get_last_direction(self):
-        """获取最后一次绘制的方向序列"""
+        """获取最后一次绘制的笔画信息"""
         return self.overlay.get_stroke_direction()
 
 
