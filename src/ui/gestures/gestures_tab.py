@@ -48,13 +48,17 @@ class GesturesPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = get_logger("GesturesPage")
+        
+        # 获取手势库实例
         self.gesture_library = get_gesture_library()
         
-        # 状态变量
-        self.current_gesture_name = None  # 当前选中的手势名称
-        self.is_editing = False  # 是否正在编辑状态
+        # 当前选中的手势
+        self.current_gesture_name = None
         
+        # 初始化UI
         self._init_ui()
+        
+        # 加载手势列表
         self._load_gesture_list()
         self.logger.info("手势管理页面初始化完成")
 
@@ -207,8 +211,8 @@ class GesturesPage(QWidget):
         if not gesture_name:
             return
 
-        # 如果正在编辑，询问是否保存
-        if self.is_editing:
+        # 如果有未保存的更改，询问是否保存
+        if self._has_form_changes():
             result = QMessageBox.question(
                 self, "确认", "当前有未保存的更改，是否先保存？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
@@ -231,7 +235,6 @@ class GesturesPage(QWidget):
 
         # 更新状态
         self.current_gesture_name = gesture_name
-        self.is_editing = False
 
         # 填充表单
         self.edit_name.setText(gesture_name)
@@ -252,23 +255,62 @@ class GesturesPage(QWidget):
 
         self.logger.debug(f"已加载手势到编辑器: {gesture_name}")
 
+    def _has_form_changes(self):
+        """检查当前表单是否有未保存的更改"""
+        if not self.current_gesture_name:
+            # 新手势，检查表单是否为空
+            name = self.edit_name.text().strip()
+            direction = self.combo_direction.currentText()
+            shortcut = self.edit_shortcut.text().strip()
+            
+            # 如果表单不为空，则认为有更改
+            return bool(name or direction != self.DIRECTIONS[0] or shortcut)
+        
+        # 现有手势，比较表单内容与手势库中的数据
+        current_gesture = self.gesture_library.get_gesture(self.current_gesture_name)
+        if not current_gesture:
+            return False
+        
+        # 获取表单当前值
+        form_name = self.edit_name.text().strip()
+        form_direction = self.combo_direction.currentText()
+        form_shortcut = self.edit_shortcut.text().strip()
+        
+        # 获取手势库中的值
+        saved_name = self.current_gesture_name
+        saved_direction = current_gesture.get('direction', '')
+        saved_action = current_gesture.get('action', {})
+        saved_shortcut = saved_action.get('value', '')
+        
+        # 比较是否有差异
+        has_changes = (
+            form_name != saved_name or
+            form_direction != saved_direction or
+            form_shortcut != saved_shortcut
+        )
+        
+        if has_changes:
+            self.logger.debug(f"表单有变化: 名称 {form_name}!={saved_name}, 方向 {form_direction}!={saved_direction}, 快捷键 {form_shortcut}!={saved_shortcut}")
+        
+        return has_changes
+
     def _on_form_changed(self):
         """表单内容发生变化"""
-        if self.current_gesture_name and not self.is_editing:
-            self.is_editing = True
-            self._update_button_states()
+        # 更新按钮状态
+        self._update_button_states()
 
     def _update_button_states(self):
         """更新按钮状态"""
         has_selection = self.current_gesture_name is not None
+        has_changes = self._has_form_changes()
         
-        self.btn_save_current.setEnabled(self.is_editing and has_selection)
-        self.btn_cancel.setEnabled(self.is_editing)
+        self.btn_save_current.setEnabled(has_changes and (has_selection or bool(self.edit_name.text().strip())))
+        self.btn_cancel.setEnabled(has_changes)
 
     def _new_gesture(self):
         """创建新手势"""
-        # 如果正在编辑，询问是否保存
-        if self.is_editing:
+        # 如果有未保存的更改，询问是否保存
+        if self._has_form_changes():
             result = QMessageBox.question(
                 self, "确认", "当前有未保存的更改，是否先保存？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
@@ -295,7 +337,6 @@ class GesturesPage(QWidget):
 
         # 设置状态
         self.current_gesture_name = None
-        self.is_editing = True
         self._update_button_states()
         
         self.logger.debug(f"开始创建新手势: {new_name}")
@@ -345,7 +386,6 @@ class GesturesPage(QWidget):
             if success:
                 # 更新状态
                 self.current_gesture_name = name
-                self.is_editing = False
                 
                 # 刷新列表
                 self._load_gesture_list()
@@ -390,7 +430,6 @@ class GesturesPage(QWidget):
         self.edit_shortcut.clear()
         
         self.current_gesture_name = None
-        self.is_editing = False
         self.btn_delete.setEnabled(False)
         self._update_button_states()
 
@@ -447,8 +486,8 @@ class GesturesPage(QWidget):
 
     def _save_gestures(self):
         """保存手势库到文件"""
-        # 如果正在编辑，先询问是否保存当前修改
-        if self.is_editing:
+        # 如果有未保存的表单更改，先询问是否保存当前修改
+        if self._has_form_changes():
             result = QMessageBox.question(
                 self, "确认", "当前有未保存的更改，是否先保存？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
@@ -472,10 +511,10 @@ class GesturesPage(QWidget):
 
     def has_unsaved_changes(self):
         """检查是否有未保存的更改"""
-        is_editing = self.is_editing
+        form_has_changes = self._has_form_changes()
         library_has_changes = self.gesture_library.has_changes()
-        result = is_editing or library_has_changes
-        self.logger.debug(f"手势页面检查未保存更改: 正在编辑={is_editing}, 库有变更={library_has_changes}, 结果={result}")
+        result = form_has_changes or library_has_changes
+        self.logger.debug(f"手势页面检查未保存更改: 表单变化={form_has_changes}, 库有变更={library_has_changes}, 结果={result}")
         return result
 
 
