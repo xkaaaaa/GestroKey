@@ -1,8 +1,9 @@
 import sys
 import os
+import math
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
-from PyQt6.QtGui import QPainter, QPen, QColor
+from PyQt6.QtGui import QPainter, QPen, QColor, QPolygon
 
 try:
     from core.logger import get_logger
@@ -184,7 +185,8 @@ class GestureDrawingWidget(QWidget):
             y = (point[1] - min_y) * scale + offset_y
             return QPoint(int(x), int(y))
         
-        # 绘制连接线
+        # 绘制连接线和方向箭头
+        painter.setPen(QPen(QColor(0, 120, 255), 2))
         for conn in connections:
             from_idx = conn.get('from', 0)
             to_idx = conn.get('to', 0)
@@ -193,15 +195,95 @@ class GestureDrawingWidget(QWidget):
                 start_point = transform_point(points[from_idx])
                 end_point = transform_point(points[to_idx])
                 painter.drawLine(start_point, end_point)
+                
+                # 在线条中间绘制方向箭头
+                self._draw_direction_arrow(painter, start_point, end_point)
         
-        # 绘制关键点（红色圆点）
+        # 绘制关键点 - 起点、终点、中间点用不同颜色
         old_pen = painter.pen()
-        painter.setPen(QPen(QColor(255, 0, 0), 4))
-        for point in points:
-            transformed_point = transform_point(point)
-            painter.drawEllipse(transformed_point, 3, 3)
-        painter.setPen(old_pen)
         
+        for i, point in enumerate(points):
+            transformed_point = transform_point(point)
+            
+            if i == 0:
+                # 起点 - 绿色，较大
+                painter.setPen(QPen(QColor(0, 200, 0), 3))
+                painter.setBrush(QColor(0, 200, 0))
+                painter.drawEllipse(transformed_point.x() - 6, transformed_point.y() - 6, 12, 12)
+            elif i == len(points) - 1:
+                # 终点 - 红色
+                if len(points) == 1:
+                    # 只有一个点时，绘制一个小一点的红色圆点在绿色内部
+                    painter.setPen(QPen(QColor(255, 0, 0), 2))
+                    painter.setBrush(QColor(255, 0, 0))
+                    painter.drawEllipse(transformed_point.x() - 3, transformed_point.y() - 3, 6, 6)
+                else:
+                    # 有多个点时，终点稍微小一点
+                    painter.setPen(QPen(QColor(255, 0, 0), 3))
+                    painter.setBrush(QColor(255, 0, 0))
+                    painter.drawEllipse(transformed_point.x() - 4, transformed_point.y() - 4, 8, 8)
+            else:
+                # 中间点 - 蓝色，最小
+                painter.setPen(QPen(QColor(0, 120, 255), 2))
+                painter.setBrush(QColor(0, 120, 255))
+                painter.drawEllipse(transformed_point.x() - 2, transformed_point.y() - 2, 4, 4)
+        
+        painter.setPen(old_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)  # 重置画刷
+    
+    def _draw_direction_arrow(self, painter, start_point, end_point):
+        """在线条中间绘制方向箭头"""
+        # 计算中点
+        mid_x = (start_point.x() + end_point.x()) / 2
+        mid_y = (start_point.y() + end_point.y()) / 2
+        mid_point = QPoint(int(mid_x), int(mid_y))
+        
+        # 计算方向向量
+        dx = end_point.x() - start_point.x()
+        dy = end_point.y() - start_point.y()
+        
+        # 如果线条太短，不画箭头
+        length = math.sqrt(dx * dx + dy * dy)
+        if length < 20:
+            return
+        
+        # 标准化方向向量
+        dx /= length
+        dy /= length
+        
+        # 箭头大小
+        arrow_length = 8
+        arrow_width = 4
+        
+        # 计算箭头的三个点
+        # 箭头顶点（指向前进方向）
+        arrow_tip_x = mid_x + dx * arrow_length / 2
+        arrow_tip_y = mid_y + dy * arrow_length / 2
+        
+        # 箭头两侧的点
+        # 垂直向量 (-dy, dx)
+        arrow_left_x = mid_x - dx * arrow_length / 2 - dy * arrow_width
+        arrow_left_y = mid_y - dy * arrow_length / 2 + dx * arrow_width
+        
+        arrow_right_x = mid_x - dx * arrow_length / 2 + dy * arrow_width
+        arrow_right_y = mid_y - dy * arrow_length / 2 - dx * arrow_width
+        
+        # 创建箭头多边形
+        arrow_polygon = QPolygon([
+            QPoint(int(arrow_tip_x), int(arrow_tip_y)),
+            QPoint(int(arrow_left_x), int(arrow_left_y)),
+            QPoint(int(arrow_right_x), int(arrow_right_y))
+        ])
+        
+        # 绘制箭头
+        old_pen = painter.pen()
+        old_brush = painter.brush()
+        painter.setPen(QPen(QColor(255, 100, 0), 1))  # 橙色箭头
+        painter.setBrush(QColor(255, 100, 0))
+        painter.drawPolygon(arrow_polygon)
+        painter.setPen(old_pen)
+        painter.setBrush(old_brush)
+    
     def clear_drawing(self):
         """清除绘制内容"""
         self.current_path = []
