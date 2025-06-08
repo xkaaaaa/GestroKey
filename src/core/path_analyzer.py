@@ -30,8 +30,11 @@ class PathAnalyzer:
         # 提取坐标
         coords = [(int(p[0]), int(p[1])) for p in raw_points]
         
+        # 预处理：对小路径进行等比缩放
+        scaled_coords = self._scale_small_path(coords)
+        
         # 简化路径，提取关键点
-        key_points = self._extract_key_points(coords)
+        key_points = self._extract_key_points(scaled_coords)
         
         # 生成连接信息（默认都是直线连接）
         connections = []
@@ -47,30 +50,70 @@ class PathAnalyzer:
             'connections': connections
         }
     
+    def _scale_small_path(self, coords):
+        """对过小的路径进行等比缩放，提高格式化准确性
+        
+        Args:
+            coords: 坐标点列表 [(x, y), ...]
+            
+        Returns:
+            list: 缩放后的坐标点列表
+        """
+        if len(coords) < 2:
+            return coords
+            
+        # 计算路径边界框
+        xs = [p[0] for p in coords]
+        ys = [p[1] for p in coords]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        
+        path_width = max_x - min_x
+        path_height = max_y - min_y
+        current_size = max(path_width, path_height)
+        
+        # 如果路径太小（小于50像素），等比放大到目标大小
+        min_size_threshold = 50  # 最小尺寸阈值
+        target_size = 200  # 目标尺寸
+        
+        if current_size < min_size_threshold and current_size > 0:
+            scale_factor = target_size / current_size
+            
+            # 计算路径中心点
+            center_x = (min_x + max_x) / 2
+            center_y = (min_y + max_y) / 2
+            
+            # 缩放所有点
+            scaled_coords = []
+            for x, y in coords:
+                # 以中心点为基准进行缩放
+                new_x = center_x + (x - center_x) * scale_factor
+                new_y = center_y + (y - center_y) * scale_factor
+                scaled_coords.append((int(new_x), int(new_y)))
+            
+            self.logger.info(f"路径预处理缩放：从{current_size:.1f}px 缩放到 {current_size*scale_factor:.1f}px (缩放因子: {scale_factor:.2f})")
+            return scaled_coords
+        else:
+            # 路径大小合适，不需要缩放
+            return coords
+    
     def _extract_key_points(self, coords):
-        """提取关键点"""
+        """智能提取关键点，保留重要的转折点"""
         if len(coords) <= 2:
             return coords
         
-        key_points = [coords[0]]  # 起点
+        # 使用道格拉斯-普克算法进行初步简化
+        simplified = self._douglas_peucker(coords, tolerance=8.0)
         
-        i = 0
-        while i < len(coords) - 1:
-            line_end = self._find_line_segment(coords, i)
-            if line_end > i + 2:
-                # 找到直线段，添加终点
-                if coords[line_end] not in key_points:
-                    key_points.append(coords[line_end])
-                i = line_end
-            else:
-                # 没找到长直线，跳过一些点
-                i += max(1, len(coords) // 10)  # 动态步长
-                if i < len(coords):
-                    if coords[i] not in key_points:
-                        key_points.append(coords[i])
+        # 再次分析以检测方向变化和重要特征
+        key_points = self._analyze_direction_changes(simplified)
         
-        # 确保终点被包含
-        if len(key_points) == 0 or key_points[-1] != coords[-1]:
+        # 确保至少有起点和终点
+        if not key_points:
+            key_points = [coords[0], coords[-1]]
+        elif key_points[0] != coords[0]:
+            key_points.insert(0, coords[0])
+        if key_points[-1] != coords[-1]:
             key_points.append(coords[-1])
         
         # 去除重复点
@@ -80,6 +123,94 @@ class PathAnalyzer:
                 unique_points.append(point)
         
         return unique_points
+    
+    def _douglas_peucker(self, points, tolerance):
+        """道格拉斯-普克算法简化路径"""
+        if len(points) <= 2:
+            return points
+            
+        # 找到距离起点和终点连线最远的点
+        dmax = 0
+        index = 0
+        end = len(points) - 1
+        
+        for i in range(1, end):
+            d = self._distance_to_line(points[0], points[end], points[i])
+            if d > dmax:
+                index = i
+                dmax = d
+        
+        # 如果最大距离大于容差，递归简化
+        if dmax > tolerance:
+            # 递归简化两段
+            rec_results1 = self._douglas_peucker(points[:index + 1], tolerance)
+            rec_results2 = self._douglas_peucker(points[index:], tolerance)
+            
+            # 合并结果（去除重复的中间点）
+            result = rec_results1[:-1] + rec_results2
+        else:
+            # 所有点都在容差范围内，只保留起点和终点
+            result = [points[0], points[end]]
+            
+        return result
+    
+    def _analyze_direction_changes(self, points):
+        """分析方向变化，识别重要的转折点"""
+        if len(points) <= 2:
+            return points
+        
+        key_points = [points[0]]  # 起点
+        
+        for i in range(1, len(points) - 1):
+            # 计算当前点的角度变化
+            angle_change = self._calculate_angle_change(points[i-1], points[i], points[i+1])
+            
+            # 如果角度变化显著（大于30度），认为是重要转折点
+            if abs(angle_change) > 30:
+                key_points.append(points[i])
+            # 或者如果距离上一个关键点较远，也保留
+            elif len(key_points) > 0:
+                distance = math.sqrt((points[i][0] - key_points[-1][0])**2 + 
+                                   (points[i][1] - key_points[-1][1])**2)
+                # 根据路径总长度动态调整距离阈值
+                path_length = self._calculate_path_length(points)
+                min_distance = max(path_length * 0.1, 20)  # 至少20像素或路径长度的10%
+                
+                if distance > min_distance:
+                    key_points.append(points[i])
+        
+        key_points.append(points[-1])  # 终点
+        return key_points
+    
+    def _calculate_angle_change(self, p1, p2, p3):
+        """计算三点之间的角度变化（度数）"""
+        # 计算两个向量
+        v1 = (p2[0] - p1[0], p2[1] - p1[1])
+        v2 = (p3[0] - p2[0], p3[1] - p2[1])
+        
+        # 计算向量长度
+        len1 = math.sqrt(v1[0]**2 + v1[1]**2)
+        len2 = math.sqrt(v2[0]**2 + v2[1]**2)
+        
+        if len1 == 0 or len2 == 0:
+            return 0
+        
+        # 计算夹角
+        dot_product = v1[0]*v2[0] + v1[1]*v2[1]
+        cross_product = v1[0]*v2[1] - v1[1]*v2[0]
+        
+        # 使用atan2计算角度，范围[-180, 180]
+        angle = math.degrees(math.atan2(cross_product, dot_product))
+        return angle
+    
+    def _calculate_path_length(self, points):
+        """计算路径总长度"""
+        total_length = 0
+        for i in range(len(points) - 1):
+            dx = points[i+1][0] - points[i][0]
+            dy = points[i+1][1] - points[i][1]
+            total_length += math.sqrt(dx*dx + dy*dy)
+        return total_length
     
     def _find_line_segment(self, points, start_idx):
         """寻找从起始点开始的最长直线段"""
