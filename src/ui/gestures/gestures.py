@@ -42,7 +42,6 @@ class GestureLibrary:
         self.gestures = self.DEFAULT_GESTURES.copy()
         self.saved_gestures = self.DEFAULT_GESTURES.copy()  # 初始化saved_gestures为默认手势库的副本
         self.gestures_file = self._get_gestures_file_path()
-        self.has_unsaved_changes = False
         self.load()
 
     def _load_default_gestures(self):
@@ -189,9 +188,9 @@ class GestureLibrary:
                                         action["value"] = new_value
                                         format_converted = True
 
-                    # 如果有转换，标记为有未保存的更改
+                    # 如果有转换，需要保存
                     if format_converted:
-                        self.has_unsaved_changes = True
+                        self.save()  # 自动保存转换后的格式
 
                 # 更新手势库，确保所有默认手势都存在
                 for name, gesture in loaded_gestures.items():
@@ -201,9 +200,8 @@ class GestureLibrary:
                 self._ensure_valid_ids(self.gestures)
 
                 self.logger.info(f"已从 {self.gestures_file} 加载手势库")
-                if not self.has_unsaved_changes:
-                    # 保存当前加载的手势库到saved_gestures
-                    self.saved_gestures = self.gestures.copy()
+                # 保存当前加载的手势库到saved_gestures
+                self.saved_gestures = self.gestures.copy()
             else:
                 self.logger.info("未找到手势库文件，使用默认手势库")
                 self.save()  # 保存默认手势库
@@ -226,7 +224,6 @@ class GestureLibrary:
             with open(self.gestures_file, "w", encoding="utf-8") as f:
                 json.dump(self.gestures, f, indent=4, ensure_ascii=False)
             self.logger.info(f"手势库已保存到 {self.gestures_file}")
-            self.has_unsaved_changes = False
             # 保存当前手势库到saved_gestures
             self.saved_gestures = self.gestures.copy()
             return True
@@ -322,7 +319,6 @@ class GestureLibrary:
         current_gesture = self.gestures.get(name, {})
         if current_gesture != new_gesture:
             self.gestures[name] = new_gesture
-            self.has_unsaved_changes = True
             self.logger.info(
                 f"更新手势: {name}, ID: {gesture_id}, 方向: {direction}, 动作: {action_type}:{action_value}"
             )
@@ -355,7 +351,6 @@ class GestureLibrary:
         self.gestures[new_name] = gesture_data
         del self.gestures[old_name]
 
-        self.has_unsaved_changes = True
         self.logger.info(
             f"重命名手势: {old_name} -> {new_name}, ID: {gesture_data.get('id')}"
         )
@@ -375,7 +370,6 @@ class GestureLibrary:
 
         # 如果ID无效，无需重排序
         if not isinstance(deleted_id, int):
-            self.has_unsaved_changes = True
             return True
 
         # 重排序其他手势的ID
@@ -386,7 +380,6 @@ class GestureLibrary:
                 other_gesture["id"] = other_id - 1
                 self.logger.debug(f"重排序手势ID: {other_name}, {other_id} -> {other_id-1}")
 
-        self.has_unsaved_changes = True
         self.logger.info(f"删除手势: {name}, ID: {deleted_id}, 并重排序剩余手势的ID")
         return True
 
@@ -479,13 +472,11 @@ class GestureLibrary:
 
             if self.gestures != default_gestures:
                 self.gestures = default_gestures.copy()
-                self.has_unsaved_changes = True
 
             # 保存并更新saved_gestures
             success = self.save()
             if success:
                 self.saved_gestures = self.gestures.copy()
-                self.has_unsaved_changes = False
 
             return success
         except Exception as e:
@@ -501,34 +492,36 @@ class GestureLibrary:
 
     def has_changes(self):
         """检查是否有未保存的更改"""
-        # 首先根据标志快速判断
-        if not self.has_unsaved_changes:
-            return False
-
-        # 如果标志为True，进一步比较当前手势库与已保存的手势库
+        # 如果没有已保存的手势库记录，则认为有未保存的更改
         if not self.saved_gestures:
-            # 如果没有已保存的手势库记录，则认为有未保存的更改
-            return True if self.gestures else False
+            result = True if self.gestures else False
+            self.logger.debug(f"手势库检查变更: 没有已保存手势记录, 结果={result}")
+            return result
 
         # 检查手势数量是否相同
         if len(self.gestures) != len(self.saved_gestures):
+            self.logger.debug(f"手势库检查变更: 数量不同 - 当前={len(self.gestures)}, 已保存={len(self.saved_gestures)}")
             return True
 
         # 逐一比较手势
         for name, gesture in self.gestures.items():
             if name not in self.saved_gestures:
+                self.logger.debug(f"手势库检查变更: 新手势 - {name}")
                 return True
 
             if self.saved_gestures[name] != gesture:
+                self.logger.debug(f"手势库检查变更: 手势内容不同 - {name}")
+                self.logger.debug(f"  当前: {gesture}")
+                self.logger.debug(f"  已保存: {self.saved_gestures[name]}")
                 return True
 
         # 检查是否有已保存的手势在当前手势库中不存在
         for name in self.saved_gestures:
             if name not in self.gestures:
+                self.logger.debug(f"手势库检查变更: 已保存的手势在当前库中不存在 - {name}")
                 return True
 
-        # 实际上没有差异，重置标志
-        self.has_unsaved_changes = False
+        self.logger.debug("手势库检查变更: 没有发现差异")
         return False
 
 

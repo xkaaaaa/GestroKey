@@ -459,7 +459,11 @@ class GesturesPage(QWidget):
 
     def has_unsaved_changes(self):
         """检查是否有未保存的更改"""
-        return self.is_editing or self.gesture_library.has_changes()
+        is_editing = self.is_editing
+        library_has_changes = self.gesture_library.has_changes()
+        result = is_editing or library_has_changes
+        self.logger.debug(f"手势页面检查未保存更改: 正在编辑={is_editing}, 库有变更={library_has_changes}, 结果={result}")
+        return result
 
 
 if __name__ == "__main__":

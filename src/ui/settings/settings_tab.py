@@ -40,7 +40,6 @@ class SettingsPage(QWidget):
         
         # 状态变量
         self.is_loading = False
-        self.has_changes = False
         
         self._init_ui()
         self._load_settings()
@@ -241,7 +240,6 @@ class SettingsPage(QWidget):
             QMessageBox.critical(self, "错误", f"加载设置失败: {str(e)}")
         finally:
             self.is_loading = False
-            self.has_changes = False
             self._update_button_states()
 
     def _on_thickness_changed(self, value):
@@ -255,7 +253,7 @@ class SettingsPage(QWidget):
         color = self.color_preview.get_color()
         self.pen_preview.update_pen(value, color)
         
-        self._apply_pen_settings_to_drawing_module(value, color)
+        # 只在视觉上预览，不立即应用到后端
         self._mark_changed()
 
     def _on_thickness_spinbox_changed(self, value):
@@ -265,6 +263,9 @@ class SettingsPage(QWidget):
             
         if self.thickness_slider.value() != value:
             self.thickness_slider.setValue(value)
+        
+        # 只在视觉上预览，不立即应用到后端
+        self._mark_changed()
 
     def _on_color_button_clicked(self):
         """颜色按钮点击"""
@@ -278,7 +279,7 @@ class SettingsPage(QWidget):
             thickness = self.thickness_slider.value()
             self.pen_preview.update_pen(thickness, rgb)
             
-            self._apply_pen_settings_to_drawing_module(thickness, rgb)
+            # 只在视觉上预览，不立即应用到后端
             self._mark_changed()
 
     def _on_autostart_changed(self, state):
@@ -299,12 +300,59 @@ class SettingsPage(QWidget):
     def _mark_changed(self):
         """标记设置已更改"""
         if not self.is_loading:
-            self.has_changes = True
             self._update_button_states()
 
     def _update_button_states(self):
         """更新按钮状态"""
-        self.apply_button.setEnabled(self.has_changes)
+        # 检查前端UI是否有未应用的更改
+        has_changes = self._has_frontend_changes() or self.settings.has_changes()
+        self.apply_button.setEnabled(has_changes)
+
+    def _has_frontend_changes(self):
+        """检查前端UI是否有未应用的更改"""
+        try:
+            # 检查笔刷设置
+            current_thickness = self.thickness_slider.value()
+            current_color = self.color_preview.get_color()
+            
+            saved_thickness = self.settings.get("brush.pen_width", 3)
+            saved_color = self.settings.get("brush.pen_color", [0, 120, 255])
+            
+            if current_thickness != saved_thickness:
+                self.logger.debug(f"笔尖粗细有变化: {current_thickness} != {saved_thickness}")
+                return True
+                
+            if current_color != saved_color:
+                self.logger.debug(f"笔尖颜色有变化: {current_color} != {saved_color}")
+                return True
+            
+            # 检查应用设置
+            current_autostart = self.autostart_checkbox.isChecked()
+            saved_autostart = self.settings.is_autostart_enabled()
+            
+            if current_autostart != saved_autostart:
+                self.logger.debug(f"开机自启动有变化: {current_autostart} != {saved_autostart}")
+                return True
+            
+            current_show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
+            saved_show_exit_dialog = self.settings.get("app.show_exit_dialog", True)
+            
+            if current_show_exit_dialog != saved_show_exit_dialog:
+                self.logger.debug(f"退出对话框设置有变化: {current_show_exit_dialog} != {saved_show_exit_dialog}")
+                return True
+            
+            current_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
+            saved_close_action = self.settings.get("app.default_close_action", "exit")
+            
+            if current_close_action != saved_close_action:
+                self.logger.debug(f"默认关闭行为有变化: {current_close_action} != {saved_close_action}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"检查前端更改时出错: {e}")
+            return False
 
     def _apply_pen_settings_to_drawing_module(self, width, color):
         """实时应用画笔设置到绘制模块"""
@@ -355,7 +403,6 @@ class SettingsPage(QWidget):
             default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
             self.settings.set("app.default_close_action", default_close_action)
             
-            self.has_changes = False
             self._update_button_states()
             QMessageBox.information(self, "成功", "设置已应用")
             
@@ -366,7 +413,8 @@ class SettingsPage(QWidget):
     def _save_settings(self):
         """保存设置到文件"""
         try:
-            if self.has_changes:
+            # 如果有前端未应用的更改，先应用它们
+            if self._has_frontend_changes():
                 self._apply_settings()
             
             success = self.settings.save()
@@ -393,6 +441,7 @@ class SettingsPage(QWidget):
                 if success:
                     self._load_settings()
                     
+                    # 重置后需要应用画笔设置到绘制模块
                     thickness = self.thickness_slider.value()
                     color = self.color_preview.get_color()
                     self._apply_pen_settings_to_drawing_module(thickness, color)
@@ -407,7 +456,12 @@ class SettingsPage(QWidget):
 
     def has_unsaved_changes(self):
         """检查是否有未保存的更改"""
-        return self.has_changes or self.settings.has_changes()
+        has_frontend_changes = self._has_frontend_changes()
+        has_backend_changes = self.settings.has_changes()
+        total_changes = has_frontend_changes or has_backend_changes
+        
+        self.logger.debug(f"设置页面检查未保存更改: 前端变化={has_frontend_changes}, 后端变化={has_backend_changes}, 总变化={total_changes}")
+        return total_changes
 
 
 class ColorPreviewWidget(QWidget):

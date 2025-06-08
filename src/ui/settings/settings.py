@@ -29,7 +29,6 @@ class Settings:
         self.logger = get_logger("Settings")
         self.settings = self._load_default_settings()
         self.settings_file = self._get_settings_file_path()
-        self.has_unsaved_changes = False
         self.saved_settings = None  # 用于保存最后一次成功保存的设置
 
         # 加载设置
@@ -99,7 +98,6 @@ class Settings:
                         self.settings[key] = value
 
                 self.logger.info(f"已从 {self.settings_file} 加载设置")
-                self.has_unsaved_changes = False
                 # 保存当前加载的设置到saved_settings
                 self.saved_settings = self.settings.copy()
             else:
@@ -118,7 +116,6 @@ class Settings:
             with open(self.settings_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, indent=4, ensure_ascii=False)
             self.logger.info(f"设置已保存到 {self.settings_file}")
-            self.has_unsaved_changes = False
             # 保存当前设置到saved_settings
             self.saved_settings = self.settings.copy()
             return True
@@ -175,33 +172,29 @@ class Settings:
                     if saved_current and keys[-1] in saved_current:
                         saved_value = saved_current[keys[-1]]
                 
-                if saved_value != value:
-                    self.has_unsaved_changes = True
-                    self.logger.debug(f"设置项已更新: {key}={value}, 有未保存更改")
-                else:
-                    self.logger.debug(f"设置项已更新: {key}={value}, 但与保存的值相同")
+                self.logger.debug(f"嵌套设置项已更新: {key}={value} (类型: {type(value)})")
             return True
         else:
             # 向后兼容，支持旧的直接键设置
             # 尝试在brush或app分组中设置
             if key in ["pen_width", "pen_color"]:
+                self.logger.debug(f"重定向画笔设置: {key} -> brush.{key}")
                 return self.set(f"brush.{key}", value)
             elif key in ["show_exit_dialog", "default_close_action"]:
+                self.logger.debug(f"重定向应用设置: {key} -> app.{key}")
                 return self.set(f"app.{key}", value)
             else:
                 # 直接设置顶级键
                 if key in self.settings:
                     if self.settings[key] != value:
                         self.settings[key] = value
-                        if (
-                            not self.saved_settings
-                            or key not in self.saved_settings
-                            or self.saved_settings[key] != value
-                        ):
-                            self.has_unsaved_changes = True
-                            self.logger.debug(f"设置项已更新: {key}={value}, 有未保存更改")
+                        self.logger.debug(f"顶级设置项已更新: {key}={value} (类型: {type(value)})")
+                    else:
+                        self.logger.debug(f"顶级设置项值未变: {key}={value}")
                     return True
-                return False
+                else:
+                    self.logger.debug(f"顶级设置项不存在: {key}")
+                    return False
 
     def reset_to_default(self):
         """重置为默认设置"""
@@ -210,13 +203,11 @@ class Settings:
             default_settings = self._load_default_settings()
             if self.settings != default_settings:
                 self.settings = default_settings
-                self.has_unsaved_changes = True
 
             # 保存设置并更新saved_settings
             success = self.save()
             if success:
                 self.saved_settings = self.settings.copy()
-                self.has_unsaved_changes = False
 
                 # 确保开机自启动设置为关闭状态
                 if self.is_autostart_enabled():
@@ -230,27 +221,30 @@ class Settings:
 
     def has_changes(self):
         """检查是否有未保存的更改"""
-        # 首先根据标志快速判断
-        if not self.has_unsaved_changes:
-            return False
-
-        # 如果标志为True，进一步比较当前设置与已保存的设置
+        self.logger.debug(f"设置库检查变更开始: 当前设置数量={len(self.settings) if self.settings else 0}, 已保存设置数量={len(self.saved_settings) if self.saved_settings else 0}")
+        
+        # 如果没有已保存的设置记录，则认为有未保存的更改
         if not self.saved_settings:
-            # 如果没有已保存的设置记录，则认为有未保存的更改
-            return True
+            result = True if self.settings else False
+            self.logger.debug(f"设置库检查变更: 没有已保存设置记录, 结果={result}")
+            return result
 
         # 逐一比较设置项
         for key, value in self.settings.items():
+            saved_value = self.saved_settings.get(key, '不存在')
             if key not in self.saved_settings or self.saved_settings[key] != value:
+                self.logger.debug(f"设置库检查变更: 发现差异 - 键={key}")
+                self.logger.debug(f"  当前值: {value} (类型: {type(value)})")
+                self.logger.debug(f"  已保存值: {saved_value} (类型: {type(saved_value)})")
                 return True
 
         # 检查是否有已保存的设置项在当前设置中不存在
         for key in self.saved_settings:
             if key not in self.settings:
+                self.logger.debug(f"设置库检查变更: 已保存的键在当前设置中不存在 - 键={key}")
                 return True
 
-        # 实际上没有差异，重置标志
-        self.has_unsaved_changes = False
+        self.logger.debug("设置库检查变更: 没有发现差异")
         return False
 
     # 以下为新增的开机自启动相关方法

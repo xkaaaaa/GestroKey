@@ -605,31 +605,88 @@ class GestroKeyApp(QMainWindow):
     def _exit_with_save_check(self):
         """退出程序并检查未保存项目"""
         self.logger.info("准备退出程序，检查未保存项目")
-        self._check_unsaved_and_exit()
+        try:
+            self.logger.debug("即将调用_check_unsaved_and_exit方法")
+            self._check_unsaved_and_exit()
+        except Exception as e:
+            self.logger.error(f"调用_check_unsaved_and_exit时出错: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            self._force_exit()
 
     def _check_unsaved_and_exit(self):
         """检查未保存的更改并退出"""
-        unsaved_settings = False
-        unsaved_gestures = False
+        try:
+            unsaved_settings = False
+            unsaved_gestures = False
 
-        if hasattr(self, "settings_page") and self.settings_page.has_unsaved_changes():
-            unsaved_settings = True
+            # 添加详细的调试输出
+            self.logger.debug("开始检查未保存的更改...")
+            
+            # 检查设置：既检查前端UI状态，也检查后端数据
+            try:
+                # 检查前端设置页面是否有未应用的更改
+                if hasattr(self, "settings_page"):
+                    frontend_changes = self.settings_page.has_unsaved_changes()
+                    self.logger.debug(f"设置页面前端是否有未保存更改: {frontend_changes}")
+                    if frontend_changes:
+                        unsaved_settings = True
+                else:
+                    # 如果没有设置页面，只检查后端
+                    from ui.settings.settings import get_settings
+                    settings = get_settings()
+                    settings_has_changes = settings.has_changes()
+                    self.logger.debug(f"设置后端是否有未保存更改: {settings_has_changes}")
+                    if settings_has_changes:
+                        unsaved_settings = True
+            except Exception as e:
+                self.logger.error(f"检查设置变更时出错: {e}")
+                import traceback
+                self.logger.error(traceback.format_exc())
 
-        if hasattr(self, "gestures_page") and self.gestures_page.has_unsaved_changes():
-            unsaved_gestures = True
+            try:
+                # 检查手势：既检查前端UI状态，也检查后端数据
+                if hasattr(self, "gestures_page"):
+                    frontend_changes = self.gestures_page.has_unsaved_changes()
+                    self.logger.debug(f"手势页面前端是否有未保存更改: {frontend_changes}")
+                    if frontend_changes:
+                        unsaved_gestures = True
+                else:
+                    # 如果没有手势页面，只检查后端
+                    from ui.gestures.gestures import get_gesture_library
+                    gesture_library = get_gesture_library()
+                    gestures_has_changes = gesture_library.has_changes()
+                    self.logger.debug(f"手势库后端是否有未保存更改: {gestures_has_changes}")
+                    if gestures_has_changes:
+                        unsaved_gestures = True
+            except Exception as e:
+                self.logger.error(f"检查手势库变更时出错: {e}")
+                import traceback
+                self.logger.error(traceback.format_exc())
 
-        if unsaved_settings or unsaved_gestures:
-            self.logger.info("检测到未保存的更改")
-            self.show_global_dialog(
-                message_type="question",
-                title_text="保存更改",
-                message="检测到未保存的更改，是否保存后退出？",
-                custom_buttons=["是", "否", "取消"],
-                callback=self._handle_save_changes_response,
-            )
-            return
+            self.logger.debug(f"最终检查结果 - 设置未保存: {unsaved_settings}, 手势未保存: {unsaved_gestures}")
 
-        self._force_exit()
+            if unsaved_settings or unsaved_gestures:
+                self.logger.info("检测到未保存的更改")
+                self.show_global_dialog(
+                    message_type="question",
+                    title_text="保存更改",
+                    message="检测到未保存的更改，是否保存后退出？",
+                    custom_buttons=["是", "否", "取消"],
+                    callback=self._handle_save_changes_response,
+                )
+                return
+            else:
+                self.logger.debug("没有检测到未保存的更改，直接退出")
+
+            self._force_exit()
+            
+        except Exception as e:
+            self.logger.error(f"检查未保存更改时发生严重错误: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            # 发生错误时直接退出
+            self._force_exit()
     
     def _force_exit(self):
         """强制退出程序"""
@@ -644,27 +701,11 @@ class GestroKeyApp(QMainWindow):
         save_success = True
 
         if button_text == "是":
-            unsaved_settings = False
-            unsaved_gestures = False
-
-            if (
-                hasattr(self, "settings_page")
-                and self.settings_page.has_unsaved_changes()
-            ):
-                unsaved_settings = True
-
-            if (
-                hasattr(self, "gestures_page")
-                and self.gestures_page.has_unsaved_changes()
-            ):
-                unsaved_gestures = True
-
             try:
-                if unsaved_settings:
+                # 保存设置（如果设置页面有未保存的更改）
+                if hasattr(self, "settings_page") and self.settings_page.has_unsaved_changes():
                     self.logger.info("正在保存设置...")
-                    # 先应用设置页面的更改
                     self.settings_page._apply_settings()
-                    # 然后保存到文件
                     if self.settings_page.settings.save():
                         self.logger.info("设置已保存")
                     else:
@@ -677,15 +718,11 @@ class GestroKeyApp(QMainWindow):
                 show_error(self, f"保存设置时出错: {str(e)}，取消退出")
 
             try:
-                if unsaved_gestures and save_success:
+                # 保存手势（如果手势页面有未保存的更改）
+                if save_success and hasattr(self, "gestures_page") and self.gestures_page.has_unsaved_changes():
                     self.logger.info("正在保存手势库...")
-                    try:
-                        self.gestures_page._save_gestures()
-                        self.logger.info("手势库已保存")
-                    except Exception as save_error:
-                        self.logger.error(f"保存手势库失败: {save_error}")
-                        save_success = False
-                        show_error(self, "保存手势库失败，取消退出")
+                    self.gestures_page._save_gestures()
+                    self.logger.info("手势库已保存")
             except Exception as e:
                 self.logger.error(f"保存手势库时出现异常: {e}")
                 save_success = False
