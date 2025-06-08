@@ -616,7 +616,6 @@ settings.set_autostart(False)  # 禁用
     - 手势相似度阈值设置（QDoubleSpinBox）
 - 底部：操作按钮区域
   - 重置设置按钮
-  - 应用设置按钮
   - 保存设置按钮
 
 **使用方法**：
