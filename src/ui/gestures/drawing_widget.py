@@ -2,8 +2,8 @@ import sys
 import os
 import math
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal
-from PyQt6.QtGui import QPainter, QPen, QColor, QPolygon
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QTimer
+from PyQt6.QtGui import QPainter, QPen, QColor, QPolygon, QTransform
 
 try:
     from core.logger import get_logger
@@ -29,9 +29,33 @@ class GestureDrawingWidget(QWidget):
         self.current_path = []
         self.completed_paths = []
         
+        # 视图变换属性
+        self.view_scale = 1.0  # 缩放因子
+        self.view_offset = QPoint(0, 0)  # 视图偏移
+        self.min_scale = 0.1  # 最小缩放
+        self.max_scale = 5.0  # 最大缩放
+        
+        # 标准视图（用于双击重置）
+        self.standard_scale = 1.0
+        self.standard_offset = QPoint(0, 0)
+        
+        # 拖拽状态
+        self.panning = False
+        self.last_pan_point = QPoint()
+        self.space_pressed = False
+        
+        # 双击检测
+        self.click_timer = QTimer()
+        self.click_timer.setSingleShot(True)
+        self.click_timer.timeout.connect(self._single_click_timeout)
+        self.click_count = 0
+        
         # 设置最小尺寸
         self.setMinimumSize(300, 200)
         self.setStyleSheet("background-color: white; border: 1px solid gray;")
+        
+        # 启用键盘焦点和滚轮事件
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         self.initUI()
         
@@ -40,28 +64,142 @@ class GestureDrawingWidget(QWidget):
         # 设置为简洁布局，无按钮无提示文字
         self.setLayout(QVBoxLayout())
         
+    def keyPressEvent(self, event):
+        """键盘按下事件"""
+        if event.key() == Qt.Key.Key_Space:
+            self.space_pressed = True
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+        super().keyPressEvent(event)
+        
+    def keyReleaseEvent(self, event):
+        """键盘释放事件"""
+        if event.key() == Qt.Key.Key_Space:
+            self.space_pressed = False
+            if not self.panning:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().keyReleaseEvent(event)
+        
+    def wheelEvent(self, event):
+        """滚轮事件 - Alt+滚轮缩放"""
+        if event.modifiers() & Qt.KeyboardModifier.AltModifier:
+            # 计算缩放中心点（鼠标位置）
+            try:
+                zoom_center = event.position().toPoint()
+            except:
+                # 兼容性处理
+                zoom_center = event.pos()
+            
+            # 计算缩放因子 - 使用angleDelta().y()或pixelDelta().y()
+            angle_delta = event.angleDelta()
+            pixel_delta = event.pixelDelta()
+            
+            # 获取滚动增量 - 通常在y()，但在某些情况下可能在x()
+            if not angle_delta.isNull():
+                delta = angle_delta.y() if angle_delta.y() != 0 else angle_delta.x()
+            elif not pixel_delta.isNull():
+                delta = pixel_delta.y() if pixel_delta.y() != 0 else pixel_delta.x()
+            else:
+                delta = 0
+            
+            # 如果没有有效的delta值，跳过处理
+            if delta == 0:
+                event.accept()
+                return
+            
+            # 修正缩放方向：向上滚动(delta>0)放大，向下滚动(delta<0)缩小
+            if delta > 0:
+                scale_factor = 1.2  # 放大
+            else:
+                scale_factor = 1.0 / 1.2  # 缩小
+            new_scale = self.view_scale * scale_factor
+            
+            # 限制缩放范围
+            new_scale = max(self.min_scale, min(self.max_scale, new_scale))
+            
+            if new_scale != self.view_scale:
+                # 计算缩放后的偏移调整，使缩放围绕鼠标位置进行
+                # 将鼠标位置转换为视图坐标
+                view_center_x = (zoom_center.x() - self.view_offset.x()) / self.view_scale
+                view_center_y = (zoom_center.y() - self.view_offset.y()) / self.view_scale
+                
+                # 更新缩放
+                self.view_scale = new_scale
+                
+                # 调整偏移以保持鼠标位置不变
+                new_offset_x = zoom_center.x() - view_center_x * self.view_scale
+                new_offset_y = zoom_center.y() - view_center_y * self.view_scale
+                self.view_offset = QPoint(int(new_offset_x), int(new_offset_y))
+                
+                self.update()
+                
+            event.accept()
+        else:
+            super().wheelEvent(event)
+            
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            # 每次新绘制都自动清除之前的内容
-            self.clear_drawing()
+        self.setFocus()  # 获取键盘焦点
+        
+        if event.button() == Qt.MouseButton.MiddleButton:
+            # 中键双击检测
+            self.click_count += 1
+            if self.click_count == 1:
+                self.click_timer.start(300)  # 300ms内等待第二次点击
+            elif self.click_count == 2:
+                self.click_timer.stop()
+                self._reset_view()  # 双击中键归位
+                self.click_count = 0
+                return
+                
+            # 开始拖拽
+            self.panning = True
+            self.last_pan_point = event.pos()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
             
-            self.drawing = True
-            self.current_path = [event.pos()]
-            self.update()
+        elif event.button() == Qt.MouseButton.LeftButton:
+            if self.space_pressed:
+                # 空格+左键拖拽
+                self.panning = True
+                self.last_pan_point = event.pos()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            else:
+                # 正常绘制
+                self.clear_drawing()
+                self.drawing = True
+                # 将屏幕坐标转换为视图坐标
+                view_pos = self._screen_to_view(event.pos())
+                self.current_path = [view_pos]
+                self.update()
+                
+    def _single_click_timeout(self):
+        """单击超时"""
+        self.click_count = 0
             
     def mouseMoveEvent(self, event):
         """鼠标移动事件"""
-        if self.drawing:
-            self.current_path.append(event.pos())
+        if self.panning:
+            # 拖拽画布
+            delta = event.pos() - self.last_pan_point
+            self.view_offset += delta
+            self.last_pan_point = event.pos()
+            self.update()
+        elif self.drawing:
+            # 绘制手势
+            view_pos = self._screen_to_view(event.pos())
+            self.current_path.append(view_pos)
             self.update()
             
     def mouseReleaseEvent(self, event):
         """鼠标释放事件"""
-        if self.drawing and event.button() == Qt.MouseButton.LeftButton:
+        if self.panning and (event.button() == Qt.MouseButton.MiddleButton or 
+                           (event.button() == Qt.MouseButton.LeftButton and self.space_pressed)):
+            self.panning = False
+            self.setCursor(Qt.CursorShape.OpenHandCursor if self.space_pressed else Qt.CursorShape.ArrowCursor)
+            
+        elif self.drawing and event.button() == Qt.MouseButton.LeftButton and not self.space_pressed:
             self.drawing = False
             if len(self.current_path) > 1:
-                # 格式化路径
+                # 格式化路径 - 注意这里current_path已经是视图坐标
                 raw_points = [(p.x(), p.y(), 0.5, 0.0, 1) for p in self.current_path]
                 formatted_path = self.path_analyzer.format_raw_path(raw_points)
                 
@@ -74,10 +212,30 @@ class GestureDrawingWidget(QWidget):
             self.current_path = []
             self.update()
             
+    def _screen_to_view(self, screen_pos):
+        """将屏幕坐标转换为视图坐标"""
+        view_x = (screen_pos.x() - self.view_offset.x()) / self.view_scale
+        view_y = (screen_pos.y() - self.view_offset.y()) / self.view_scale
+        return QPoint(int(view_x), int(view_y))
+        
+
+    def _reset_view(self):
+        """重置视图到标准视图状态"""
+        self.view_scale = self.standard_scale
+        self.view_offset = QPoint(self.standard_offset)
+        self.update()
+        self.logger.info("视图已重置到标准状态")
+            
     def paintEvent(self, event):
         """绘制事件"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # 应用视图变换
+        transform = QTransform()
+        transform.translate(self.view_offset.x(), self.view_offset.y())
+        transform.scale(self.view_scale, self.view_scale)
+        painter.setTransform(transform)
         
         # 绘制已完成的路径（蓝色）
         painter.setPen(QPen(QColor(0, 120, 255), 2))
@@ -247,13 +405,24 @@ class GestureDrawingWidget(QWidget):
         """清除绘制内容"""
         self.current_path = []
         self.completed_paths = []
+        # 重置到默认视图
+        self.view_scale = 1.0
+        self.view_offset = QPoint(0, 0)
+        self.standard_scale = 1.0
+        self.standard_offset = QPoint(0, 0)
         self.update()
         
+
     def load_path(self, path):
         """加载并显示指定路径（用于编辑现有手势）"""
         if path and path.get('points'):
             self.clear_drawing()  # 先清除现有内容
             self.completed_paths = [path]
+            # 重置到标准视图（1:1）让自动缩放生效
+            self.view_scale = 1.0
+            self.view_offset = QPoint(0, 0)
+            self.standard_scale = 1.0
+            self.standard_offset = QPoint(0, 0)
             self.update()
         else:
             self.clear_drawing() 
