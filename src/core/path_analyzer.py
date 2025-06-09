@@ -269,33 +269,38 @@ class PathAnalyzer:
         score = 0.0
         total_weight = 0.0
         
-        # 1. 段数相似度 (20%权重)
+        # 1. 段数相似度 (10%权重)
         seg_count_diff = abs(len(connections1) - len(connections2))
         max_segments = max(len(connections1), len(connections2))
         if max_segments > 0:
-            seg_similarity = max(0, 1 - (seg_count_diff / max_segments) * 2)  # 更严格的惩罚
-            score += seg_similarity * 0.2
-            total_weight += 0.2
+            seg_similarity = max(0, 1 - (seg_count_diff / max_segments) * 2)
+            score += seg_similarity * 0.10
+            total_weight += 0.10
         
-        # 2. 路径类型序列相似度 (30%权重)
+        # 2. 路径类型序列相似度 (15%权重)
         type_similarity = self._compare_path_types(connections1, connections2)
-        score += type_similarity * 0.3
-        total_weight += 0.3
+        score += type_similarity * 0.15
+        total_weight += 0.15
         
-        # 3. 形状相似度 (25%权重)
+        # 3. 路径顺序性相似度 (50%权重) - 大幅提高权重
+        sequence_similarity = self._compare_path_sequence(points1, points2)
+        score += sequence_similarity * 0.50
+        total_weight += 0.50
+        
+        # 4. 形状相似度 (15%权重)
         shape_similarity = self._compare_detailed_shape(points1, points2)
-        score += shape_similarity * 0.25
-        total_weight += 0.25
+        score += shape_similarity * 0.15
+        total_weight += 0.15
         
-        # 4. 路径方向相似度 (25%权重)
+        # 5. 路径方向相似度 (10%权重)
         direction_similarity = self._compare_path_directions(points1, points2)
-        score += direction_similarity * 0.25
-        total_weight += 0.25
+        score += direction_similarity * 0.10
+        total_weight += 0.10
         
         final_score = score / total_weight if total_weight > 0 else 0.0
         
         # 应用非线性变换，让差异更明显
-        final_score = final_score ** 1.5  # 让低分更低，高分相对保持
+        final_score = final_score ** 2.2  # 更严格的惩罚，让低分更低
         
         return final_score
     
@@ -308,6 +313,128 @@ class PathAnalyzer:
         max_len = max(len(types1), len(types2), 1)
         edit_dist = self._edit_distance(types1, types2)
         return max(0, 1 - (edit_dist / max_len))
+    
+    def _compare_path_sequence(self, points1, points2):
+        """比较路径的顺序性相似度，确保绘制顺序和方向一致性
+        
+        Args:
+            points1: 第一个路径的点列表
+            points2: 第二个路径的点列表
+            
+        Returns:
+            float: 顺序性相似度 (0.0 到 1.0)
+        """
+        if len(points1) < 2 or len(points2) < 2:
+            return 0.5
+        
+        # 1. 计算正向匹配相似度
+        forward_similarity = self._calculate_sequence_match(points1, points2)
+        
+        # 2. 计算反向匹配相似度（考虑路径可能被反向绘制）
+        # 但是大幅降低权重，因为顺序在手势触发时坚决不可颠倒
+        reversed_points2 = list(reversed(points2))
+        backward_similarity = self._calculate_sequence_match(points1, reversed_points2)
+        
+        # 返回较高的相似度，但对反向匹配给予严格的惩罚
+        # 反向匹配权重从0.8降低到0.1，确保顺序错误时相似度很低
+        final_similarity = max(forward_similarity, backward_similarity * 0.1)
+        
+        return final_similarity
+    
+    def _calculate_sequence_match(self, points1, points2):
+        """计算两个点序列的匹配度
+        
+        Args:
+            points1: 第一个点序列
+            points2: 第二个点序列
+            
+        Returns:
+            float: 序列匹配度 (0.0 到 1.0)
+        """
+        # 将路径分割成相等数量的段进行比较
+        segment_count = min(8, max(len(points1), len(points2)) // 2)  # 最多8段，最少根据点数确定
+        
+        if segment_count < 2:
+            return 0.5
+        
+        # 获取路径段的方向向量
+        vectors1 = self._get_path_segments(points1, segment_count)
+        vectors2 = self._get_path_segments(points2, segment_count)
+        
+        if not vectors1 or not vectors2:
+            return 0.5
+        
+        # 计算每个段的方向相似度
+        similarities = []
+        for i in range(min(len(vectors1), len(vectors2))):
+            v1 = vectors1[i]
+            v2 = vectors2[i]
+            
+            # 计算方向向量的余弦相似度
+            dot_product = v1[0] * v2[0] + v1[1] * v2[1]
+            magnitude1 = math.sqrt(v1[0]**2 + v1[1]**2)
+            magnitude2 = math.sqrt(v2[0]**2 + v2[1]**2)
+            
+            if magnitude1 > 0 and magnitude2 > 0:
+                cosine_similarity = dot_product / (magnitude1 * magnitude2)
+                # 对方向差异进行更严格的惩罚
+                if cosine_similarity > 0.5:  # 同向或接近同向
+                    segment_similarity = (cosine_similarity + 1) / 2
+                else:  # 反向或垂直方向，严重惩罚
+                    segment_similarity = max(0, cosine_similarity * 0.2)
+            else:
+                segment_similarity = 0.1  # 零向量给予很低分数
+            
+            similarities.append(segment_similarity)
+        
+        # 计算加权平均，早期段权重更高（路径起始方向更重要）
+        # 使用更陡峭的递减权重
+        if similarities:
+            weights = [1.0 - 0.2 * i for i in range(len(similarities))]  # 更快递减权重
+            weights = [max(0.1, w) for w in weights]  # 确保最小权重为0.1
+            weighted_sum = sum(sim * weight for sim, weight in zip(similarities, weights))
+            weight_sum = sum(weights)
+            return weighted_sum / weight_sum if weight_sum > 0 else 0.1
+        
+        return 0.1
+    
+    def _get_path_segments(self, points, segment_count):
+        """将路径分割成指定数量的段，返回每段的方向向量
+        
+        Args:
+            points: 点列表
+            segment_count: 段数
+            
+        Returns:
+            list: 方向向量列表，每个元素为(dx, dy)
+        """
+        if len(points) < 2 or segment_count < 1:
+            return []
+        
+        segments = []
+        step = len(points) / segment_count
+        
+        for i in range(segment_count):
+            start_idx = int(i * step)
+            end_idx = int((i + 1) * step)
+            
+            # 确保索引在有效范围内
+            start_idx = min(start_idx, len(points) - 1)
+            end_idx = min(end_idx, len(points) - 1)
+            
+            if start_idx >= end_idx:
+                end_idx = min(start_idx + 1, len(points) - 1)
+            
+            if start_idx < end_idx:
+                start_point = points[start_idx]
+                end_point = points[end_idx]
+                
+                # 计算方向向量
+                dx = end_point[0] - start_point[0]
+                dy = end_point[1] - start_point[1]
+                segments.append((dx, dy))
+        
+        return segments
     
     def _edit_distance(self, seq1, seq2):
         """计算编辑距离"""
