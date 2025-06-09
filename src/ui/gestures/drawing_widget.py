@@ -53,6 +53,8 @@ class GestureDrawingWidget(QWidget):
         self.panning = False
         self.last_pan_point = QPoint()
         self.space_pressed = False
+        self.left_shift_pressed = False   # 左Shift键状态
+        self.right_shift_pressed = False  # 右Shift键状态
         
         # 双击检测
         self.click_timer = QTimer()
@@ -289,6 +291,15 @@ class GestureDrawingWidget(QWidget):
         if event.key() == Qt.Key.Key_Space:
             self.space_pressed = True
             self.setCursor(Qt.CursorShape.OpenHandCursor)
+        elif event.key() == Qt.Key.Key_Shift:
+            # 区分左右Shift键
+            if event.nativeVirtualKey() == 160:  # 左Shift的虚拟键码
+                self.left_shift_pressed = True
+            elif event.nativeVirtualKey() == 161:  # 右Shift的虚拟键码
+                self.right_shift_pressed = True
+            else:
+                # 如果无法区分，默认为左Shift
+                self.left_shift_pressed = True
         elif event.key() == Qt.Key.Key_Z and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             # Ctrl+Z 撤回
             self.undo_action()
@@ -306,6 +317,16 @@ class GestureDrawingWidget(QWidget):
             self.space_pressed = False
             if not self.panning:
                 self.setCursor(Qt.CursorShape.ArrowCursor)
+        elif event.key() == Qt.Key.Key_Shift:
+            # 重置Shift键状态
+            if event.nativeVirtualKey() == 160:  # 左Shift
+                self.left_shift_pressed = False
+            elif event.nativeVirtualKey() == 161:  # 右Shift
+                self.right_shift_pressed = False
+            else:
+                # 如果无法区分，重置所有Shift状态
+                self.left_shift_pressed = False
+                self.right_shift_pressed = False
         super().keyReleaseEvent(event)
         
     def wheelEvent(self, event):
@@ -689,10 +710,97 @@ class GestureDrawingWidget(QWidget):
             adjusted_pos = self._adjust_for_drawing_area(screen_pos)
             view_pos = self._screen_to_view(adjusted_pos)
             
+            # 如果按住Shift键，启用角度约束功能
+            if self.left_shift_pressed or self.right_shift_pressed:
+                use_left_shift = self.left_shift_pressed
+                view_pos = self._apply_angle_snap(path_index, point_index, view_pos, use_left_shift)
+            
             # 更新点位置，使用视图坐标
             self.completed_paths[path_index]['points'][point_index] = (view_pos.x(), view_pos.y())
             self.update()
-            
+    
+    def _apply_angle_snap(self, path_index, point_index, new_pos, use_left_shift):
+        """应用角度约束功能：只能沿着30度和45度整数倍的角度线移动
+        
+        Args:
+            use_left_shift: True表示左Shift（参考前一个点），False表示右Shift（参考后一个点）
+        """
+        points = self.completed_paths[path_index]['points']
+        connections = self.completed_paths[path_index].get('connections', [])
+        
+        # 根据Shift键方向查找参考点
+        reference_point = None
+        
+        if use_left_shift:
+            # 左Shift：查找指向当前点的连接（前一个点）
+            for conn in connections:
+                if conn.get('to') == point_index:
+                    from_idx = conn.get('from')
+                    if from_idx < len(points):
+                        reference_point = points[from_idx]
+                        break
+        else:
+            # 右Shift：查找从当前点出发的连接（后一个点）
+            for conn in connections:
+                if conn.get('from') == point_index:
+                    to_idx = conn.get('to')
+                    if to_idx < len(points):
+                        reference_point = points[to_idx]
+                        break
+        
+        # 如果按照方向找不到参考点，尝试找另一个方向（处理开头/结尾情况）
+        if reference_point is None:
+            for conn in connections:
+                if conn.get('from') == point_index:
+                    to_idx = conn.get('to')
+                    if to_idx < len(points):
+                        reference_point = points[to_idx]
+                        break
+                elif conn.get('to') == point_index:
+                    from_idx = conn.get('from')
+                    if from_idx < len(points):
+                        reference_point = points[from_idx]
+                        break
+        
+        # 如果仍然没有参考点，不进行约束
+        if reference_point is None:
+            return new_pos
+        
+        ref_x, ref_y = reference_point
+        
+        # 计算从参考点到新位置的距离和角度
+        distance = math.sqrt((new_pos.x() - ref_x) ** 2 + (new_pos.y() - ref_y) ** 2)
+        if distance < 10:  # 距离太近时不进行约束
+            return new_pos
+        
+        angle_rad = math.atan2(new_pos.y() - ref_y, new_pos.x() - ref_x)
+        angle_deg = math.degrees(angle_rad)
+        
+        # 定义所有允许的角度（30度和45度的整数倍，去重并排序）
+        allowed_angles = set()
+        for base_angle in [30, 45]:
+            for multiplier in range(int(360 / base_angle)):
+                allowed_angles.add((base_angle * multiplier) % 360)
+        allowed_angles = sorted(list(allowed_angles))
+        
+        # 找到最接近当前角度的允许角度
+        # 处理角度环绕问题（0度和360度相同）
+        angle_deg_normalized = angle_deg % 360
+        if angle_deg_normalized < 0:
+            angle_deg_normalized += 360
+        
+        closest_allowed_angle = min(allowed_angles, 
+            key=lambda x: min(abs(angle_deg_normalized - x), 
+                            abs(angle_deg_normalized - x + 360), 
+                            abs(angle_deg_normalized - x - 360)))
+        
+        # 计算约束后的位置（沿着最近的允许角度线）
+        constrained_angle_rad = math.radians(closest_allowed_angle)
+        constrained_x = ref_x + distance * math.cos(constrained_angle_rad)
+        constrained_y = ref_y + distance * math.sin(constrained_angle_rad)
+        
+        return QPoint(int(constrained_x), int(constrained_y))
+    
     def _delete_selected_point(self):
         """删除选中的点"""
         if self.selected_point_index < 0:
