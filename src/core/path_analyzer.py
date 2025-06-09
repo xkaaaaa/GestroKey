@@ -77,7 +77,7 @@ class PathAnalyzer:
             self.logger.info(f"路径预处理缩放：从 {current_size:.1f}px 放大至 {target_size:.1f}px。")
             return scaled_coords
         
-            return coords
+        return coords
     
     def _extract_key_points(self, coords: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
         """从坐标点中智能提取关键点，保留路径的核心特征。"""
@@ -137,7 +137,7 @@ class PathAnalyzer:
             
             # 保留点位的条件：显著的角度变化 或 与上一个关键点距离足够远
             if abs(angle_change) > 30 or distance_from_last_key > min_distance_threshold:
-                    key_points.append(points[i])
+                key_points.append(points[i])
         
         key_points.append(points[-1])
         return key_points

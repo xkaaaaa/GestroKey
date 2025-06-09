@@ -37,7 +37,6 @@ class GestureDrawingWidget(QWidget):
         
         # 工具状态
         self.current_tool = "brush"  # 当前工具：brush 或 pointer
-        self.point_editing_mode = False  # 点编辑模式
         self.selected_point_index = -1  # 选中的点索引
         self.dragging_point = False  # 是否正在拖拽点
 
@@ -213,7 +212,6 @@ class GestureDrawingWidget(QWidget):
         self.current_tool = "brush"
         self.brush_btn.setChecked(True)
         self.pointer_btn.setChecked(False)
-        self.point_editing_mode = False
         self.selected_point_index = -1
         self.dragging_point = False
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -224,7 +222,6 @@ class GestureDrawingWidget(QWidget):
         self.current_tool = "pointer"
         self.brush_btn.setChecked(False)
         self.pointer_btn.setChecked(True)
-        self.point_editing_mode = True
         self.drawing = False  # 停止绘制模式
         self.selected_point_index = -1
         self.dragging_point = False
@@ -298,6 +295,9 @@ class GestureDrawingWidget(QWidget):
         elif event.key() == Qt.Key.Key_Y and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             # Ctrl+Y 还原
             self.redo_action()
+        elif event.key() == Qt.Key.Key_Delete and self.current_tool == "pointer" and self.selected_point_index >= 0:
+            # Delete键删除选中的点
+            self._delete_selected_point()
         super().keyPressEvent(event)
         
     def keyReleaseEvent(self, event):
@@ -464,14 +464,13 @@ class GestureDrawingWidget(QWidget):
         elif self.current_tool == "pointer" and self.dragging_point and event.button() == Qt.MouseButton.LeftButton:
             # 点击工具 - 完成拖拽
             self.dragging_point = False
-
             self.setCursor(Qt.CursorShape.PointingHandCursor)
             # 保存到历史记录
             self.save_to_history()
             
             # 不发送路径更新信号，避免路径被替换
             self.logger.info(f"完成拖拽点 {self.selected_point_index}")
-            self.selected_point_index = -1  # 清除选择状态
+            # 保持选中状态，不清除 self.selected_point_index
             
     def _is_in_drawing_area(self, pos):
         """检查位置是否在绘制区域内"""
@@ -569,17 +568,25 @@ class GestureDrawingWidget(QWidget):
         clicked_point_index = self._find_point_at_position(screen_pos)
         
         if clicked_point_index >= 0:
-            # 点击了现有点，开始拖拽
-            self.selected_point_index = clicked_point_index
-            self.dragging_point = True
-            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            # 解析点索引
+            path_index = clicked_point_index // 1000
+            point_index = clicked_point_index % 1000
             
-
-            
-            self.logger.info(f"开始拖拽点 {clicked_point_index}")
+            if self.selected_point_index == clicked_point_index:
+                # 已经选中的点，开始拖拽
+                self.dragging_point = True
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+                self.logger.info(f"开始拖拽点 {clicked_point_index}")
+            else:
+                # 选中新点
+                self.selected_point_index = clicked_point_index
+                self.update()  # 重绘以显示选中状态
+                self.logger.info(f"选中点 {clicked_point_index}")
         else:
-            # 添加新点
+            # 点击空白区域，取消选择并添加新点
+            self.selected_point_index = -1
             self._add_new_point(screen_pos)
+            self.update()  # 重绘以清除选中状态
             
     def _find_point_at_position(self, screen_pos, tolerance=15):
         """查找指定位置的点，返回点索引，如果没找到返回-1"""
@@ -686,6 +693,84 @@ class GestureDrawingWidget(QWidget):
             self.completed_paths[path_index]['points'][point_index] = (view_pos.x(), view_pos.y())
             self.update()
             
+    def _delete_selected_point(self):
+        """删除选中的点"""
+        if self.selected_point_index < 0:
+            return
+            
+        # 解析全局点索引
+        path_index = self.selected_point_index // 1000
+        point_index = self.selected_point_index % 1000
+        
+        if (path_index < len(self.completed_paths) and 
+            self.completed_paths[path_index].get('points') and
+            point_index < len(self.completed_paths[path_index]['points'])):
+            
+            path = self.completed_paths[path_index]
+            points = path['points']
+            connections = path.get('connections', [])
+            
+            # 删除点
+            del points[point_index]
+            
+            # 如果路径没有点了，删除整个路径
+            if not points:
+                del self.completed_paths[path_index]
+            else:
+                # 更新连接关系：找到涉及被删除点的连接，建立新的桥接连接
+                new_connections = []
+                incoming_points = []  # 指向被删除点的连接的起点
+                outgoing_points = []  # 从被删除点出发的连接的终点
+                
+                # 分析现有连接，收集需要桥接的信息
+                for conn in connections:
+                    from_idx = conn.get('from', 0)
+                    to_idx = conn.get('to', 0)
+                    
+                    if to_idx == point_index:
+                        # 指向被删除点的连接
+                        incoming_points.append(from_idx)
+                    elif from_idx == point_index:
+                        # 从被删除点出发的连接
+                        outgoing_points.append(to_idx)
+                    else:
+                        # 不涉及被删除点的连接，调整索引后保留
+                        adjusted_from = from_idx - 1 if from_idx > point_index else from_idx
+                        adjusted_to = to_idx - 1 if to_idx > point_index else to_idx
+                        new_connections.append({
+                            'from': adjusted_from,
+                            'to': adjusted_to,
+                            'type': conn.get('type', 'line')
+                        })
+                
+                # 建立桥接连接：每个incoming点连接到每个outgoing点
+                for incoming in incoming_points:
+                    for outgoing in outgoing_points:
+                        # 调整索引
+                        adjusted_incoming = incoming - 1 if incoming > point_index else incoming
+                        adjusted_outgoing = outgoing - 1 if outgoing > point_index else outgoing
+                        
+                        # 避免自连接
+                        if adjusted_incoming != adjusted_outgoing:
+                            new_connections.append({
+                                'from': adjusted_incoming,
+                                'to': adjusted_outgoing,
+                                'type': 'line'
+                            })
+                
+                path['connections'] = new_connections
+            
+            # 清除选择状态
+            self.selected_point_index = -1
+            
+            # 保存到历史记录
+            self.save_to_history()
+            
+            # 更新显示
+            self.update()
+            
+            self.logger.info(f"删除点 {point_index} from path {path_index}")
+            
     def paintEvent(self, event):
         """绘制事件"""
         painter = QPainter(self)
@@ -772,28 +857,63 @@ class GestureDrawingWidget(QWidget):
         for i, point in enumerate(points):
             point_pos = get_point(point)
             
+            # 绘制选中状态的黄色半透明圆环
+            global_point_index = -1
+            for path_idx, p in enumerate(self.completed_paths):
+                if p == path:
+                    global_point_index = path_idx * 1000 + i
+                    break
+            
+            if global_point_index >= 0 and global_point_index == self.selected_point_index:
+                # 根据点型确定选择圆环的基础大小（视图坐标下的像素）
+                if i == 0:
+                    # 起点 - 圆环半径比点大4像素
+                    base_ring_radius = 10  # 6 + 4
+                elif i == len(points) - 1:
+                    # 终点 - 圆环半径比点大4像素  
+                    if len(points) == 1:
+                        base_ring_radius = 10  # 单点情况，与起点相同
+                    else:
+                        base_ring_radius = 8   # 4 + 4
+                else:
+                    # 中间点 - 圆环半径比点大4像素
+                    base_ring_radius = 6   # 2 + 4
+                
+                # 根据当前缩放比例调整圆环大小，确保在屏幕上显示一致
+                actual_ring_radius = int(base_ring_radius / self.view_scale)
+                
+                # 绘制选中状态的黄色半透明圆环
+                painter.setPen(QPen(QColor(255, 255, 0, 180), max(1, int(3 / self.view_scale))))
+                painter.setBrush(QColor(255, 255, 0, 60))  # 半透明黄色
+                ring_size = actual_ring_radius * 2
+                painter.drawEllipse(point_pos.x() - actual_ring_radius, point_pos.y() - actual_ring_radius, ring_size, ring_size)
+            
             if i == 0:
                 # 起点 - 绿色，较大
-                painter.setPen(QPen(QColor(0, 200, 0), 3))
+                start_radius = int(6 / self.view_scale)
+                painter.setPen(QPen(QColor(0, 200, 0), max(1, int(3 / self.view_scale))))
                 painter.setBrush(QColor(0, 200, 0))
-                painter.drawEllipse(point_pos.x() - 6, point_pos.y() - 6, 12, 12)
+                painter.drawEllipse(point_pos.x() - start_radius, point_pos.y() - start_radius, start_radius * 2, start_radius * 2)
             elif i == len(points) - 1:
                 # 终点 - 红色
                 if len(points) == 1:
                     # 只有一个点时，绘制一个小一点的红色圆点在绿色内部
-                    painter.setPen(QPen(QColor(255, 0, 0), 2))
+                    end_radius = int(3 / self.view_scale)
+                    painter.setPen(QPen(QColor(255, 0, 0), max(1, int(2 / self.view_scale))))
                     painter.setBrush(QColor(255, 0, 0))
-                    painter.drawEllipse(point_pos.x() - 3, point_pos.y() - 3, 6, 6)
+                    painter.drawEllipse(point_pos.x() - end_radius, point_pos.y() - end_radius, end_radius * 2, end_radius * 2)
                 else:
                     # 有多个点时，终点稍微小一点
-                    painter.setPen(QPen(QColor(255, 0, 0), 3))
+                    end_radius = int(4 / self.view_scale)
+                    painter.setPen(QPen(QColor(255, 0, 0), max(1, int(3 / self.view_scale))))
                     painter.setBrush(QColor(255, 0, 0))
-                    painter.drawEllipse(point_pos.x() - 4, point_pos.y() - 4, 8, 8)
+                    painter.drawEllipse(point_pos.x() - end_radius, point_pos.y() - end_radius, end_radius * 2, end_radius * 2)
             else:
                 # 中间点 - 蓝色，最小
-                painter.setPen(QPen(QColor(0, 120, 255), 2))
+                mid_radius = int(2 / self.view_scale)
+                painter.setPen(QPen(QColor(0, 120, 255), max(1, int(2 / self.view_scale))))
                 painter.setBrush(QColor(0, 120, 255))
-                painter.drawEllipse(point_pos.x() - 2, point_pos.y() - 2, 4, 4)
+                painter.drawEllipse(point_pos.x() - mid_radius, point_pos.y() - mid_radius, mid_radius * 2, mid_radius * 2)
         
         painter.setPen(old_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)  # 重置画刷
