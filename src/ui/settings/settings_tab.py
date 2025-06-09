@@ -421,48 +421,53 @@ class SettingsPage(QWidget):
 
     def _apply_all_settings(self):
         """应用所有当前设置到系统（内部通用方法）"""
-        # 应用画笔设置
-        thickness = self.thickness_slider.value()
-        color = self.color_preview.get_color()
-        self._apply_pen_settings_to_drawing_module(thickness, color)
-        
-        # 应用开机自启设置
-        is_autostart = self.autostart_checkbox.isChecked()
-        current_autostart = self.settings.is_autostart_enabled()
-        
-        if is_autostart != current_autostart:
-            success = self.settings.set_autostart(is_autostart)
-            if not success:
-                QMessageBox.warning(self, "警告", "更新开机自启动设置失败")
-                return False
-        
-        # 应用应用设置
-        show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
-        self.settings.set("app.show_exit_dialog", show_exit_dialog)
-        
-        default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
-        self.settings.set("app.default_close_action", default_close_action)
-        
-        # 应用手势相似度阈值
-        threshold = self.threshold_spinbox.value()
-        self.settings.set("gesture.similarity_threshold", threshold)
-        
-        # 应用强制置顶设置
-        force_topmost = self.force_topmost_checkbox.isChecked()
-        self.settings.set("brush.force_topmost", force_topmost)
-        
-        # 立即更新绘制模块的强制置顶设置
         try:
-            main_window = self._find_main_window()
-            if main_window and hasattr(main_window, 'console_page'):
-                console_page = main_window.console_page
-                if hasattr(console_page, 'drawing_manager') and console_page.drawing_manager:
-                    console_page.drawing_manager.update_settings()
-                    self.logger.debug(f"已立即应用强制置顶设置: {force_topmost}")
+            # 应用画笔设置
+            thickness = self.thickness_slider.value()
+            color = self.color_preview.get_color()
+            self._apply_pen_settings_to_drawing_module(thickness, color)
+            
+            # 应用开机自启设置
+            is_autostart = self.autostart_checkbox.isChecked()
+            current_autostart = self.settings.is_autostart_enabled()
+            
+            if is_autostart != current_autostart:
+                success = self.settings.set_autostart(is_autostart)
+                if not success:
+                    QMessageBox.warning(self, "警告", "更新开机自启动设置失败")
+                    return False
+            
+            # 应用应用设置
+            show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
+            self.settings.set("app.show_exit_dialog", show_exit_dialog)
+            
+            default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
+            self.settings.set("app.default_close_action", default_close_action)
+            
+            # 应用手势相似度阈值
+            threshold = self.threshold_spinbox.value()
+            self.settings.set("gesture.similarity_threshold", threshold)
+            
+            # 应用强制置顶设置
+            force_topmost = self.force_topmost_checkbox.isChecked()
+            self.settings.set("brush.force_topmost", force_topmost)
+            
+            # 立即更新绘制模块的强制置顶设置
+            try:
+                main_window = self._find_main_window()
+                if main_window and hasattr(main_window, 'console_page'):
+                    console_page = main_window.console_page
+                    if hasattr(console_page, 'drawing_manager') and console_page.drawing_manager:
+                        console_page.drawing_manager.update_settings()
+                        self.logger.debug(f"已立即应用强制置顶设置: {force_topmost}")
+            except Exception as e:
+                self.logger.error(f"应用强制置顶设置失败: {e}")
+            
+            return True
+            
         except Exception as e:
-            self.logger.error(f"应用强制置顶设置失败: {e}")
-        
-        return True
+            self.logger.error(f"应用所有设置失败: {e}")
+            return False
 
     def _apply_settings(self):
         """应用当前设置"""
