@@ -20,6 +20,8 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QDoubleSpinBox,
     QTabWidget,
+    QFrame,
+    QDialog,
 )
 
 try:
@@ -172,11 +174,10 @@ class GesturesPage(QWidget):
         
         self.drawing_widget = GestureDrawingWidget()
         self.drawing_widget.pathCompleted.connect(self._on_path_completed)
+        self.drawing_widget.testSimilarity.connect(self._test_similarity)
         path_layout.addWidget(self.drawing_widget)
         
         layout.addWidget(path_group)
-
-
 
         # 操作按钮
         button_layout = QHBoxLayout()
@@ -497,8 +498,6 @@ class GesturesPage(QWidget):
         
         self.logger.debug(f"开始创建新手势: {new_name}")
 
-
-
     def _select_gesture_in_list(self, name):
         """在列表中选中指定手势"""
         for i in range(self.gesture_list.count()):
@@ -610,6 +609,165 @@ class GesturesPage(QWidget):
         self.current_path = copy.deepcopy(path)
         self._on_form_changed()  # 触发表单变更检测
         self.logger.info(f"路径绘制完成，关键点数: {len(path.get('points', []))}")
+    
+    def _test_similarity(self):
+        """测试相似度"""
+        if not self.current_path:
+            QMessageBox.warning(self, "警告", "请先绘制手势路径")
+            return
+        
+        # 创建并显示测试对话框
+        dialog = SimilarityTestDialog(self.current_path, self)
+        dialog.exec()
+
+
+class SimilarityTestDialog(QDialog):
+    """相似度测试对话框"""
+    
+    def __init__(self, reference_path, parent=None):
+        super().__init__(parent)
+        self.reference_path = reference_path
+        self.test_path = None
+        
+        try:
+            from core.path_analyzer import PathAnalyzer
+            self.path_analyzer = PathAnalyzer()
+        except ImportError:
+            self.path_analyzer = None
+        
+        self.setWindowTitle("相似度测试")
+        self.setFixedSize(800, 600)
+        self._init_ui()
+    
+    def _init_ui(self):
+        """初始化UI"""
+        layout = QVBoxLayout(self)
+        
+        # 上半部分：两个画板
+        canvas_group = QGroupBox("路径对比")
+        canvas_layout = QHBoxLayout(canvas_group)
+        
+        # 左侧：显示参考路径
+        left_group = QGroupBox("当前编辑的路径")
+        left_layout = QVBoxLayout(left_group)
+        
+        self.reference_widget = GestureDrawingWidget()
+        self.reference_widget.setFixedHeight(250)
+        # 隐藏工具栏
+        self.reference_widget.toolbar.setVisible(False)
+        # 禁用所有工具，但保持显示功能
+        self.reference_widget.current_tool = None
+        self.reference_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        # 加载参考路径
+        self.reference_widget.load_path(self.reference_path)
+        left_layout.addWidget(self.reference_widget)
+        
+        # 延迟重置视图，确保widget已完全显示
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, self.reference_widget._reset_view)
+        
+        canvas_layout.addWidget(left_group)
+        
+        # 右侧：用户绘制测试路径
+        right_group = QGroupBox("绘制测试路径")
+        right_layout = QVBoxLayout(right_group)
+        
+        self.test_widget = GestureDrawingWidget()
+        self.test_widget.setFixedHeight(250)
+        # 隐藏工具栏
+        self.test_widget.toolbar.setVisible(False)
+        # 设置为画笔工具
+        self.test_widget.current_tool = "brush"
+        # 连接路径完成信号
+        self.test_widget.pathCompleted.connect(self._on_test_path_completed)
+        # 重写鼠标按下事件以在开始绘画时清空画布
+        self._setup_test_widget_events()
+        right_layout.addWidget(self.test_widget)
+        
+        canvas_layout.addWidget(right_group)
+        
+        layout.addWidget(canvas_group)
+        
+        # 下半部分：相似度显示
+        result_group = QGroupBox("相似度结果")
+        result_layout = QVBoxLayout(result_group)
+        
+        self.similarity_label = QLabel("请在右侧画板绘制测试路径")
+        self.similarity_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.similarity_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 20px;")
+        result_layout.addWidget(self.similarity_label)
+        
+        layout.addWidget(result_group)
+        
+        # 按钮区域
+        button_layout = QHBoxLayout()
+        
+        self.btn_close = QPushButton("关闭")
+        self.btn_close.clicked.connect(self.close)
+        button_layout.addWidget(self.btn_close)
+        
+        layout.addLayout(button_layout)
+    
+    def _on_test_path_completed(self, path):
+        """测试路径绘制完成"""
+        self.test_path = path
+        self._calculate_similarity()
+    
+    def _setup_test_widget_events(self):
+        """设置测试组件的事件处理"""
+        # 保存原始的鼠标按下事件
+        original_mouse_press = self.test_widget.mousePressEvent
+        
+        def custom_mouse_press(event):
+            # 如果是左键按下且不是在拖拽状态，表示开始新的绘画
+            if (event.button() == Qt.MouseButton.LeftButton and 
+                self.test_widget.current_tool == "brush" and
+                not self.test_widget.space_pressed and
+                self.test_widget._is_in_drawing_area(event.pos())):
+                
+                # 清空画布并重置视图
+                self.test_widget.clear_drawing()
+                self.test_widget._reset_view()
+                self.test_path = None
+                self.similarity_label.setText("请在右侧画板绘制测试路径")
+            
+            # 调用原始的事件处理
+            original_mouse_press(event)
+        
+        # 替换鼠标按下事件
+        self.test_widget.mousePressEvent = custom_mouse_press
+    
+    def _calculate_similarity(self):
+        """计算相似度"""
+        if not self.test_path or not self.path_analyzer:
+            self.similarity_label.setText("无法计算相似度")
+            return
+        
+        try:
+            # 归一化路径
+            normalized_ref = self.path_analyzer.normalize_path_scale(self.reference_path)
+            normalized_test = self.path_analyzer.normalize_path_scale(self.test_path)
+            
+            # 计算相似度
+            similarity = self.path_analyzer.calculate_similarity(normalized_ref, normalized_test)
+            
+            # 显示结果
+            percentage = similarity * 100
+            if percentage >= 70:
+                color = "green"
+                status = "很相似"
+            elif percentage >= 50:
+                color = "orange"
+                status = "较相似"
+            else:
+                color = "red"
+                status = "不相似"
+            
+            result_text = f"相似度: <span style='color: {color}; font-size: 24px;'>{percentage:.1f}%</span> ({status})"
+            self.similarity_label.setText(result_text)
+            
+        except Exception as e:
+            self.similarity_label.setText(f"计算错误: {str(e)}")
     
 
 

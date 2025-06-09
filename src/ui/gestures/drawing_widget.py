@@ -19,6 +19,7 @@ class GestureDrawingWidget(QWidget):
     """手势绘制组件，用于在手势管理界面绘制手势路径"""
     
     pathCompleted = pyqtSignal(dict)  # 路径完成信号，发送格式化的路径
+    testSimilarity = pyqtSignal()  # 测试相似度信号
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -166,6 +167,21 @@ class GestureDrawingWidget(QWidget):
         self.redo_btn.clicked.connect(self.redo_action)
         toolbar_layout.addWidget(self.redo_btn)
         
+        # 第二个分割线
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.Shape.HLine)
+        separator2.setFrameShadow(QFrame.Shadow.Sunken)
+        separator2.setStyleSheet("color: #aaa;")
+        toolbar_layout.addWidget(separator2)
+        
+        # 测试相似度按钮
+        self.test_btn = QToolButton()
+        self.test_btn.setIcon(self.load_svg_icon("test.svg"))
+        self.test_btn.setIconSize(QSize(24, 24))
+        self.test_btn.setToolTip("测试相似度")
+        self.test_btn.clicked.connect(self.test_similarity)
+        toolbar_layout.addWidget(self.test_btn)
+        
         # 弹性空间
         toolbar_layout.addStretch()
         
@@ -178,9 +194,10 @@ class GestureDrawingWidget(QWidget):
         """加载SVG图标"""
         try:
             # 构建图标文件路径
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(os.path.dirname(current_dir))
-            icon_path = os.path.join(project_root, "assets", "images", filename)
+            current_dir = os.path.dirname(os.path.abspath(__file__))  # src/ui/gestures/
+            ui_dir = os.path.dirname(current_dir)  # src/ui/
+            src_dir = os.path.dirname(ui_dir)  # src/
+            icon_path = os.path.join(src_dir, "assets", "images", filename)
             
             if os.path.exists(icon_path):
                 return QIcon(icon_path)
@@ -241,6 +258,13 @@ class GestureDrawingWidget(QWidget):
         
         # 更新还原按钮状态
         self.redo_btn.setEnabled(self.history_index < len(self.path_history) - 1)
+        
+        # 更新测试按钮状态：有路径时启用
+        self.test_btn.setEnabled(bool(self.completed_paths))
+    
+    def test_similarity(self):
+        """测试相似度"""
+        self.testSimilarity.emit()
         
     def save_to_history(self):
         """保存当前状态到历史记录"""
