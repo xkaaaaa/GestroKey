@@ -148,7 +148,7 @@ class SettingsPage(QWidget):
 
         # 开机自启动
         self.autostart_checkbox = QCheckBox("开机自启动")
-        self.autostart_checkbox.setToolTip("设置应用程序是否在系统启动时自动运行")
+        self.autostart_checkbox.setToolTip("设置应用程序是否在系统启动时自动运行（将以静默模式启动，自动开始监听并最小化到托盘）")
         self.autostart_checkbox.stateChanged.connect(self._on_autostart_changed)
         layout.addRow("启动选项:", self.autostart_checkbox)
 

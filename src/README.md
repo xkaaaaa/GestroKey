@@ -2,6 +2,16 @@
 
 GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来执行各种操作（如快捷键、启动程序等）。本工具的核心特性包括全局鼠标手势识别、方向分析、手势库管理以及自定义UI组件，适用于日常办公、创意设计和编程开发等场景。
 
+## 主要功能特性
+
+- **全局手势识别**：支持在任何应用程序中绘制手势
+- **智能路径分析**：精确的手势方向识别和相似度匹配
+- **可视化手势编辑**：直观的手势绘制和编辑界面
+- **系统托盘集成**：支持最小化到托盘，后台运行
+- **静默启动模式**：支持`--silent`参数，适用于开机自启动
+- **跨平台兼容**：支持Windows、macOS和Linux系统
+- **开机自启动**：一键设置开机自动启动（静默模式）
+
 本文档详细介绍了GestroKey项目`src`目录下各文件和文件夹的功能及使用方法。
 
 ## 目录索引
@@ -121,6 +131,11 @@ src/
 # 直接运行该文件启动应用程序
 python src/main.py
 
+# 静默启动（自动开始监听并最小化到托盘）
+python src/main.py --silent
+# 或使用短参数
+python src/main.py -s
+
 # 或从其他Python代码中导入并创建实例
 from main import GestroKeyApp
 from PyQt6.QtWidgets import QApplication
@@ -131,6 +146,13 @@ window = GestroKeyApp()
 window.show()
 sys.exit(app.exec())
 ```
+
+**命令行参数**：
+- `--silent` 或 `-s`：静默启动模式，应用程序将：
+  - 不显示主窗口
+  - 自动开始手势监听
+  - 直接最小化到系统托盘
+  - 适用于开机自启动场景
 
 **GUI页面**：
 - 控制台页面：提供绘制功能的开启和停止控制，以及系统资源监测
@@ -606,9 +628,10 @@ drawing_widget.show()
   - `get_app_path(self)`：获取应用程序可执行文件路径
   - `is_autostart_enabled(self)`：检查应用程序是否设置为开机自启动，支持Windows、macOS和Linux系统
   - `set_autostart(self, enable)`：设置开机自启动状态，在不同系统上使用不同的实现方式：
-    - Windows：通过注册表实现
-    - macOS：通过LaunchAgents的plist文件实现
-    - Linux：通过~/.config/autostart目录下的.desktop文件实现
+    - Windows：通过注册表实现，自动添加`--silent`参数
+    - macOS：通过LaunchAgents的plist文件实现，自动添加`--silent`参数
+    - Linux：通过~/.config/autostart目录下的.desktop文件实现，自动添加`--silent`参数
+  - `get_app_path_with_silent(self)`：获取带有静默启动参数的应用程序路径，专用于开机自启设置
 
 - `get_settings()`：获取设置管理器实例的单例函数
 
@@ -687,7 +710,7 @@ settings.set_autostart(False)  # 禁用
     - 笔尖颜色选择（QPushButton和颜色预览）
     - 笔尖预览组件
   - 应用设置组：
-    - 开机自启动选项（QCheckBox）
+    - 开机自启动选项（QCheckBox）：启用后将以静默模式自动启动并开始监听
     - 退出行为设置（QCheckBox和QRadioButton）
     - 手势相似度阈值设置（QDoubleSpinBox）
 - 底部：操作按钮区域

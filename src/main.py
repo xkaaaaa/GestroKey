@@ -1,6 +1,6 @@
+import argparse
 import os
 import sys
-import time
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon
@@ -9,15 +9,15 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from core.drawer import DrawingManager
 from core.logger import get_logger
-from PyQt6.QtWidgets import QMessageBox, QStackedWidget
 from ui.console import ConsolePage
 
 
@@ -165,11 +165,11 @@ from version import APP_NAME, get_version_string
 
 
 class GestroKeyApp(QMainWindow):
-    def __init__(self):
+    def __init__(self, silent_start=False):
         super().__init__()
         self.logger = get_logger("MainApp")
-        self.drawing_manager = None
         self.is_drawing_active = False
+        self.silent_start = silent_start
 
         self.init_global_resources()
         self.initUI()
@@ -179,7 +179,13 @@ class GestroKeyApp(QMainWindow):
         toast_manager.set_main_window(self)
         self.logger.debug("初始化Toast管理器并设置主窗口引用")
 
-        self.logger.info("GestroKey应用程序已启动")
+        # 如果是静默启动，自动开始监听（不显示窗口）
+        if self.silent_start:
+            self.logger.info("GestroKey应用程序已静默启动")
+            # 延迟启动监听，确保所有初始化完成
+            QTimer.singleShot(100, self._silent_start_drawing)
+        else:
+            self.logger.info("GestroKey应用程序已启动")
 
     def init_global_resources(self):
         try:
@@ -213,6 +219,15 @@ class GestroKeyApp(QMainWindow):
                 self.start_drawing()
         else:
             self.logger.warning("找不到控制台页面，无法切换绘制状态")
+
+    def _silent_start_drawing(self):
+        """静默启动时的绘制启动方法"""
+        if hasattr(self, "console_page"):
+            self.start_drawing()
+        else:
+            # 如果console_page还未初始化，再延迟一点时间
+            self.logger.warning("console_page尚未初始化，延迟启动监听")
+            QTimer.singleShot(200, self._silent_start_drawing)
 
     def start_drawing(self):
         if not self.is_drawing_active and hasattr(self, "console_page"):
@@ -442,7 +457,9 @@ class GestroKeyApp(QMainWindow):
         status_widget.setLayout(status_layout)
         main_layout.addWidget(status_widget)
 
-        self.show()
+        # 静默启动时不显示窗口
+        if not self.silent_start:
+            self.show()
 
         self.logger.debug("设置初始页面为控制台")
         QApplication.processEvents()
@@ -813,6 +830,12 @@ class GestroKeyApp(QMainWindow):
 
 
 if __name__ == "__main__":
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='GestroKey - 手势控制应用程序')
+    parser.add_argument('--silent', '-s', action='store_true', 
+                       help='静默启动：自动开始监听并最小化到托盘')
+    args = parser.parse_args()
+
     app = QApplication(sys.argv)
 
     app.setHighDpiScaleFactorRoundingPolicy(
@@ -820,9 +843,15 @@ if __name__ == "__main__":
     )
 
     logger = get_logger("Main")
-    logger.info("启动GestroKey应用程序")
+    if args.silent:
+        logger.info("静默启动GestroKey应用程序")
+    else:
+        logger.info("启动GestroKey应用程序")
 
-    window = GestroKeyApp()
-    window.show()
+    window = GestroKeyApp(silent_start=args.silent)
+    
+    # 静默启动时不显示窗口
+    if not args.silent:
+        window.show()
 
     sys.exit(app.exec())

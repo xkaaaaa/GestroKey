@@ -325,6 +325,32 @@ class Settings:
                 # 如果上述方法都失败，返回None
                 return None
 
+    def get_app_path_with_silent(self):
+        """
+        获取带有静默启动参数的应用程序路径，用于开机自启
+        """
+        app_path = self.get_app_path()
+        if not app_path:
+            return None
+        
+        # 添加静默启动参数
+        if sys.platform == "win32":
+            # Windows: 添加 --silent 参数
+            if app_path.endswith('"'):
+                # 如果路径被引号包围，在引号内添加参数
+                app_path = app_path[:-1] + ' --silent"'
+            else:
+                app_path = app_path + ' --silent'
+        else:
+            # macOS 和 Linux: 添加 --silent 参数
+            if app_path.endswith('"'):
+                # 如果路径被引号包围，在引号内添加参数
+                app_path = app_path[:-1] + ' --silent"'
+            else:
+                app_path = app_path + ' --silent'
+        
+        return app_path
+
     def _get_autostart_dir(self):
         """获取自启动目录路径"""
         if sys.platform.startswith("darwin"):
@@ -483,8 +509,9 @@ Hidden=false
                     self.logger.warning("Windows注册表模块未导入，开机自启动检查失败")
                     return False
 
-                app_path = self.get_app_path()
-                if not app_path:
+                # 检查是否存在带有静默启动参数的注册表项
+                app_path_with_silent = self.get_app_path_with_silent()
+                if not app_path_with_silent:
                     self.logger.warning("无法获取应用程序路径")
                     return False
 
@@ -539,7 +566,8 @@ Hidden=false
             bool: 操作是否成功
         """
         try:
-            app_path = self.get_app_path()
+            # 使用带有静默启动参数的路径
+            app_path = self.get_app_path_with_silent()
             if not app_path:
                 self.logger.error("无法获取应用程序路径，无法设置自启动")
                 return False
@@ -565,8 +593,8 @@ Hidden=false
                 )
 
                 if enable:
-                    # 添加自启动项
-                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, f'"{app_path}"')
+                    # 添加自启动项（使用带有静默启动参数的路径）
+                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, app_path)
                     self.logger.info(f"Windows: 已添加开机自启动: {app_path}")
                 else:
                     # 移除自启动项
@@ -585,7 +613,7 @@ Hidden=false
                 autostart_file = self._get_autostart_file_path()
 
                 if enable:
-                    # 创建plist文件
+                    # 创建plist文件（使用带有静默启动参数的路径）
                     plist_content = self._create_macos_plist(app_path)
                     with open(autostart_file, "w") as f:
                         f.write(plist_content)
@@ -605,7 +633,7 @@ Hidden=false
                 autostart_file = self._get_autostart_file_path()
 
                 if enable:
-                    # 创建desktop文件
+                    # 创建desktop文件（使用带有静默启动参数的路径）
                     desktop_content = self._create_linux_desktop(app_path)
                     with open(autostart_file, "w") as f:
                         f.write(desktop_content)
