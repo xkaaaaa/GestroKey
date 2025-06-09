@@ -1,7 +1,8 @@
 {
     "brush": {
         "pen_width": 7,
-        "pen_color": [0, 120, 255]
+        "pen_color": [0, 120, 255],
+        "force_topmost": true
     },
     "app": {
         "show_exit_dialog": true,

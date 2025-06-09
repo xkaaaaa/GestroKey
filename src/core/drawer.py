@@ -94,8 +94,31 @@ class TransparentDrawingOverlay(QWidget):
         self.painter_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         self.painter_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
 
+        # 强制置顶定时器
+        self.force_topmost_timer = QTimer(self)
+        self.force_topmost_timer.timeout.connect(self._force_window_topmost)
+        self.force_topmost_enabled = True  # 默认启用强制置顶
+
         self.initUI()
         self.logger.debug("绘制覆盖层初始化完成")
+
+    def set_force_topmost(self, enabled):
+        """设置是否启用强制置顶"""
+        self.force_topmost_enabled = enabled
+        self.logger.debug(f"强制置顶已设置为: {enabled}")
+
+    def _force_window_topmost(self):
+        """强制窗口置顶"""
+        if self.force_topmost_enabled and self.isVisible():
+            self.raise_()
+            self.activateWindow()
+            # 确保窗口始终在最顶层
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowStaysOnTopHint
+                | Qt.WindowType.Tool
+            )
+            self.show()
 
     def set_pen_width(self, width):
         """设置笔尖粗细"""
@@ -209,6 +232,10 @@ class TransparentDrawingOverlay(QWidget):
         # 显示窗口
         self.show()
 
+        # 如果启用强制置顶，开始定时器
+        if self.force_topmost_enabled:
+            self.force_topmost_timer.start(100)  # 每100ms执行一次置顶操作
+
         # 在开始新的绘制前，先进行一次全屏更新，确保清除之前的内容
         self.update()
 
@@ -311,8 +338,10 @@ class TransparentDrawingOverlay(QWidget):
         self.fade_alpha = 255
         self.last_fade_time = time.time()  # 记录开始淡出的时间点
 
-        # 停止更新计时器，启动淡出计时器
+        # 停止更新计时器和强制置顶定时器，启动淡出计时器
         self.update_timer.stop()
+        if self.force_topmost_timer.isActive():
+            self.force_topmost_timer.stop()
         if self.fade_timer.isActive():
             self.fade_timer.stop()
         self.fade_timer.start()
@@ -485,6 +514,11 @@ class DrawingManager:
                 if pen_color:
                     self.overlay.set_pen_color(pen_color)
                     self.logger.debug(f"从设置中加载笔尖颜色: {pen_color}")
+
+                # 设置强制置顶
+                force_topmost = settings.get("brush.force_topmost", True)
+                self.overlay.set_force_topmost(force_topmost)
+                self.logger.debug(f"从设置中加载强制置顶设置: {force_topmost}")
             else:
                 self.logger.warning("未能获取设置实例，使用当前默认值")
         except Exception as e:
@@ -522,6 +556,11 @@ class DrawingManager:
             if pen_color:
                 self.overlay.set_pen_color(pen_color)
                 self.logger.debug(f"已更新笔尖颜色: {pen_color}")
+
+            # 更新强制置顶设置
+            force_topmost = settings.get("brush.force_topmost", True)
+            self.overlay.set_force_topmost(force_topmost)
+            self.logger.debug(f"已更新强制置顶设置: {force_topmost}")
 
             return True
         except Exception as e:

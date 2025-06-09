@@ -157,6 +157,8 @@ def get_toast_manager():
         def update_positions_on_resize(self):
             pass
     return DummyToastManager()
+
+
 from ui.gestures.gestures import get_gesture_library
 from ui.gestures.gestures_tab import GesturesPage
 from ui.settings.settings import get_settings

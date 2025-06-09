@@ -641,6 +641,7 @@ drawing_widget.show()
 - 支持的设置项：
   - `pen_width`：笔尖粗细，范围1-20像素
   - `pen_color`：笔尖颜色，RGB格式数组
+  - `brush.force_topmost`：绘制时强制置顶，布尔值，默认true
   - `gesture.similarity_threshold`：手势相似度阈值，范围0.0-1.0，默认0.70
 
 **使用方法**：
@@ -708,6 +709,7 @@ settings.set_autostart(False)  # 禁用
   - 画笔设置组：
     - 笔尖粗细设置（QSlider和QSpinBox）
     - 笔尖颜色选择（QPushButton和颜色预览）
+    - 绘制时强制置顶（QCheckBox）：开启后在绘制过程中重复执行置顶命令，确保绘画窗口始终保持在最前面
     - 笔尖预览组件
   - 应用设置组：
     - 开机自启动选项（QCheckBox）：启用后将以静默模式自动启动并开始监听
@@ -832,9 +834,11 @@ def on_drawing_state_changed(self, is_active):
   - `initUI(self)`：设置窗口属性和创建绘图缓冲区
   - `set_pen_width(self, width)`：设置笔尖粗细
   - `set_pen_color(self, color)`：设置笔尖颜色
-  - `startDrawing(self, x, y, pressure)`：开始绘制，同时停止任何正在进行的淡出效果
+  - `set_force_topmost(self, enabled)`：设置是否启用强制置顶功能
+  - `_force_window_topmost(self)`：强制窗口置顶的内部方法
+  - `startDrawing(self, x, y, pressure)`：开始绘制，同时停止任何正在进行的淡出效果，启用强制置顶时开始定时置顶
   - `continueDrawing(self, x, y, pressure)`：继续绘制轨迹
-  - `stopDrawing(self)`：停止绘制并开始淡出效果，同时分析手势并执行
+  - `stopDrawing(self)`：停止绘制并开始淡出效果，同时分析手势并执行，停止强制置顶定时器
   - `get_stroke_direction(self, stroke_id)`：获取指定笔画的方向
   - `paintEvent(self, event)`：绘制事件处理，负责绘制当前笔画
   - `_log_stroke_data(self, stroke_data, ...)`：记录笔画数据，简化后只记录必要信息
@@ -844,7 +848,7 @@ def on_drawing_state_changed(self, is_active):
   - `__init__(self)`：初始化绘制管理器，创建鼠标钩子和参数
   - `start(self)`：开始绘制功能，启动监听
   - `stop(self)`：停止绘制功能，清理资源
-  - `update_settings(self)`：更新设置参数
+  - `update_settings(self)`：更新设置参数，包括笔尖粗细、颜色和强制置顶设置
   - `get_last_direction(self)`：获取最后一次绘制的方向
   - `_init_mouse_hook(self)`：初始化全局鼠标监听
   - `_calculate_simulated_pressure(self, x, y)`：根据鼠标移动速度计算模拟压力值

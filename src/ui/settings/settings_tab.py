@@ -126,6 +126,12 @@ class SettingsPage(QWidget):
         
         form_layout.addRow("笔尖颜色:", color_layout)
 
+        # 强制置顶
+        self.force_topmost_checkbox = QCheckBox("绘制时强制置顶")
+        self.force_topmost_checkbox.setToolTip("开启后在绘制路径过程中会重复执行置顶命令，确保绘画窗口始终保持在最前面")
+        self.force_topmost_checkbox.stateChanged.connect(self._on_force_topmost_changed)
+        form_layout.addRow("绘制行为:", self.force_topmost_checkbox)
+
         layout.addLayout(form_layout)
 
         # 预览区域
@@ -228,12 +234,15 @@ class SettingsPage(QWidget):
         try:
             pen_width = self.settings.get("pen_width", 3)
             pen_color = self.settings.get("pen_color", [0, 120, 255])
+            force_topmost = self.settings.get("brush.force_topmost", True)
             
             self.thickness_slider.setValue(pen_width)
             self.thickness_spinbox.setValue(pen_width)
             
             self.color_preview.set_color(pen_color)
             self.pen_preview.update_pen(pen_width, pen_color)
+            
+            self.force_topmost_checkbox.setChecked(force_topmost)
             
             is_autostart = self.settings.is_autostart_enabled()
             self.autostart_checkbox.setChecked(is_autostart)
@@ -321,58 +330,57 @@ class SettingsPage(QWidget):
         if not self.is_loading:
             self._mark_changed()
 
+    def _on_force_topmost_changed(self, state):
+        """强制置顶设置变化"""
+        if not self.is_loading:
+            self._mark_changed()
+
     def _mark_changed(self):
         """标记设置已更改"""
         if not self.is_loading:
             self._update_button_states()
 
     def _has_frontend_changes(self):
-        """检查前端UI是否有未应用的更改"""
+        """检查前端UI是否有未应用的更改 - 通用方法，自动检测所有设置项"""
         try:
-            # 检查笔刷设置
-            current_thickness = self.thickness_slider.value()
-            current_color = self.color_preview.get_color()
-            
-            saved_thickness = self.settings.get("brush.pen_width", 3)
-            saved_color = self.settings.get("brush.pen_color", [0, 120, 255])
-            
-            if current_thickness != saved_thickness:
-                self.logger.debug(f"笔尖粗细有变化: {current_thickness} != {saved_thickness}")
-                return True
+            # 定义所有设置项的映射关系：(UI组件获取方法, 设置键, 默认值)
+            setting_mappings = [
+                # 画笔设置（使用与_load_settings一致的键名）
+                (lambda: self.thickness_slider.value(), "pen_width", 3),
+                (lambda: self.color_preview.get_color(), "pen_color", [0, 120, 255]),
+                (lambda: self.force_topmost_checkbox.isChecked(), "brush.force_topmost", True),
                 
-            if current_color != saved_color:
-                self.logger.debug(f"笔尖颜色有变化: {current_color} != {saved_color}")
-                return True
+                # 应用设置
+                (lambda: self.show_exit_dialog_checkbox.isChecked(), "app.show_exit_dialog", True),
+                (lambda: "minimize" if self.minimize_radio.isChecked() else "exit", "app.default_close_action", "minimize"),
+                
+                # 手势设置
+                (lambda: self.threshold_spinbox.value(), "gesture.similarity_threshold", 0.70),
+            ]
             
-            # 检查应用设置
-            current_autostart = self.autostart_checkbox.isChecked()
-            saved_autostart = self.settings.is_autostart_enabled()
+            # 检查每个设置项
+            for get_current_value, setting_key, default_value in setting_mappings:
+                try:
+                    current_value = get_current_value()
+                    saved_value = self.settings.get(setting_key, default_value)
+                    
+                    if current_value != saved_value:
+                        self.logger.debug(f"设置项 {setting_key} 有变化: {current_value} != {saved_value}")
+                        return True
+                except Exception as e:
+                    self.logger.warning(f"检查设置项 {setting_key} 时出错: {e}")
+                    continue
             
-            if current_autostart != saved_autostart:
-                self.logger.debug(f"开机自启动有变化: {current_autostart} != {saved_autostart}")
-                return True
-            
-            current_show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
-            saved_show_exit_dialog = self.settings.get("app.show_exit_dialog", True)
-            
-            if current_show_exit_dialog != saved_show_exit_dialog:
-                self.logger.debug(f"退出对话框设置有变化: {current_show_exit_dialog} != {saved_show_exit_dialog}")
-                return True
-            
-            current_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
-            saved_close_action = self.settings.get("app.default_close_action", "exit")
-            
-            if current_close_action != saved_close_action:
-                self.logger.debug(f"默认关闭行为有变化: {current_close_action} != {saved_close_action}")
-                return True
-            
-            # 检查手势相似度阈值
-            current_threshold = self.threshold_spinbox.value()
-            saved_threshold = self.settings.get("gesture.similarity_threshold", 0.70)
-            
-            if current_threshold != saved_threshold:
-                self.logger.debug(f"手势相似度阈值有变化: {current_threshold} != {saved_threshold}")
-                return True
+            # 特殊处理：开机自启动（需要调用特殊方法）
+            try:
+                current_autostart = self.autostart_checkbox.isChecked()
+                saved_autostart = self.settings.is_autostart_enabled()
+                
+                if current_autostart != saved_autostart:
+                    self.logger.debug(f"开机自启动有变化: {current_autostart} != {saved_autostart}")
+                    return True
+            except Exception as e:
+                self.logger.warning(f"检查开机自启动设置时出错: {e}")
             
             return False
             
@@ -411,78 +419,73 @@ class SettingsPage(QWidget):
             widget = widget.parent()
         return None
 
+    def _apply_all_settings(self):
+        """应用所有当前设置到系统（内部通用方法）"""
+        # 应用画笔设置
+        thickness = self.thickness_slider.value()
+        color = self.color_preview.get_color()
+        self._apply_pen_settings_to_drawing_module(thickness, color)
+        
+        # 应用开机自启设置
+        is_autostart = self.autostart_checkbox.isChecked()
+        current_autostart = self.settings.is_autostart_enabled()
+        
+        if is_autostart != current_autostart:
+            success = self.settings.set_autostart(is_autostart)
+            if not success:
+                QMessageBox.warning(self, "警告", "更新开机自启动设置失败")
+                return False
+        
+        # 应用应用设置
+        show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
+        self.settings.set("app.show_exit_dialog", show_exit_dialog)
+        
+        default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
+        self.settings.set("app.default_close_action", default_close_action)
+        
+        # 应用手势相似度阈值
+        threshold = self.threshold_spinbox.value()
+        self.settings.set("gesture.similarity_threshold", threshold)
+        
+        # 应用强制置顶设置
+        force_topmost = self.force_topmost_checkbox.isChecked()
+        self.settings.set("brush.force_topmost", force_topmost)
+        
+        # 立即更新绘制模块的强制置顶设置
+        try:
+            main_window = self._find_main_window()
+            if main_window and hasattr(main_window, 'console_page'):
+                console_page = main_window.console_page
+                if hasattr(console_page, 'drawing_manager') and console_page.drawing_manager:
+                    console_page.drawing_manager.update_settings()
+                    self.logger.debug(f"已立即应用强制置顶设置: {force_topmost}")
+        except Exception as e:
+            self.logger.error(f"应用强制置顶设置失败: {e}")
+        
+        return True
+
     def _apply_settings(self):
         """应用当前设置"""
         try:
-            thickness = self.thickness_slider.value()
-            color = self.color_preview.get_color()
-            self._apply_pen_settings_to_drawing_module(thickness, color)
-            
-            is_autostart = self.autostart_checkbox.isChecked()
-            current_autostart = self.settings.is_autostart_enabled()
-            
-            if is_autostart != current_autostart:
-                success = self.settings.set_autostart(is_autostart)
-                if success:
-                    self.logger.info(f"开机自启动设置已更新: {is_autostart}")
-                else:
-                    QMessageBox.warning(self, "警告", "更新开机自启动设置失败")
-            
-            # 应用应用设置
-            show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
-            self.settings.set("app.show_exit_dialog", show_exit_dialog)
-            
-            default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
-            self.settings.set("app.default_close_action", default_close_action)
-            
-            # 应用手势相似度阈值
-            threshold = self.threshold_spinbox.value()
-            self.settings.set("gesture.similarity_threshold", threshold)
-            
-            self._update_button_states()
-            QMessageBox.information(self, "成功", "设置已应用")
+            if self._apply_all_settings():
+                self._update_button_states()
+                QMessageBox.information(self, "成功", "设置已应用")
             
         except Exception as e:
             self.logger.error(f"应用设置失败: {e}")
             QMessageBox.critical(self, "错误", f"应用设置失败: {str(e)}")
 
-
-
     def _save_settings(self):
         """应用并保存设置到文件"""
         try:
-            # 先应用所有设置
-            thickness = self.thickness_slider.value()
-            color = self.color_preview.get_color()
-            self._apply_pen_settings_to_drawing_module(thickness, color)
-            
-            is_autostart = self.autostart_checkbox.isChecked()
-            current_autostart = self.settings.is_autostart_enabled()
-            
-            if is_autostart != current_autostart:
-                success = self.settings.set_autostart(is_autostart)
-                if not success:
-                    QMessageBox.warning(self, "警告", "更新开机自启动设置失败")
-                    return
-            
-            # 应用应用设置
-            show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
-            self.settings.set("app.show_exit_dialog", show_exit_dialog)
-            
-            default_close_action = "minimize" if self.minimize_radio.isChecked() else "exit"
-            self.settings.set("app.default_close_action", default_close_action)
-            
-            # 应用手势相似度阈值
-            threshold = self.threshold_spinbox.value()
-            self.settings.set("gesture.similarity_threshold", threshold)
-            
-            # 保存到文件
-            success = self.settings.save()
-            if success:
-                QMessageBox.information(self, "成功", "设置已保存")
-                self.logger.info("设置已保存到文件")
-            else:
-                QMessageBox.critical(self, "错误", "保存设置失败")
+            if self._apply_all_settings():
+                # 保存到文件
+                success = self.settings.save()
+                if success:
+                    QMessageBox.information(self, "成功", "设置已保存")
+                    self.logger.info("设置已保存到文件")
+                else:
+                    QMessageBox.critical(self, "错误", "保存设置失败")
                 
         except Exception as e:
             self.logger.error(f"保存设置失败: {e}")
