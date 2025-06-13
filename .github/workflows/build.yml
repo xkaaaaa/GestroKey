@@ -529,7 +529,7 @@ jobs:
         run: |
           QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
           echo "检测到 Qt API: $QT_API"
-          python -m nuitka --onefile --mode=app --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --mode=app --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
           cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone/GestroKey.app"
           cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
