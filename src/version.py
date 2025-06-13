@@ -42,9 +42,9 @@ PACKAGE_STANDALONE = True  # 是否生成单文件版本
 PACKAGE_PORTABLE = True  # 是否生成便携版本
 
 # 打包工具选择
-PACKAGER_WINDOWS = "pyinstaller"  # Windows打包工具: "nuitka" 或 "pyinstaller"
-PACKAGER_MACOS = "pyinstaller"  # macOS打包工具: 仅支持 "pyinstaller"
-PACKAGER_LINUX = "pyinstaller"  # Linux打包工具: "nuitka" 或 "pyinstaller"
+PACKAGER_WINDOWS = "nuitka"  # Windows打包工具: "nuitka" 或 "pyinstaller"
+PACKAGER_MACOS = "nuitka"  # macOS打包工具: "nuitka" 或 "pyinstaller"
+PACKAGER_LINUX = "nuitka"  # Linux打包工具: "nuitka" 或 "pyinstaller"
 
 # 打包参数配置
 PACKAGE_INCLUDE_DEBUG_SYMBOLS = False  # 是否包含调试符号

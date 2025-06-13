@@ -268,6 +268,35 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
 
+      - name: macOS - 设置QT_API为pyside6
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          # 在macOS上强制使用pyside6
+          python -c "
+          import sys
+          import os
+          sys.path.append('src')
+          
+          # 读取version.py文件
+          with open('src/version.py', 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          # 将QT_API替换为pyside6
+          if 'QT_API = \"pyqt6\"' in content:
+              content = content.replace('QT_API = \"pyqt6\"', 'QT_API = \"pyside6\"')
+          elif 'QT_API = \"pyqt5\"' in content:
+              content = content.replace('QT_API = \"pyqt5\"', 'QT_API = \"pyside6\"')
+          elif 'QT_API = \"pyside2\"' in content:
+              content = content.replace('QT_API = \"pyside2\"', 'QT_API = \"pyside6\"')
+          
+          # 写回文件
+          with open('src/version.py', 'w', encoding='utf-8') as f:
+              f.write(content)
+          
+          print('macOS环境已设置QT_API为pyside6')
+          "
+
       - name: 安装依赖
         shell: bash
         run: |
@@ -356,8 +385,18 @@ jobs:
           cp -r dist/GestroKey/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
           cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
 
+      # 构建多文件便携版 - macOS (Nuitka)
+      - name: 构建便携版 - macOS (Nuitka)
+        if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'nuitka'
+        shell: bash
+        run: |
+          python -m nuitka --standalone --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
+          cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
+          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
+
       # 构建多文件便携版 - macOS (使用PyInstaller)
-      - name: 构建便携版 - macOS
+      - name: 构建便携版 - macOS (PyInstaller)
         if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'pyinstaller'
         shell: bash
         run: |
@@ -473,8 +512,17 @@ jobs:
           mv dist/GestroKey "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
           chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
 
+      # 构建单文件版本 - macOS (Nuitka)
+      - name: 构建单文件版 - macOS (Nuitka)
+        if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'nuitka'
+        shell: bash
+        run: |
+          python -m nuitka --onefile --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+
       # 构建单文件版本 - macOS (使用PyInstaller)
-      - name: 构建单文件版 - macOS
+      - name: 构建单文件版 - macOS (PyInstaller)
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'pyinstaller'
         shell: bash
         run: |
