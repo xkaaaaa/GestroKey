@@ -396,9 +396,9 @@ jobs:
         run: |
           QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
           echo "检测到 Qt API: $QT_API"
-          python -m nuitka --standalone --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --standalone --mode=app --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
-          cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
+          cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/GestroKey.app"
           cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
 
       # 构建多文件便携版 - macOS (使用PyInstaller)
@@ -529,9 +529,10 @@ jobs:
         run: |
           QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
           echo "检测到 Qt API: $QT_API"
-          python -m nuitka --onefile --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
-          mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
-          chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          python -m nuitka --onefile --mode=app --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
+          cp -r dist/main.app "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone/GestroKey.app"
+          cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
 
       # 构建单文件版本 - macOS (使用PyInstaller)
       - name: 构建单文件版 - macOS (PyInstaller)
@@ -748,35 +749,90 @@ jobs:
           breaking_changes=""
           others=""
           
+          # 定义关联数组来存储已添加的描述，用于去重
+          declare -A added_breaking_changes
+          declare -A added_features
+          declare -A added_fixes
+          declare -A added_docs
+          declare -A added_styles
+          declare -A added_refactors
+          declare -A added_performances
+          declare -A added_tests
+          declare -A added_chores
+          declare -A added_others
+          
           # 解析 Conventional Commits 格式的提交信息
           while IFS= read -r commit; do
             # 检查是否包含破坏性变更标记
             if [[ "$commit" =~ ^[a-zA-Z]+(\(.+\))?!:.*$ ]] || [[ "$commit" =~ BREAKING[[:space:]]CHANGE ]]; then
               # 提取描述部分（去掉类型前缀）
               description=$(echo "$commit" | sed -E 's/^[a-zA-Z]+(\(.+\))?!?:[[:space:]]*//')
-              breaking_changes="${breaking_changes}- ${description}\n"
+              if [[ -z "${added_breaking_changes[$description]}" ]]; then
+                breaking_changes="${breaking_changes}- ${description}\n"
+                added_breaking_changes["$description"]=1
+              fi
             elif [[ "$commit" =~ ^feat(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              features="${features}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_features[$description]}" ]]; then
+                features="${features}- ${description}\n"
+                added_features["$description"]=1
+              fi
             elif [[ "$commit" =~ ^fix(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              fixes="${fixes}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_fixes[$description]}" ]]; then
+                fixes="${fixes}- ${description}\n"
+                added_fixes["$description"]=1
+              fi
             elif [[ "$commit" =~ ^docs(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              docs="${docs}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_docs[$description]}" ]]; then
+                docs="${docs}- ${description}\n"
+                added_docs["$description"]=1
+              fi
             elif [[ "$commit" =~ ^style(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              styles="${styles}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_styles[$description]}" ]]; then
+                styles="${styles}- ${description}\n"
+                added_styles["$description"]=1
+              fi
             elif [[ "$commit" =~ ^refactor(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              refactors="${refactors}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_refactors[$description]}" ]]; then
+                refactors="${refactors}- ${description}\n"
+                added_refactors["$description"]=1
+              fi
             elif [[ "$commit" =~ ^perf(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              performances="${performances}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_performances[$description]}" ]]; then
+                performances="${performances}- ${description}\n"
+                added_performances["$description"]=1
+              fi
             elif [[ "$commit" =~ ^test(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              tests="${tests}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_tests[$description]}" ]]; then
+                tests="${tests}- ${description}\n"
+                added_tests["$description"]=1
+              fi
             elif [[ "$commit" =~ ^chore(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              chores="${chores}- ${BASH_REMATCH[2]}\n"
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_chores[$description]}" ]]; then
+                chores="${chores}- ${description}\n"
+                added_chores["$description"]=1
+              fi
             elif [[ "$commit" =~ ^(build|ci|revert)(\(.+\))?:[[:space:]]*(.+)$ ]]; then
               # 将 build、ci、revert 归类到其他变更
-              others="${others}- ${BASH_REMATCH[3]}\n"
+              description="${BASH_REMATCH[3]}"
+              if [[ -z "${added_others[$description]}" ]]; then
+                others="${others}- ${description}\n"
+                added_others["$description"]=1
+              fi
             else
               # 不符合 Conventional Commits 格式的提交，归类到其他变更
-              others="${others}- ${commit}\n"
+              description="$commit"
+              if [[ -z "${added_others[$description]}" ]]; then
+                others="${others}- ${description}\n"
+                added_others["$description"]=1
+              fi
             fi
           done <<< "$commits"
           
