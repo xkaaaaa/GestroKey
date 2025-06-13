@@ -706,39 +706,106 @@ jobs:
           # 获取提交记录
           commits=$(git log --pretty=format:"%s" $previous_tag..HEAD)
           
-          # 初始化三个部分的内容
-          new_features=""
+          # 初始化各个部分的内容
+          features=""
           fixes=""
-          improvements=""
+          docs=""
+          styles=""
+          refactors=""
+          performances=""
+          tests=""
+          chores=""
+          breaking_changes=""
+          others=""
           
-          # 解析提交信息
+          # 解析 Conventional Commits 格式的提交信息
           while IFS= read -r commit; do
-            if [[ "$commit" =~ ^新增：(.+) ]]; then
-              new_features="${new_features}- ${BASH_REMATCH[1]}\n"
-            elif [[ "$commit" =~ ^修复：(.+) ]]; then
-              fixes="${fixes}- ${BASH_REMATCH[1]}\n"
-            elif [[ "$commit" =~ ^改进：(.+) ]]; then
-              improvements="${improvements}- ${BASH_REMATCH[1]}\n"
+            # 检查是否包含破坏性变更标记
+            if [[ "$commit" =~ ^[a-zA-Z]+(\(.+\))?!:.*$ ]] || [[ "$commit" =~ BREAKING[[:space:]]CHANGE ]]; then
+              # 提取描述部分（去掉类型前缀）
+              description=$(echo "$commit" | sed -E 's/^[a-zA-Z]+(\(.+\))?!?:[[:space:]]*//')
+              breaking_changes="${breaking_changes}- ${description}\n"
+            elif [[ "$commit" =~ ^feat(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              features="${features}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^fix(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              fixes="${fixes}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^docs(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              docs="${docs}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^style(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              styles="${styles}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^refactor(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              refactors="${refactors}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^perf(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              performances="${performances}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^test(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              tests="${tests}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^chore(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              chores="${chores}- ${BASH_REMATCH[2]}\n"
+            elif [[ "$commit" =~ ^(build|ci|revert)(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              # 将 build、ci、revert 归类到其他变更
+              others="${others}- ${BASH_REMATCH[3]}\n"
+            else
+              # 不符合 Conventional Commits 格式的提交，归类到其他变更
+              others="${others}- ${commit}\n"
             fi
           done <<< "$commits"
           
           # 生成更新日志
           changelog="## 更新日志\n\n"
           
-          if [[ -n "$new_features" ]]; then
-            changelog="${changelog}### 新增功能\n\n${new_features}\n"
+          # 破坏性变更（最重要，放在最前面）
+          if [[ -n "$breaking_changes" ]]; then
+            changelog="${changelog}### ⚠️ 破坏性变更\n\n${breaking_changes}\n"
           fi
           
+          # 新功能
+          if [[ -n "$features" ]]; then
+            changelog="${changelog}### ✨ 新功能\n\n${features}\n"
+          fi
+          
+          # 问题修复
           if [[ -n "$fixes" ]]; then
-            changelog="${changelog}### 问题修复\n\n${fixes}\n"
+            changelog="${changelog}### 🐛 问题修复\n\n${fixes}\n"
           fi
           
-          if [[ -n "$improvements" ]]; then
-            changelog="${changelog}### 功能改进\n\n${improvements}\n"
+          # 性能优化
+          if [[ -n "$performances" ]]; then
+            changelog="${changelog}### ⚡ 性能优化\n\n${performances}\n"
           fi
           
-          if [[ "$new_features" == "" && "$fixes" == "" && "$improvements" == "" ]]; then
-            changelog="${changelog}*本次版本更新未包含符合格式要求的提交信息*\n"
+          # 代码重构
+          if [[ -n "$refactors" ]]; then
+            changelog="${changelog}### ♻️ 代码重构\n\n${refactors}\n"
+          fi
+          
+          # 文档更新
+          if [[ -n "$docs" ]]; then
+            changelog="${changelog}### 📝 文档更新\n\n${docs}\n"
+          fi
+          
+          # 代码风格
+          if [[ -n "$styles" ]]; then
+            changelog="${changelog}### 💄 代码风格\n\n${styles}\n"
+          fi
+          
+          # 测试相关
+          if [[ -n "$tests" ]]; then
+            changelog="${changelog}### 🧪 测试相关\n\n${tests}\n"
+          fi
+          
+          # 构建和维护
+          if [[ -n "$chores" ]]; then
+            changelog="${changelog}### 🔧 构建和维护\n\n${chores}\n"
+          fi
+          
+          # 其他变更
+          if [[ -n "$others" ]]; then
+            changelog="${changelog}### 📦 其他变更\n\n${others}\n"
+          fi
+          
+          # 如果没有任何变更记录，显示提示信息
+          if [[ "$breaking_changes" == "" && "$features" == "" && "$fixes" == "" && "$docs" == "" && "$styles" == "" && "$refactors" == "" && "$performances" == "" && "$tests" == "" && "$chores" == "" && "$others" == "" ]]; then
+            changelog="${changelog}*本次版本更新未包含符合 Conventional Commits 格式的提交信息*\n"
           fi
           
           # 输出更新日志给后续步骤使用

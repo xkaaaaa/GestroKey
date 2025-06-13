@@ -7,7 +7,7 @@
 import datetime
 
 # 版本信息
-VERSION = "0.0.1-beta.2"
+VERSION = "0.0.1-beta.3"
 APP_NAME = "GestroKey"
 APP_DESCRIPTION = "一款手势控制工具"
 BUILD_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -23,7 +23,7 @@ VERSION_TYPE_PREVIEW = "预览版"  # 预览版本
 VERSION_TYPE_DEVELOPMENT = "未发布版"  # 开发中版本
 
 # 当前版本类型
-CURRENT_VERSION_TYPE = VERSION_TYPE_PREVIEW
+CURRENT_VERSION_TYPE = VERSION_TYPE_DEVELOPMENT
 
 # 打包配置选项
 # 总体控制
