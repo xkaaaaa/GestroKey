@@ -348,7 +348,9 @@ jobs:
         if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
-          python -m nuitka --standalone --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+          $QT_API = python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)"
+          Write-Host "检测到 Qt API: $QT_API"
+          python -m nuitka --standalone --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
           Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
           Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
@@ -369,7 +371,9 @@ jobs:
         if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
-          python -m nuitka --standalone --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
+          echo "检测到 Qt API: $QT_API"
+          python -m nuitka --standalone --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
           cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
           cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
@@ -390,7 +394,9 @@ jobs:
         if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'nuitka'
         shell: bash
         run: |
-          python -m nuitka --standalone --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
+          echo "检测到 Qt API: $QT_API"
+          python -m nuitka --standalone --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
           cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable/"
           cd dist && zip -r "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable.zip" "GestroKey-${{ needs.get-version.outputs.version }}-macOS-Portable"
@@ -481,7 +487,9 @@ jobs:
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
-          python -m nuitka --onefile --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+          $QT_API = python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)"
+          Write-Host "检测到 Qt API: $QT_API"
+          python -m nuitka --onefile --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           Move-Item -Path dist/main.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
 
       # 构建单文件版本 - Windows (PyInstaller)
@@ -498,7 +506,9 @@ jobs:
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
-          python -m nuitka --onefile --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
+          echo "检测到 Qt API: $QT_API"
+          python -m nuitka --onefile --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
           chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
 
@@ -517,7 +527,9 @@ jobs:
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'macos-latest' && needs.get-version.outputs.packager_macos == 'nuitka'
         shell: bash
         run: |
-          python -m nuitka --onefile --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
+          echo "检测到 Qt API: $QT_API"
+          python -m nuitka --onefile --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
           chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-macOS-Standalone"
 
