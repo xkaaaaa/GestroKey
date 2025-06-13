@@ -1,10 +1,18 @@
 import sys
 import os
 import math
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QToolButton
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QTimer, QSize
-from PyQt6.QtGui import QPainter, QPen, QColor, QPolygon, QTransform, QIcon
-from PyQt6.QtSvgWidgets import QSvgWidget
+from qtpy.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QToolButton
+from qtpy.QtCore import Qt, QPoint, Signal, QTimer, QSize
+from qtpy.QtGui import QPainter, QPen, QColor, QPolygon, QTransform, QIcon
+
+# 尝试导入 SVG 组件，如果不支持则使用替代方案
+try:
+    from qtpy.QtSvgWidgets import QSvgWidget
+    SVG_SUPPORT = True
+except ImportError:
+    # PyQt5 不支持 QtSvgWidgets，使用 QLabel 作为替代
+    SVG_SUPPORT = False
+    QSvgWidget = QLabel
 
 try:
     from core.logger import get_logger
@@ -18,8 +26,8 @@ except ImportError:
 class GestureDrawingWidget(QWidget):
     """手势绘制组件，用于在手势管理界面绘制手势路径"""
     
-    pathCompleted = pyqtSignal(dict)  # 路径完成信号，发送格式化的路径
-    testSimilarity = pyqtSignal()  # 测试相似度信号
+    pathCompleted = Signal(dict)  # 路径完成信号，发送格式化的路径
+    testSimilarity = Signal()  # 测试相似度信号
     
     def __init__(self, parent=None):
         super().__init__(parent)

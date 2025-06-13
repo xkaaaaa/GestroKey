@@ -2,9 +2,13 @@ import argparse
 import os
 import sys
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import (
+# 设置 Qt API
+from version import QT_API
+os.environ['QT_API'] = QT_API
+
+from qtpy.QtCore import Qt, QTimer
+from qtpy.QtGui import QIcon
+from qtpy.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
@@ -81,9 +85,9 @@ def show_error(parent, message):
 
 def get_system_tray(parent):
     """创建系统托盘图标"""
-    from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
-    from PyQt6.QtGui import QIcon, QAction
-    from PyQt6.QtCore import QTimer
+    from qtpy.QtWidgets import QSystemTrayIcon, QMenu
+    from qtpy.QtGui import QIcon, QAction
+    from qtpy.QtCore import QTimer
     import os
     
     if not QSystemTrayIcon.isSystemTrayAvailable():
@@ -404,7 +408,7 @@ class GestroKeyApp(QMainWindow):
         self.settings_btn.clicked.connect(lambda: self.switch_page(2))
         
         # 设置选项卡按钮样式
-        from PyQt6.QtCore import QSize
+        from qtpy.QtCore import QSize
         tab_buttons = [self.console_btn, self.gestures_btn, self.settings_btn]
         for btn in tab_buttons:
             btn.setMinimumHeight(40)
@@ -517,7 +521,7 @@ class GestroKeyApp(QMainWindow):
 
     def _show_exit_dialog(self):
         """显示退出确认对话框"""
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QRadioButton, QPushButton, QButtonGroup
+        from qtpy.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QRadioButton, QPushButton, QButtonGroup
         from ui.settings.settings import get_settings
         
         class ExitDialog(QDialog):

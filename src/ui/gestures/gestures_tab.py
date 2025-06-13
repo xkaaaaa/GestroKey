@@ -1,7 +1,7 @@
 import os
 import sys
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
+from qtpy.QtCore import Qt
+from qtpy.QtWidgets import (
     QApplication,
     QComboBox,
     QHBoxLayout,
@@ -663,7 +663,7 @@ class SimilarityTestDialog(QDialog):
         left_layout.addWidget(self.reference_widget)
         
         # 延迟重置视图，确保widget已完全显示
-        from PyQt6.QtCore import QTimer
+        from qtpy.QtCore import QTimer
         QTimer.singleShot(100, self.reference_widget._reset_view)
         
         canvas_layout.addWidget(left_group)

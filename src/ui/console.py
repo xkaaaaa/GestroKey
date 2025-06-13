@@ -1,17 +1,17 @@
 import os
 import sys
 
-from PyQt6.QtCore import (
+from qtpy.QtCore import (
     QEasingCurve,
     QPropertyAnimation,
     QSize,
     Qt,
     QTimer,
-    pyqtProperty,
-    pyqtSignal,
+    Property,
+    Signal,
 )
-from PyQt6.QtGui import QColor, QCursor
-from PyQt6.QtWidgets import (
+from qtpy.QtGui import QColor, QCursor
+from qtpy.QtWidgets import (
     QApplication,
     QFrame,
     QGridLayout,
@@ -86,7 +86,7 @@ class ConsolePage(QWidget):
     """
 
     # 添加绘制状态变化信号
-    drawing_state_changed = pyqtSignal(bool)  # 参数为是否处于绘制状态
+    drawing_state_changed = Signal(bool)  # 参数为是否处于绘制状态
 
     def __init__(self, parent=None):
         super().__init__(parent)

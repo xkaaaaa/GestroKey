@@ -1,8 +1,8 @@
 import os
 import sys
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPainter, QPen
-from PyQt6.QtWidgets import (
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QColor, QPainter, QPen
+from qtpy.QtWidgets import (
     QApplication,
     QCheckBox,
     QColorDialog,

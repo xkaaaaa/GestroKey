@@ -274,6 +274,18 @@ jobs:
           pip install nuitka
           pip install -r requirements.txt
           
+          # 根据 version.py 中的 QT_API 配置安装对应的 Qt 后端
+          QT_API=$(python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)")
+          echo "检测到 Qt API: $QT_API"
+          
+          if [ "$QT_API" = "pyqt5" ]; then
+            pip install "PyQt5>=5.15.0" "PyQt5-sip>=12.8.0"
+          elif [ "$QT_API" = "pyside6" ]; then
+            pip install "PySide6>=6.5.0"
+          elif [ "$QT_API" = "pyside2" ]; then
+            pip install "PySide2>=5.15.0"
+          fi
+          
       # 为macOS安装PyInstaller
       - name: macOS - 安装PyInstaller
         if: matrix.os == 'macos-latest'
@@ -299,57 +311,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y imagemagick fakeroot
 
-      # 处理图标 - Windows
-      - name: Windows - 处理图标
-        if: matrix.os == 'windows-latest'
-        run: |
-          if (-Not (Test-Path -Path "src/assets/images")) {
-            mkdir -p src/assets/images
-          }
-          if (Test-Path -Path src/assets/images/icons/icon.ico) {
-            # 直接复制已准备好的ICO文件
-            Copy-Item -Path src/assets/images/icons/icon.ico -Destination src/assets/images/icon.ico
-          } else {
-            Write-Error "缺少图标文件: src/assets/images/icons/icon.ico"
-            exit 1
-          }
 
-      # 处理图标 - macOS
-      - name: macOS - 处理图标
-        if: matrix.os == 'macos-latest'
-        run: |
-          if [ ! -d "src/assets/images" ]; then
-            mkdir -p src/assets/images
-          fi
-          if [ -f src/assets/images/icons/icon.icns ]; then
-            # 直接复制已准备好的ICNS文件
-            cp src/assets/images/icons/icon.icns src/assets/images/icon.icns
-          else
-            echo "缺少图标文件: src/assets/images/icons/icon.icns"
-            exit 1
-          fi
-
-      # 处理图标 - Linux
-      - name: Linux - 处理图标
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          if [ ! -d "src/assets/images" ]; then
-            mkdir -p src/assets/images
-          fi
-          if [ -f src/assets/images/icons/icon.png ]; then
-            # 直接复制已准备好的PNG文件
-            cp src/assets/images/icons/icon.png src/assets/images/icon.png
-          else
-            echo "缺少图标文件: src/assets/images/icons/icon.png"
-            exit 1
-          fi
 
       # 构建多文件便携版 - Windows (Nuitka)
       - name: 构建便携版 - Windows (Nuitka)
         if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
-          python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --standalone --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
           Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
           Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
@@ -360,7 +329,7 @@ jobs:
         shell: pwsh
         run: |
           pip install pyinstaller
-          pyinstaller --name=GestroKey --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icon.ico src/main.py
+          pyinstaller --name=GestroKey --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icons/icon.ico src/main.py
           mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
           Copy-Item -Path dist/GestroKey/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
           Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
@@ -370,7 +339,7 @@ jobs:
         if: matrix.package-type == 'portable' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
-          python -m nuitka --standalone --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --standalone --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -p "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
           cp -r dist/main.dist/* "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable/"
           cd dist && tar -czvf "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable.tar.gz" "GestroKey-${{ needs.get-version.outputs.version }}-Linux-Portable"
@@ -430,7 +399,7 @@ jobs:
               target_arch=None,
               codesign_identity=None,
               entitlements_file=None,
-              icon='src/assets/images/icon.icns',
+              icon='src/assets/images/icons/icon.icns',
           )
           
           coll = COLLECT(
@@ -446,7 +415,7 @@ jobs:
           app = BUNDLE(
               coll,
               name='GestroKey.app',
-              icon='src/assets/images/icon.icns',
+              icon='src/assets/images/icons/icon.icns',
               bundle_identifier=None,
               info_plist={
                   'NSHighResolutionCapable': 'True',
@@ -472,7 +441,7 @@ jobs:
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'windows-latest' && needs.get-version.outputs.packager_windows == 'nuitka'
         shell: pwsh
         run: |
-          python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --onefile --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           Move-Item -Path dist/main.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
 
       # 构建单文件版本 - Windows (PyInstaller)
@@ -481,7 +450,7 @@ jobs:
         shell: pwsh
         run: |
           pip install pyinstaller
-          pyinstaller --name=GestroKey --onefile --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icon.ico src/main.py
+          pyinstaller --name=GestroKey --onefile --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icons/icon.ico src/main.py
           Move-Item -Path dist/GestroKey.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
 
       # 构建单文件版本 - Linux
@@ -489,7 +458,7 @@ jobs:
         if: matrix.package-type == 'standalone' && github.event.inputs.skip_build != 'true' && matrix.os == 'ubuntu-latest' && needs.get-version.outputs.packager_linux == 'nuitka'
         shell: bash
         run: |
-          python -m nuitka --onefile --enable-plugin=pyqt6 --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --onefile --enable-plugin=qt-plugins --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --output-dir=dist --assume-yes-for-downloads src/main.py
           mv dist/main.bin "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
           chmod +x "dist/GestroKey-${{ needs.get-version.outputs.version }}-Linux-Standalone"
 
@@ -550,13 +519,13 @@ jobs:
               target_arch=None,
               codesign_identity=None,
               entitlements_file=None,
-              icon='src/assets/images/icon.icns',
+              icon='src/assets/images/icons/icon.icns',
           )
           
           app = BUNDLE(
               exe,
               name='GestroKey.app',
-              icon='src/assets/images/icon.icns',
+              icon='src/assets/images/icons/icon.icns',
               bundle_identifier=None,
               info_plist={
                   'NSHighResolutionCapable': 'True',

@@ -6,8 +6,8 @@ import traceback
 
 import numpy as np
 from pynput import mouse
-from PyQt6.QtCore import QObject, QPoint, QRect, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import (
+from qtpy.QtCore import QObject, QPoint, QRect, Qt, QTimer, Signal
+from qtpy.QtGui import (
     QBrush,
     QColor,
     QPainter,
@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
     QPixmap,
     QSurfaceFormat,
 )
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 
 # 导入路径分析器
 try:
@@ -39,9 +39,9 @@ except ImportError:
 class DrawingSignals(QObject):
     """信号类，用于在线程间安全地传递信号"""
 
-    start_drawing_signal = pyqtSignal(int, int, float)  # x, y, pressure
-    continue_drawing_signal = pyqtSignal(int, int, float)  # x, y, pressure
-    stop_drawing_signal = pyqtSignal()
+    start_drawing_signal = Signal(int, int, float)  # x, y, pressure
+    continue_drawing_signal = Signal(int, int, float)  # x, y, pressure
+    stop_drawing_signal = Signal()
 
 
 class TransparentDrawingOverlay(QWidget):
@@ -157,7 +157,7 @@ class TransparentDrawingOverlay(QWidget):
 
         # 有选择性地启用硬件加速，避免与QPainter冲突
         try:
-            from PyQt6.QtGui import QSurfaceFormat
+            from qtpy.QtGui import QSurfaceFormat
 
             # 设置高质量渲染格式
             format = QSurfaceFormat()
@@ -178,7 +178,7 @@ class TransparentDrawingOverlay(QWidget):
             self.logger.warning(f"配置图形硬件加速时出错: {e}")
 
         # 获取屏幕尺寸
-        from PyQt6.QtWidgets import QApplication
+        from qtpy.QtWidgets import QApplication
 
         screen = QApplication.primaryScreen()
         screen_geometry = screen.geometry()

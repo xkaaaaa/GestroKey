@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta
 
 import psutil
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from qtpy.QtCore import QObject, QTimer, Signal
 
 try:
     from core.logger import get_logger
@@ -17,7 +17,7 @@ class SystemMonitor(QObject):
     """系统监测器，提供CPU、内存使用情况和程序运行时间等信息"""
 
     # 自定义信号
-    dataUpdated = pyqtSignal(dict)  # 数据更新时触发的信号
+    dataUpdated = Signal(dict)  # 数据更新时触发的信号
 
     def __init__(self, update_interval=1000):
         """

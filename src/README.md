@@ -11,6 +11,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
 - **静默启动模式**：支持`--silent`参数，适用于开机自启动
 - **跨平台兼容**：支持Windows、macOS和Linux系统
 - **开机自启动**：一键设置开机自动启动（静默模式）
+- **多 Qt 框架支持**：通过 QtPy 兼容 PyQt5/6 和 PySide2/6，可根据需要切换
 
 本文档详细介绍了GestroKey项目`src`目录下各文件和文件夹的功能及使用方法。
 
@@ -137,9 +138,15 @@ python src/main.py --silent
 python src/main.py -s
 
 # 或从其他Python代码中导入并创建实例
-from main import GestroKeyApp
-from PyQt6.QtWidgets import QApplication
+import os
 import sys
+
+# 设置 Qt API（必须在导入任何 Qt 相关模块之前）
+from version import QT_API
+os.environ['QT_API'] = QT_API
+
+from main import GestroKeyApp
+from qtpy.QtWidgets import QApplication
 
 app = QApplication(sys.argv)
 window = GestroKeyApp()
@@ -175,6 +182,13 @@ sys.exit(app.exec())
 - `VERSION_TYPE_DEVELOPMENT`：未发布版本的类型标识
 - `CURRENT_VERSION_TYPE`：当前版本的类型，可设置为上述三种类型之一
 
+**Qt API 配置**：
+- `QT_API`：指定使用的 Qt API，支持以下值：
+  - `"pyqt6"`：使用 PyQt6（默认）
+  - `"pyqt5"`：使用 PyQt5
+  - `"pyside6"`：使用 PySide6
+  - `"pyside2"`：使用 PySide2
+
 **主要函数**：
 - `get_version_string()`：获取格式化的版本字符串，如"GestroKey v0.0.0"
 - `get_full_version_info()`：获取完整的版本信息，返回包含所有版本相关信息的字典
@@ -197,6 +211,20 @@ version_string = get_version_string()  # 返回："GestroKey v0.0.0"
 
 # 获取完整的版本信息
 version_info = get_full_version_info()  # 返回包含所有版本信息的字典
+
+# Qt API 配置
+from version import QT_API
+print(f"当前使用的 Qt API: {QT_API}")
+
+# 修改 Qt API（需要在导入 qtpy 之前设置）
+# 注意：修改此配置后需要重启应用程序才能生效
+# 示例：切换到 PyQt5
+# QT_API = "pyqt5"
+
+# 切换到 PyQt5 的完整步骤：
+# 1. 安装 PyQt5 依赖：pip install -r requirements-pyqt5.txt
+# 2. 在 version.py 中设置：QT_API = "pyqt5"
+# 3. 重启应用程序
 ```
 
 **版本管理说明**：
@@ -443,8 +471,14 @@ has_changes = gestures_page.has_unsaved_changes()
 **手势编辑界面示例**：
 ```python
 # 手势编辑界面示例
+import os
+
+# 设置 Qt API（必须在导入任何 Qt 相关模块之前）
+from version import QT_API
+os.environ['QT_API'] = QT_API
+
 from ui.gestures.gestures_tab import GesturesPage
-from PyQt6.QtWidgets import QApplication
+from qtpy.QtWidgets import QApplication
 
 # 创建手势管理页面
 app = QApplication([])
@@ -673,9 +707,15 @@ app.exec()
 **使用方法示例**：
 
 ```python
-from ui.gestures.drawing_widget import GestureDrawingWidget
-from PyQt6.QtWidgets import QApplication
+import os
 import sys
+
+# 设置 Qt API（必须在导入任何 Qt 相关模块之前）
+from version import QT_API
+os.environ['QT_API'] = QT_API
+
+from ui.gestures.drawing_widget import GestureDrawingWidget
+from qtpy.QtWidgets import QApplication
 
 # 创建Qt应用程序
 app = QApplication(sys.argv)

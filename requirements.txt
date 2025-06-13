@@ -2,4 +2,4 @@ numpy==2.2.5
 psutil==6.1.1
 pynput==1.7.7
 PyQt6==6.9.0
-PyQt6_sip==13.9.1
+qtpy==2.6.0

@@ -7,7 +7,7 @@
 import datetime
 
 # 版本信息
-VERSION = "0.0.1-beta.3"
+VERSION = "0.0.1-beta.2"
 APP_NAME = "GestroKey"
 APP_DESCRIPTION = "一款手势控制工具"
 BUILD_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -16,6 +16,9 @@ LICENSE = "GPL-3.0"
 
 # 仓库地址
 REPO_URL = f"https://github.com/{AUTHOR}/{APP_NAME}"
+
+# Qt API 配置 (支持: "pyqt5", "pyqt6", "pyside2", "pyside6")
+QT_API = "pyqt6"
 
 # 版本类型
 VERSION_TYPE_RELEASE = "正式版"  # 正式发布版本
