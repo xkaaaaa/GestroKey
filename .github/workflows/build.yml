@@ -884,13 +884,8 @@ jobs:
             changelog="${changelog}### 🔧 构建和维护\n\n${chores}\n"
           fi
           
-          # 其他变更
-          if [[ -n "$others" ]]; then
-            changelog="${changelog}### 📦 其他变更\n\n${others}\n"
-          fi
-          
           # 如果没有任何变更记录，显示提示信息
-          if [[ "$breaking_changes" == "" && "$features" == "" && "$fixes" == "" && "$docs" == "" && "$styles" == "" && "$refactors" == "" && "$performances" == "" && "$tests" == "" && "$chores" == "" && "$others" == "" ]]; then
+          if [[ "$breaking_changes" == "" && "$features" == "" && "$fixes" == "" && "$docs" == "" && "$styles" == "" && "$refactors" == "" && "$performances" == "" && "$tests" == "" && "$chores" == "" ]]; then
             changelog="${changelog}*本次版本更新未包含符合 Conventional Commits 格式的提交信息*\n"
           fi
           

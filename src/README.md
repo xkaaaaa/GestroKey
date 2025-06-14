@@ -25,8 +25,11 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
     - [2.1.1 控制台选项卡](#211-控制台选项卡-uiconsolepy)
     - [2.1.2 手势管理模块](#212-手势管理模块)
       - [2.1.2.1 手势库](#2121-手势库-uigesturesgesturespy)
-      - [2.1.2.2 手势选项卡](#2122-手势选项卡-uigesturesgestures_tabpy)
-      - [2.1.2.3 手势绘制组件](#2123-手势绘制组件-uigesturesdrawing_widgetpy)
+      - [2.1.2.2 手势选项卡主页面](#2122-手势选项卡主页面-uigesturesgestures_tabpy)
+      - [2.1.2.3 触发路径选项卡](#2123-触发路径选项卡-uigesturestrigger_paths_tabpy)
+      - [2.1.2.4 执行操作选项卡](#2124-执行操作选项卡-uigesturesexecute_actions_tabpy)
+      - [2.1.2.5 手势映射选项卡](#2125-手势映射选项卡-uigesturesgesture_mappings_tabpy)
+      - [2.1.2.6 手势绘制组件](#2126-手势绘制组件-uigesturesdrawing_widgetpy)
     - [2.1.3 设置模块](#213-设置模块)
       - [2.1.3.1 设置管理器](#2131-设置管理器-uisettingssettingspy)
       - [2.1.3.2 设置选项卡](#2132-设置选项卡-uisettingssettings_tabpy)
@@ -60,17 +63,19 @@ src/
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
 │   ├── console.py           # 控制台选项卡
+│   ├── __init__.py          # UI模块初始化文件
 │   ├── settings/            # 设置模块
 │   │   ├── settings_tab.py  # 设置选项卡
 │   │   ├── settings.py      # 设置管理器
-│   │   ├── default_settings.json # 默认设置定义（JSON格式）
 │   │   └── __init__.py      # 设置模块初始化文件
-│   ├── gestures/            # 手势管理模块
-│   │   ├── gestures_tab.py  # 手势管理选项卡
-│   │   ├── gestures.py      # 手势库管理模块
-│   │   ├── drawing_widget.py # 手势绘制组件（支持可视化路径显示）
-│   │   └── default_gestures.json # 默认手势库定义（JSON格式）
-│   └── __init__.py          # UI模块初始化文件
+│   └── gestures/            # 手势管理模块
+│       ├── gestures_tab.py  # 手势管理选项卡（主页面）
+│       ├── trigger_paths_tab.py # 触发路径选项卡
+│       ├── execute_actions_tab.py # 执行操作选项卡
+│       ├── gesture_mappings_tab.py # 手势映射选项卡
+│       ├── gestures.py      # 手势库管理模块
+│       ├── drawing_widget.py # 手势绘制组件
+│       └── default_gestures.json # 默认手势库定义（JSON格式）
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源
 │       ├── console.svg      # 控制台图标
@@ -78,7 +83,8 @@ src/
 │       ├── icon.svg         # 应用程序图标
 │       └── settings.svg     # 设置图标
 ├── version.py               # 版本信息模块
-└── main.py                  # 主程序入口
+├── main.py                  # 主程序入口
+└── README.md               # 本文档
 ```
 
 ## 详细模块说明
@@ -168,15 +174,16 @@ sys.exit(app.exec())
 
 #### 1.2 version.py
 
-**功能说明**：版本信息模块，存储和管理版本号、构建日期等应用程序基本信息。
+**功能说明**：版本信息模块，存储和管理版本号、构建日期等应用程序基本信息，以及打包配置。
 
 **主要变量**：
-- `VERSION`：版本号，如"2.0.0"
+- `VERSION`：版本号，如"0.0.1-beta.2"
 - `APP_NAME`：应用程序名称，固定为"GestroKey"
 - `APP_DESCRIPTION`：应用程序描述
-- `BUILD_DATE`：构建日期，格式为"YYYY-MM-DD"
+- `BUILD_DATE`：构建日期，格式为"YYYY-MM-DD"，使用当前日期自动生成
 - `AUTHOR`：作者信息
-- `LICENSE`：许可证信息
+- `LICENSE`：许可证信息，如"GPL-3.0"
+- `REPO_URL`：仓库地址，基于作者和应用名称自动生成
 - `VERSION_TYPE_RELEASE`：正式发布版本的类型标识
 - `VERSION_TYPE_PREVIEW`：预览版本的类型标识
 - `VERSION_TYPE_DEVELOPMENT`：未发布版本的类型标识
@@ -189,16 +196,29 @@ sys.exit(app.exec())
   - `"pyside6"`：使用 PySide6
   - `"pyside2"`：使用 PySide2
 
+**打包配置变量**：
+- `ENABLE_PACKAGING`：是否启用打包流程
+- `PACKAGE_WINDOWS`、`PACKAGE_MACOS`、`PACKAGE_LINUX`：各平台是否启用打包
+- `PACKAGE_STANDALONE`、`PACKAGE_PORTABLE`：打包类型控制
+- `PACKAGER_WINDOWS`、`PACKAGER_MACOS`、`PACKAGER_LINUX`：各平台打包工具选择（nuitka或pyinstaller）
+- `PACKAGE_INCLUDE_DEBUG_SYMBOLS`：是否包含调试符号
+- `PACKAGE_OPTIMIZE_LEVEL`：优化级别（0-2）
+- `PACKAGE_COMPRESS_ASSETS`：是否压缩资源文件
+- `PACKAGE_UPXIFY`：是否使用UPX压缩可执行文件
+- `PACKAGE_OUTPUT_DIR`：输出目录名称
+- `PACKAGE_NAMING_PATTERN`：命名模式，支持占位符{app_name}、{version}、{platform}、{type}
+
 **主要函数**：
-- `get_version_string()`：获取格式化的版本字符串，如"GestroKey v0.0.0"
+- `get_version_string()`：获取格式化的版本字符串，如"GestroKey v0.0.1-beta.2"
 - `get_full_version_info()`：获取完整的版本信息，返回包含所有版本相关信息的字典
+- `get_packaging_config()`：获取打包配置信息，返回包含所有打包设置的字典
 
 **使用方法**：
 ```python
-from version import VERSION, APP_NAME, CURRENT_VERSION_TYPE, get_version_string, get_full_version_info
+from version import VERSION, APP_NAME, CURRENT_VERSION_TYPE, get_version_string, get_full_version_info, get_packaging_config
 
 # 获取版本号
-current_version = VERSION  # 如："0.0.0"
+current_version = VERSION  # 如："0.0.1-beta.2"
 
 # 获取应用名称
 app_name = APP_NAME  # 返回："GestroKey"
@@ -207,10 +227,13 @@ app_name = APP_NAME  # 返回："GestroKey"
 version_type = CURRENT_VERSION_TYPE  # 返回："未发布版"、"预览版"或"正式版"
 
 # 获取格式化的版本字符串
-version_string = get_version_string()  # 返回："GestroKey v0.0.0"
+version_string = get_version_string()  # 返回："GestroKey v0.0.1-beta.2"
 
 # 获取完整的版本信息
 version_info = get_full_version_info()  # 返回包含所有版本信息的字典
+
+# 获取打包配置信息
+packaging_config = get_packaging_config()  # 返回包含所有打包设置的字典
 
 # Qt API 配置
 from version import QT_API
@@ -305,39 +328,62 @@ console_page.update_system_info(system_data)
 ###### 2.1.2.1 手势库 (ui/gestures/gestures.py)
 
 **功能说明**：
-手势库管理模块，负责保存和加载用户手势库，提供添加、删除、修改手势的功能。作为后端模块，专注于数据管理和持久化，与前端界面逻辑分离。
+手势库管理器，负责保存和加载用户手势库。采用新的三部分架构：触发路径、执行操作和手势映射，提供更灵活的手势管理方式。作为后端模块，专注于数据管理和持久化，与前端界面逻辑分离。
+
+**架构设计**：
+新的手势库结构分为三个独立的部分：
+1. **trigger_paths**: 触发路径（绘制的轨迹数据）
+2. **execute_actions**: 执行操作（要执行的动作定义）
+3. **gesture_mappings**: 手势映射（将路径和操作关联起来）
 
 **主要类和方法**：
 - `GestureLibrary`：手势库类
-  - `__init__(self)`：初始化手势库
+  - `__init__(self)`：初始化手势库，加载默认手势和用户配置
   - `_load_default_gestures(self)`：从JSON文件加载默认手势库
-  - `_ensure_valid_ids(self, gestures)`：确保所有手势都有有效的整数ID，并且ID是连续的
-  - `_get_next_id(self)`：获取下一个可用的ID
-  - `_get_gestures_file_path(self)`：获取手势库文件路径
+  - `_convert_actions_for_current_platform(self)`：转换操作的快捷键格式为当前平台格式
+  - `_convert_shortcut_for_current_platform(self, shortcut)`：将快捷键转换为当前平台的格式
+  - `_get_gestures_file_path(self)`：获取手势库文件路径，支持多平台
   - `load(self)`：从文件加载手势库
+  - `_convert_loaded_actions_for_current_platform(self, loaded_data)`：转换加载的操作快捷键格式
+  - `_update_saved_state(self)`：更新已保存状态（深拷贝）
   - `save(self)`：保存手势库到文件
-  - `get_gesture(self, name)`：获取指定名称的手势
-  - `get_gesture_by_id(self, gesture_id)`：根据ID获取手势
-  - `get_all_gestures(self, use_saved=False)`：获取所有手势
-  - `get_all_gestures_sorted(self, use_saved=False)`：获取按ID排序的所有手势
-  - `get_gesture_by_direction(self, direction)`：根据方向序列获取匹配的手势
-  - `add_gesture(self, name, direction, action_type, action_value, gesture_id=None)`：添加新手势
-  - `update_gesture_name(self, old_name, new_name)`：更新手势名称
-  - `remove_gesture(self, name)`：删除指定名称的手势
-  - `reset_to_default(self)`：重置手势库为默认设置
   - `has_changes(self)`：检查是否有未保存的更改
+  - `get_gesture_by_path(self, drawn_path, similarity_threshold=0.70)`：根据绘制路径获取匹配的手势
+  - `get_gesture_count(self, use_saved=False)`：获取手势数量
+  - `_get_next_mapping_id(self)`：获取下一个可用的映射ID
+  - `_get_next_path_id(self)`：获取下一个可用的路径ID
+  - `_get_next_action_id(self)`：获取下一个可用的操作ID
+  - `reset_to_default(self)`：重置手势库为默认设置
 
 - `get_gesture_library()`：单例函数，获取手势库实例
 
-**手势数据结构**：
+**数据结构**：
 ```json
 {
-  "复制": {
-    "id": 1,
-    "direction": "右-下",
-    "action": {
+  "trigger_paths": {
+    "path_1": {
+      "id": 1,
+      "name": "向右滑动",
+      "path": {
+        "points": [[0, 0], [100, 0]],
+        "connections": [{"from": 0, "to": 1, "type": "line"}]
+      }
+    }
+  },
+  "execute_actions": {
+    "action_1": {
+      "id": 1,
+      "name": "复制",
       "type": "shortcut",
       "value": "Ctrl+C"
+    }
+  },
+  "gesture_mappings": {
+    "gesture_1": {
+      "id": 1,
+      "name": "复制手势",
+      "trigger_path_id": 1,
+      "execute_action_id": 1
     }
   }
 }
@@ -349,522 +395,609 @@ console_page.update_system_info(system_data)
 from ui.gestures.gestures import get_gesture_library
 gesture_library = get_gesture_library()
 
-# 获取所有手势
-all_gestures = gesture_library.get_all_gestures()
-print(f"当前有 {len(all_gestures)} 个手势")
+# 获取各部分数据
+trigger_paths = gesture_library.trigger_paths
+execute_actions = gesture_library.execute_actions
+gesture_mappings = gesture_library.gesture_mappings
 
-# 添加新手势
-gesture_library.add_gesture(
-    name="截图",
-    direction="右-下-左",
-    action_type="shortcut",
-    action_value="win+shift+s"
-)
-print(f"添加了新手势：截图")
+# 检查是否有未保存变更
+if gesture_library.has_changes():
+    print("有未保存的变更")
 
-# 更新手势名称
-gesture_library.update_gesture_name("截图", "屏幕截图")
-print(f"更新了手势名称")
-
-# 查找匹配手势
-direction = "右-下"
-name, gesture = gesture_library.get_gesture_by_direction(direction)
-if name:
-    print(f"匹配到手势: {name}")
-    print(f"执行动作: {gesture['action']['type']} - {gesture['action']['value']}")
-else:
-    print(f"未找到匹配的手势: {direction}")
-
-# 删除手势
-result = gesture_library.remove_gesture("屏幕截图")
-print(f"删除结果: {'成功' if result else '失败'}")
-
-# 重置手势库
-gesture_library.reset_to_default()
-print("手势库已重置为默认设置")
+# 根据绘制路径查找匹配手势
+drawn_path = {"points": [[0, 0], [100, 0]], "connections": [...]}
+gesture_name, action, similarity = gesture_library.get_gesture_by_path(drawn_path)
+if action:
+    print(f"识别到手势: {gesture_name}, 操作: {action['name']}")
 
 # 保存手势库
-gesture_library.save()
-print("手势库已保存")
+success = gesture_library.save()
+if success:
+    print("手势库已保存")
+
+# 重置为默认
+gesture_library.reset_to_default()
 ```
 
-###### 2.1.2.2 手势选项卡 (ui/gestures/gestures_tab.py)
+###### 2.1.2.2 手势选项卡主页面 (ui/gestures/gestures_tab.py)
 
 **功能说明**：
-手势管理界面，为用户提供可视化的手势添加、编辑和删除功能。作为前端模块，专注于用户界面展示和交互，通过调用手势库后端模块完成实际的数据操作。
-
-**关联模块**：
-- `ui/gestures/drawing_widget.py`：手势绘制组件，提供手势路径的可视化绘制和显示功能
+手势管理主页面，包含三个子选项卡的容器页面。提供统一的手势库操作界面，管理触发路径、执行操作和手势映射三个部分。
 
 **主要类和方法**：
-- `GesturesPage`：手势管理页面类
-  - `__init__(self, parent=None)`：初始化手势管理页面
-  - `showEvent(self, event)`：页面显示时刷新按钮状态
-  - `_init_ui(self)`：初始化UI组件和布局
-  - `_create_gesture_list_panel(self)`：创建左侧手势列表面板
-  - `_create_gesture_editor_panel(self)`：创建右侧手势编辑面板
-  - `_load_gesture_list(self)`：加载并显示手势列表
-  - `_on_gesture_selected(self, item)`：处理手势选择事件
-  - `_load_gesture_to_editor(self, gesture_name)`：加载手势数据到编辑器
-  - `_auto_apply_changes(self)`：自动应用表单变更到手势库（不保存到文件）
-  - `_update_button_states(self)`：更新按钮启用状态
-  - `_new_gesture(self)`：创建新手势
-  - `_undo_changes(self)`：撤销当前修改
-  - `_clear_editor(self)`：清空编辑器
-  - `_delete_gesture(self)`：删除选中手势
-  - `_reset_gestures(self)`：重置手势库
-  - `_save_gestures(self)`：保存手势库到文件
-  - `has_unsaved_changes(self)`：检查是否有未保存的更改
+- `GesturesPage`：手势管理主页面类
+  - `__init__(self, parent=None)`：初始化手势管理主页面，创建三个子选项卡
+  - `initUI(self)`：初始化用户界面，创建选项卡控件和底部操作按钮
+  - `_on_tab_changed(self, index)`：选项卡切换事件处理
+  - `_check_library_changes(self)`：定时检查手势库是否有变更，自动更新保存按钮状态
+  - `_save_gesture_library(self)`：保存手势库到文件
+  - `_refresh_all(self)`：刷新所有子选项卡的显示
+  - `_reset_to_default(self)`：重置手势库为默认设置
 
-**界面特性**：
-- **自动应用变更**：表单修改自动应用到手势库，无需手动保存
-- **实时列表更新**：右侧表单修改时，左侧列表实时更新显示所有要素
-- **智能按钮状态**：
-  - 撤销按钮：有表单变更时启用
-  - 保存手势库按钮：有手势库变更时启用
-  - 页面显示时自动刷新按钮状态
+- `SimilarityTestDialog`：相似度测试对话框类
+  - `__init__(self, reference_path, parent=None)`：初始化相似度测试对话框
+  - `_init_ui(self)`：初始化测试界面
+  - `_on_test_path_completed(self, path)`：处理测试路径绘制完成事件
+  - `_setup_test_widget_events(self)`：设置测试绘制组件的事件处理
+  - `_calculate_similarity(self)`：计算两个路径的相似度
 
-**组件布局**：
-- 左侧：手势列表面板
-  - 手势列表（显示编号、名称、类型、快捷键）
-  - 添加新手势、删除手势、重置、保存手势库按钮
-- 右侧：手势编辑面板
-  - 手势名称输入框
-  - 快捷键输入框
-  - 手势路径绘制组件（支持可视化绘制和显示）
-  - 新建、清空表单、撤销按钮
+**界面结构**：
+- **选项卡容器**：包含三个子选项卡
+  - 触发路径选项卡（`TriggerPathsTab`）
+  - 执行操作选项卡（`ExecuteActionsTab`）
+  - 手势映射选项卡（`GestureMappingsTab`）
+- **底部操作区域**：
+  - 提示标签："修改后需要保存手势库才能生效"
+  - 保存手势库按钮（有变更时自动启用）
+  - 重置为默认手势库按钮
+
+**自动化功能**：
+- **变更检测**：每秒自动检查手势库变更状态
+- **按钮状态管理**：保存按钮根据变更状态自动启用/禁用
+- **子选项卡刷新**：保存或重置后自动刷新所有子选项卡
 
 **使用方法**：
 ```python
-# 创建手势管理页面
+# 创建手势管理主页面
 from ui.gestures.gestures_tab import GesturesPage
 
 # 创建页面实例
 gestures_page = GesturesPage()
 
-# 页面会自动加载并显示所有手势到左侧列表中
+# 访问子选项卡
+trigger_paths_tab = gestures_page.trigger_paths_tab     # 触发路径选项卡
+execute_actions_tab = gestures_page.execute_actions_tab # 执行操作选项卡
+gesture_mappings_tab = gestures_page.gesture_mappings_tab # 手势映射选项卡
 
-# 编辑手势
-# 1. 点击左侧列表中的手势项
-# 2. 右侧编辑器会显示手势信息
-# 3. 修改名称、快捷键或绘制新路径（自动应用到手势库）
-# 4. 左侧列表实时更新显示
+# 手动触发操作
+gestures_page._save_gesture_library()    # 保存手势库
+gestures_page._reset_to_default()        # 重置为默认
+gestures_page._refresh_all()             # 刷新所有选项卡
 
-# 添加新手势
-gestures_page._add_new_gesture()    # 添加新手势（通过按钮触发）
-
-# 删除手势
-gestures_page._delete_gesture()     # 删除当前选中的手势
-
-# 撤销和清空
-gestures_page._undo_changes()       # 撤销当前修改
-gestures_page._clear_editor()       # 清空表单
-
-# 保存和重置
-gestures_page._save_gestures()      # 保存手势库到文件
-gestures_page._reset_gestures()     # 重置为默认手势库
-
-# 检查未保存更改
-has_changes = gestures_page.has_unsaved_changes()
+# 获取选项卡控件
+tab_widget = gestures_page.tab_widget    # QTabWidget控件
+current_index = tab_widget.currentIndex() # 当前选项卡索引
 ```
 
-**手势编辑界面示例**：
-```python
-# 手势编辑界面示例
-import os
-
-# 设置 Qt API（必须在导入任何 Qt 相关模块之前）
-from version import QT_API
-os.environ['QT_API'] = QT_API
-
-from ui.gestures.gestures_tab import GesturesPage
-from qtpy.QtWidgets import QApplication
-
-# 创建手势管理页面
-app = QApplication([])
-gestures_page = GesturesPage()
-
-# 访问编辑器组件
-name_input = gestures_page.edit_name            # QLineEdit组件
-shortcut_input = gestures_page.edit_shortcut    # QLineEdit组件
-drawing_widget = gestures_page.drawing_widget   # 手势绘制组件
-
-# 设置输入字段值（会自动应用到手势库）
-name_input.setText("新手势名称")
-shortcut_input.setText("Ctrl+C")
-
-# 读取输入字段值
-print(f"手势名称: {name_input.text()}")
-print(f"快捷键: {shortcut_input.text()}")
-
-# 显示并运行应用程序
-gestures_page.show()
-app.exec()
-```
-
-###### 2.1.2.3 手势绘制组件 (ui/gestures/drawing_widget.py)
+###### 2.1.2.3 触发路径选项卡 (ui/gestures/trigger_paths_tab.py)
 
 **功能说明**：
-手势绘制和可视化编辑组件，提供手势路径创建、编辑和预览功能。支持双工具模式（画笔工具和点击工具）、多种视图操作、历史记录管理和相似度测试功能。是GestroKey手势管理系统的核心交互界面。
+触发路径管理选项卡，用于管理手势的触发路径数据。提供路径的添加、编辑、删除功能，以及可视化的路径绘制和相似度测试工具。
 
 **主要类和方法**：
+- `TriggerPathsTab`：触发路径管理选项卡类
+  - `__init__(self, parent=None)`：初始化触发路径选项卡
+  - `initUI(self)`：初始化用户界面，创建左右分栏布局
+  - `_create_path_list_panel(self)`：创建左侧路径列表面板
+  - `_create_path_editor_panel(self)`：创建右侧路径编辑器面板
+  - `_load_path_list(self)`：加载并显示路径列表，按ID排序
+  - `_on_path_selected(self, item)`：处理路径选择事件
+  - `_load_path_to_editor(self, path_key)`：将路径数据加载到编辑器
+  - `_on_form_changed(self)`：表单内容变化事件处理
+  - `_auto_save_changes(self)`：自动保存变更到手势库变量中
+  - `_has_form_changes(self)`：检查表单是否有未保存的更改
+  - `_paths_different(self, path1, path2)`：比较两个路径是否不同
+  - `_on_path_completed(self, path)`：处理路径绘制完成事件
+  - `_create_new_path_from_drawing(self)`：从绘制区域创建新路径
+  - `_add_new_path(self)`：添加新路径
+  - `_clear_form(self)`：清空表单
+  - `_select_path_in_list(self, path_key)`：在列表中选择指定路径
+  - `_delete_path(self)`：删除选中的路径
+  - `has_unsaved_changes(self)`：检查是否有未保存的更改
+  - `refresh_list(self)`：刷新路径列表显示
+  - `_on_test_similarity(self)`：触发相似度测试
+  - `_show_similarity_results(self, test_path, results)`：显示相似度测试结果
 
-**GestureDrawingWidget 手势绘制组件类**：继承自`QWidget`
+**界面布局**：
+- **左侧路径列表面板**：
+  - 路径列表（显示ID、名称、点数）
+  - 添加路径按钮
+  - 删除路径按钮（选中路径时启用）
+- **右侧路径编辑器面板**：
+  - 路径名称输入框
+  - 手势绘制组件（支持绘制、显示、测试相似度）
+  - 清空按钮
 
-**初始化和UI管理**：
-- `__init__(self, parent=None)`：初始化绘制组件，设置绘制状态、历史记录、工具状态和视图变换属性
-- `initUI(self)`：初始化UI布局，创建水平布局包含左侧工具栏和右侧绘制区域
-- `create_toolbar(self)`：创建工具栏，包含画笔、点击、撤销、重做和相似度测试按钮
-- `load_svg_icon(self, filename)`：加载SVG图标，支持错误处理
+**核心功能**：
+- **路径绘制**：使用绘制组件绘制手势路径
+- **自动保存**：表单修改自动保存到手势库变量
+- **相似度测试**：测试绘制路径与参考路径的相似度
+- **列表同步**：编辑后自动刷新列表显示
 
-**工具模式管理**：
-- `select_brush_tool(self)`：切换到画笔工具模式，启用自由绘制功能
-- `select_pointer_tool(self)`：切换到点击工具模式，启用精确点位编辑
-- `update_toolbar_buttons(self)`：更新工具栏按钮状态，根据操作历史和路径状态
+**使用方法**：
+```python
+# 创建触发路径选项卡
+from ui.gestures.trigger_paths_tab import TriggerPathsTab
+
+# 创建选项卡实例
+paths_tab = TriggerPathsTab()
+
+# 访问组件
+path_list = paths_tab.path_list              # 路径列表控件
+name_input = paths_tab.edit_name             # 路径名称输入框
+drawing_widget = paths_tab.drawing_widget    # 绘制组件
+
+# 手动操作
+paths_tab._add_new_path()        # 添加新路径
+paths_tab._delete_path()         # 删除当前选中路径
+paths_tab._clear_form()          # 清空表单
+paths_tab.refresh_list()         # 刷新列表
+
+# 检查变更状态
+has_changes = paths_tab.has_unsaved_changes()
+
+# 访问当前路径数据
+current_path_key = paths_tab.current_path_key
+current_path = paths_tab.current_path
+```
+
+###### 2.1.2.4 执行操作选项卡 (ui/gestures/execute_actions_tab.py)
+
+**功能说明**：
+执行操作管理选项卡，用于管理手势要执行的操作。支持快捷键操作的定义、编辑和删除。
+
+**主要类和方法**：
+- `ExecuteActionsTab`：执行操作管理选项卡类
+  - `__init__(self, parent=None)`：初始化执行操作选项卡
+  - `initUI(self)`：初始化用户界面，创建左右分栏布局
+  - `_create_action_list_panel(self)`：创建左侧操作列表面板
+  - `_create_action_editor_panel(self)`：创建右侧操作编辑器面板
+  - `_load_action_list(self)`：加载并显示操作列表，按ID排序
+  - `_on_action_selected(self, item)`：处理操作选择事件
+  - `_load_action_to_editor(self, action_key)`：将操作数据加载到编辑器
+  - `_on_form_changed(self)`：表单内容变化事件处理
+  - `_auto_save_changes(self)`：自动保存变更到手势库变量中
+  - `_has_form_changes(self)`：检查表单是否有未保存的更改
+  - `_clear_form(self)`：清空表单
+  - `_add_new_action(self)`：添加新操作
+  - `_select_action_in_list(self, action_key)`：在列表中选择指定操作
+  - `_delete_action(self)`：删除选中的操作
+  - `has_unsaved_changes(self)`：检查是否有未保存的更改
+  - `refresh_list(self)`：刷新操作列表显示
+
+**界面布局**：
+- **左侧操作列表面板**：
+  - 操作列表（显示ID、名称、类型、值）
+  - 添加操作按钮
+  - 删除操作按钮（选中操作时启用）
+- **右侧操作编辑器面板**：
+  - 操作名称输入框
+  - 操作类型下拉框（当前支持"快捷键"）
+  - 操作值输入框（如"Ctrl+C"）
+  - 清空按钮
+
+**支持的操作类型**：
+- **快捷键（shortcut）**：执行键盘快捷键组合
+
+**使用方法**：
+```python
+# 创建执行操作选项卡
+from ui.gestures.execute_actions_tab import ExecuteActionsTab
+
+# 创建选项卡实例
+actions_tab = ExecuteActionsTab()
+
+# 访问组件
+action_list = actions_tab.action_list        # 操作列表控件
+name_input = actions_tab.edit_name           # 操作名称输入框
+type_combo = actions_tab.combo_type          # 操作类型下拉框
+value_input = actions_tab.edit_value         # 操作值输入框
+
+# 手动操作
+actions_tab._add_new_action()        # 添加新操作
+actions_tab._delete_action()         # 删除当前选中操作
+actions_tab._clear_form()            # 清空表单
+actions_tab.refresh_list()           # 刷新列表
+
+# 检查变更状态
+has_changes = actions_tab.has_unsaved_changes()
+
+# 访问当前操作数据
+current_action_key = actions_tab.current_action_key
+```
+
+###### 2.1.2.5 手势映射选项卡 (ui/gestures/gesture_mappings_tab.py)
+
+**功能说明**：
+手势映射管理选项卡，用于将触发路径和执行操作关联起来，形成完整的手势定义。提供映射关系的创建、编辑和删除功能。
+
+**主要类和方法**：
+- `GestureMappingsTab`：手势映射管理选项卡类
+  - `__init__(self, parent=None)`：初始化手势映射选项卡
+  - `initUI(self)`：初始化用户界面，创建左右分栏布局
+  - `_create_mapping_list_panel(self)`：创建左侧映射列表面板
+  - `_create_mapping_editor_panel(self)`：创建右侧映射编辑器面板
+  - `_load_mapping_list(self)`：加载并显示映射列表，按ID排序
+  - `_load_combo_options(self)`：加载下拉框选项
+  - `_get_path_name_by_id(self, path_id)`：根据ID获取路径名称
+  - `_get_action_name_by_id(self, action_id)`：根据ID获取操作名称
+  - `_on_mapping_selected(self, item)`：处理映射选择事件
+  - `_load_mapping_to_editor(self, mapping_key)`：将映射数据加载到编辑器
+  - `_on_form_changed(self)`：表单内容变化事件处理
+  - `_auto_save_changes(self)`：自动保存变更到手势库变量中
+  - `_update_button_states(self)`：更新按钮启用状态
+  - `_add_new_mapping(self)`：添加新映射
+  - `_select_mapping_in_list(self, mapping_key)`：在列表中选择指定映射
+  - `_delete_mapping(self)`：删除选中的映射
+  - `_clear_form(self)`：清空表单
+  - `has_unsaved_changes(self)`：检查是否有未保存的更改
+  - `refresh_list(self)`：刷新映射列表显示
+
+**界面布局**：
+- **左侧映射列表面板**：
+  - 映射列表（显示ID、手势名称、路径→操作）
+  - 添加映射按钮
+  - 删除映射按钮（选中映射时启用）
+- **右侧映射编辑器面板**：
+  - 手势名称输入框
+  - 触发路径下拉框（显示可用路径）
+  - 执行操作下拉框（显示可用操作）
+  - 清空按钮
+
+**核心功能**：
+- **关联管理**：将触发路径和执行操作关联成完整手势
+- **下拉框同步**：自动加载并显示可用的路径和操作
+- **名称解析**：根据ID自动解析并显示路径和操作名称
+- **完整性检查**：确保映射引用的路径和操作存在
+
+**使用方法**：
+```python
+# 创建手势映射选项卡
+from ui.gestures.gesture_mappings_tab import GestureMappingsTab
+
+# 创建选项卡实例
+mappings_tab = GestureMappingsTab()
+
+# 访问组件
+mapping_list = mappings_tab.mapping_list              # 映射列表控件
+name_input = mappings_tab.edit_name                   # 手势名称输入框
+path_combo = mappings_tab.combo_trigger_path          # 触发路径下拉框
+action_combo = mappings_tab.combo_execute_action      # 执行操作下拉框
+
+# 手动操作
+mappings_tab._add_new_mapping()      # 添加新映射
+mappings_tab._delete_mapping()       # 删除当前选中映射
+mappings_tab._clear_form()           # 清空表单
+mappings_tab.refresh_list()          # 刷新列表
+
+# 检查变更状态
+has_changes = mappings_tab.has_unsaved_changes()
+
+# 访问当前映射数据
+current_mapping_key = mappings_tab.current_mapping_key
+
+# 获取名称解析方法
+path_name = mappings_tab._get_path_name_by_id(1)      # 根据ID获取路径名
+action_name = mappings_tab._get_action_name_by_id(1)  # 根据ID获取操作名
+```
+
+###### 2.1.2.6 手势绘制组件 (ui/gestures/drawing_widget.py)
+
+**功能说明**：
+手势绘制组件，提供可视化的手势路径绘制和编辑功能。支持多种绘制工具、历史记录、视图变换和路径测试等功能。集成在触发路径选项卡中，为用户提供直观的手势路径创建和编辑体验。
+
+**主要类和信号**：
+- `GestureDrawingWidget`：手势绘制组件类
+  - `pathCompleted = Signal(dict)`：路径完成信号，发送格式化的路径数据
+  - `testSimilarity = Signal()`：测试相似度信号
+
+**核心属性**：
+- **绘制状态**：`drawing`、`current_path`、`completed_paths`
+- **历史记录**：`path_history`、`history_index`（支持撤回/还原）
+- **工具状态**：`current_tool`（brush/pointer）、`selected_point_index`、`dragging_point`
+- **视图变换**：`view_scale`、`view_offset`、`min_scale`、`max_scale`
+- **交互状态**：`panning`、`space_pressed`、`left_shift_pressed`、`right_shift_pressed`
+
+**主要方法分类**：
+
+**初始化和UI**：
+- `__init__(self, parent=None)`：初始化绘制组件，设置默认状态和事件处理
+- `initUI(self)`：初始化用户界面，创建工具栏和绘制区域
+- `create_toolbar(self)`：创建左侧工具栏，包含所有绘制工具
+
+**工具管理**：
+- `load_svg_icon(self, filename)`：加载SVG图标，支持SVG不可用时的降级处理
+- `select_brush_tool(self)`：选择画笔工具，用于连续路径绘制
+- `select_pointer_tool(self)`：选择点击工具，用于精确点编辑
+- `update_toolbar_buttons(self)`：更新工具栏按钮的启用/禁用状态
 
 **历史记录系统**：
-- `save_to_history(self)`：保存当前状态到历史记录，支持分支历史管理
-- `undo_action(self)`：撤销操作，支持多级撤销（Ctrl+Z）
-- `redo_action(self)`：重做操作，支持多级重做（Ctrl+Y）
+- `undo_action(self)`：撤回操作（快捷键Ctrl+Z）
+- `redo_action(self)`：还原操作（快捷键Ctrl+Y）
+- `save_to_history(self)`：保存当前状态到历史记录，支持分支历史
 
-**鼠标事件处理**：
-- `mousePressEvent(self, event)`：处理鼠标按下事件，支持画笔绘制、点位编辑和视图拖拽
-- `mouseMoveEvent(self, event)`：处理鼠标移动事件，实时更新绘制轨迹或拖拽点位
-- `mouseReleaseEvent(self, event)`：处理鼠标释放事件，完成绘制或编辑操作
+**事件处理**：
+- `keyPressEvent(self, event)`：键盘按下事件，支持Ctrl+Z/Y、Space、Delete等
+- `keyReleaseEvent(self, event)`：键盘释放事件，处理修饰键状态
+- `wheelEvent(self, event)`：滚轮事件，实现缩放和平移功能
+- `mousePressEvent(self, event)`：鼠标按下事件，处理绘制开始和工具选择
+- `mouseMoveEvent(self, event)`：鼠标移动事件，处理绘制进行和点拖拽
+- `mouseReleaseEvent(self, event)`：鼠标释放事件，完成绘制和点操作
 
-**视图控制系统**：
-- `wheelEvent(self, event)`：Alt+滚轮缩放功能，支持围绕鼠标位置的缩放
-- `keyPressEvent(self, event)`：键盘事件处理，支持空格拖拽、快捷键和DELETE删除
-- `keyReleaseEvent(self, event)`：键盘释放事件，恢复光标状态
-- `_reset_view(self)`：视图重置，自动计算最佳缩放比例和居中位置
-
-**绘制和可视化**：
-- `paintEvent(self, event)`：主绘制事件，处理所有可视化元素的渲染
-- `_draw_formatted_path(self, painter, path)`：绘制格式化路径，包含起点、终点、中间点和连线
-- `_draw_direction_arrow(self, painter, start_point, end_point)`：绘制方向指示箭头
-
-**点位编辑功能**：
-- `_handle_pointer_click(self, screen_pos)`：处理点击工具的点击事件，支持点选择和拖拽
-- `_find_point_at_position(self, screen_pos, tolerance=15)`：查找指定位置的点
-- `_add_new_point(self, screen_pos)`：添加新的路径点
-- `_update_dragging_point(self, screen_pos)`：更新拖拽点的位置，支持角度吸附
-- `_apply_angle_snap(self, path_index, point_index, new_pos)`：应用角度约束算法
-- `_delete_selected_point(self)`：删除选中的点，自动更新连接关系
-
-**坐标转换系统**：
-- `_is_in_drawing_area(self, pos)`：检查位置是否在绘制区域内
-- `_adjust_for_drawing_area(self, pos)`：调整坐标为绘制区域相对坐标
+**视图变换**：
 - `_screen_to_view(self, screen_pos)`：屏幕坐标转换为视图坐标
+- `_reset_view(self)`：重置视图变换到默认状态
+- `_is_in_drawing_area(self, pos)`：检查位置是否在绘制区域内
+- `_adjust_for_drawing_area(self, pos)`：调整坐标到绘制区域范围
+
+**点操作（点击工具模式）**：
+- `_handle_pointer_click(self, screen_pos)`：处理点击工具的单击事件
+- `_find_point_at_position(self, screen_pos, tolerance=15)`：查找指定位置附近的点
+- `_add_new_point(self, screen_pos)`：在指定位置添加新点
+- `_update_dragging_point(self, screen_pos)`：更新正在拖拽的点位置
+- `_apply_angle_snap(self, path_index, point_index, new_pos, use_left_shift)`：应用角度吸附功能
+- `_delete_selected_point(self)`：删除当前选中的点
+
+**绘制和渲染**：
+- `paintEvent(self, event)`：主绘制事件，渲染所有路径、工具状态和UI元素
+- `_get_point_position(self, point)`：获取点的屏幕坐标位置
+- `_draw_formatted_path(self, painter, path)`：绘制格式化的路径数据
+- `_draw_direction_arrow(self, painter, start_point, end_point)`：绘制路径方向箭头
 
 **路径管理**：
-- `clear_drawing(self)`：清除绘制内容，重置所有状态
-- `load_path(self, path)`：加载并显示指定路径，自动重置视图
-- `test_similarity(self)`：触发相似度测试功能
+- `clear_drawing(self)`：清空所有绘制内容，重置到初始状态
+- `load_path(self, path)`：加载外部路径数据到绘制区域
+- `test_similarity(self)`：发送测试相似度信号
 
-**双工具编辑系统**：
+**工具栏组件**：
+- **画笔工具**：用于连续路径绘制，支持平滑绘制
+- **点击工具**：用于精确点编辑，支持添加、移动、删除点
+- **撤回/还原按钮**：历史记录操作，支持多级撤回
+- **测试相似度按钮**：触发路径相似度测试功能
 
-**画笔工具模式**（默认模式）：
-- **自由绘制**：支持连续轨迹绘制，实时跟踪鼠标移动
-- **自动清理**：开始新绘制时自动清除之前的内容
-- **实时反馈**：绘制过程中显示红色预览轨迹
-- **自动完成**：释放鼠标后自动格式化路径并重置视图
-- **路径发送**：完成绘制后自动发送`pathCompleted`信号
+**交互模式详解**：
 
-**点击工具模式**（精确编辑）：
-- **点位添加**：点击空白区域添加新的路径点
-- **点位选择**：点击现有点进行选择，显示自适应大小的黄色半透明选择圆环
-- **点位移动**：选中点后可拖拽移动，支持实时位置更新
-- **角度约束**：按住Shift键拖拽时只能沿30°和45°整数倍的角度线移动
-- **点位删除**：选中点后按DELETE键删除，自动建立桥接连接
-- **路径扩展**：在现有路径基础上添加新点，自动建立连接关系
-- **视觉反馈**：拖拽时光标变为闭合手型，提供直观操作指示
-- **容忍度设置**：15像素的点击容忍度，确保易于选中目标点
+**画笔工具模式**：
+- 左键按下并拖拽：开始绘制连续路径
+- 鼠标移动：添加路径点，自动连接前一个点
+- 左键释放：完成当前路径段
+- 双击：完成整个路径绘制，触发`pathCompleted`信号
 
-**工具栏界面**：
-- **左侧垂直布局**：固定宽度50像素，灰色主题
-- **工具按钮组**：
-  - 画笔工具按钮（brush.svg图标，默认选中）
-  - 点击工具按钮（pointer.svg图标）
-- **编辑操作组**：
-  - 撤销按钮（undo.svg图标，支持Ctrl+Z）
-  - 重做按钮（redo.svg图标，支持Ctrl+Y）
-- **测试功能组**：
-  - 相似度测试按钮（test.svg图标，有路径时启用）
-- **按钮状态**：启用/禁用，视觉高亮当前选中工具
+**点击工具模式**：
+- 左键单击空白区域：添加新的独立点
+- 左键单击现有点：选中该点（高亮显示）
+- 左键拖拽选中点：移动点位置，支持角度吸附
+- 右键点击选中点：删除该点
+- Delete键：删除当前选中点
 
-**右侧绘制区域**：
-- **白色画布**：绘制背景，带浅灰色边框
-- **自适应布局**：占据剩余空间，最小尺寸300x200像素
-- **坐标系统**：统一的视图坐标系，确保点击精度
+**视图操作**：
+- 滚轮上下滚动：缩放视图（0.1x到5.0x范围）
+- Space键+鼠标拖拽：平移视图
+- Shift+滚轮：水平滚动
+- 自动限制缩放和平移范围
 
-**可视化系统**：
+**角度吸附功能**：
+- 左Shift+拖拽点：启用45度角度吸附（0°、45°、90°、135°等）
+- 右Shift+拖拽点：启用任意角度吸附到最近连线
+- 吸附时显示虚线指示参考线
 
-**分层点位标识**：
-- **起点标识**：绿色大圆点（直径12px），清晰标识手势绘制起始位置
-- **终点标识**：红色圆点，根据路径复杂度自适应大小
-  - 多点路径：红色圆点（直径8px）
-  - 单点路径：红色小圆点（直径6px）嵌套显示在绿色起点内部
-- **中间关键点**：蓝色小圆点（直径4px），突出显示路径的重要转折点
-- **选择状态标识**：黄色半透明圆环，根据点类型自适应大小
-  - 起点选择圆环：半径10px，包围绿色起点
-  - 终点选择圆环：半径8px，包围红色终点
-  - 中间点选择圆环：半径6px，包围蓝色中间点
-- **颜色编码系统**：绿色（起点）→ 蓝色（中间）→ 红色（终点），黄色圆环表示选中状态
+**键盘快捷键**：
+- `Ctrl+Z`：撤回上一步操作
+- `Ctrl+Y`：还原被撤回的操作
+- `Space`：临时启用平移模式
+- `Delete`：删除选中的点（点击工具模式）
+- `Left Shift`：启用45度角度吸附
+- `Right Shift`：启用自由角度吸附
 
-**方向指示系统**：
-- **橙色箭头**：三角形指示器显示手势的绘制方向
-- **位置策略**：定位在连接线的几何中点
-- **过滤机制**：仅在线段长度超过20像素时显示，避免视觉混乱
-- **方向计算**：箭头方向基于向量计算，确保准确指示
+**信号系统**：
+- `pathCompleted(dict)`：路径绘制完成时发出，携带完整的路径数据
+- `testSimilarity()`：用户请求测试相似度时发出
 
-**路径可视化**：
-- **连接线**：2像素宽的蓝色线条，平滑连接所有关键点
-- **抗锯齿渲染**：启用抗锯齿，提供流畅的视觉效果
-- **实时轨迹**：绘制过程中的红色预览线，提供即时反馈
-
-**视图控制**：
-
-**缩放系统**：
-- **Alt+滚轮**：围绕鼠标位置的缩放，缩放范围0.1-5.0倍
-- **缩放中心**：动态计算鼠标位置为缩放中心，保持视觉连续性
-- **平滑插值**：1.2倍缩放增量，提供平滑的缩放体验
-
-**拖拽系统**：
-- **中键拖拽**：画布平移操作
-- **空格+左键**：备用拖拽方式，适应不同用户习惯
-- **实时预览**：拖拽过程中光标变为闭合手型，提供即时反馈
-- **双击重置**：双击中键重置到最佳视图状态
-
-**视图管理**：
-- **自动居中**：根据路径边界框计算最佳显示位置
-- **最佳缩放**：自动计算合适的缩放比例，确保路径完整可见
-- **边距保护**：80像素的安全边距，防止路径贴边显示
-- **尺寸适应**：根据绘制区域大小动态调整显示效果
-
-**历史记录管理**：
-- **分支历史**：支持撤销后进行新操作的分支历史管理
-- **深度限制**：最多保存50个历史状态，平衡功能与内存使用
-- **状态完整性**：深拷贝所有路径数据，确保历史状态独立性
-- **按钮同步**：实时更新撤销/重做按钮的启用状态
-
-**交互操作指南**：
-
-**鼠标操作**：
-- **左键绘制**：画笔模式下拖拽绘制自由轨迹
-- **左键点击**：点击模式下选择点位或添加新点
-- **左键拖拽**：点击模式下移动选中的点位
-- **中键拖拽**：平移画布视图
-- **中键双击**：重置视图到最佳状态
-- **Alt+滚轮**：围绕鼠标位置缩放视图
-
-**键盘操作**：
-- **空格+拖拽**：备用画布平移方式
-- **左Shift+拖拽**：基于前一个连接点的角度约束（点击模式下）
-- **右Shift+拖拽**：基于后一个连接点的角度约束（点击模式下）
-- **Ctrl+Z**：撤销上一步操作
-- **Ctrl+Y**：重做上一步操作  
-- **DELETE**：删除选中的点位（点击模式下）
-
-**连接关系智能更新**：
-- **桥接连接**：删除中间点时自动建立前后点的连接
-- **示例**：点1→2→3删除点2后变成点1→3
-- **多分支处理**：支持复杂连接关系的正确更新
-- **孤立连接清理**：自动移除无效的连接关系
-
-**信号通信系统**：
-- `pathCompleted`：路径绘制完成信号，自动发送格式化的路径数据
-- `testSimilarity`：相似度测试信号，触发外部测试窗口显示
-
-**技术特点和优化**：
-
-**代码结构优化**：
-- **状态管理精简**：移除冗余的点编辑模式变量和重复的状态跟踪
-- **变量命名规范**：使用清晰的变量命名，避免混淆和重复
-- **方法职责明确**：每个方法都有单一明确的职责，提高代码可维护性
-
-**渲染性能优化**：
-- **缩放适应渲染**：点和圆环大小根据视图缩放比例自适应调整
-- **类型安全绘制**：修复浮点数绘制错误，确保所有绘制参数为整数类型
-- **抗锯齿优化**：启用抗锯齿渲染，提供流畅的视觉效果
-
-**交互响应优化**：
-- **精确点击检测**：15像素容忍度确保易于选中目标点
-- **实时视觉反馈**：选择状态、拖拽状态都有对应的视觉指示
-- **操作连续性**：拖拽操作后保持选中状态，便于连续编辑
-
-**角度约束系统**：
-- **激活方式**：按住左Shift或右Shift键进行拖拽操作
-- **约束角度**：30度和45度的整数倍（0°, 30°, 45°, 60°, 90°, 135°...）
-- **参考基准区分**：
-  - 左Shift：基于前一个连接点（指向当前点的连接）
-  - 右Shift：基于后一个连接点（从当前点出发的连接）
-  - 开头/结尾点：自动选择唯一的连接点作为参考
-- **约束模式**：强制点沿最接近的允许角度线移动
-- **最小距离**：10像素以上才启用约束，避免过近时的抖动
-- **连接感知**：基于实际的点连接关系确定参考基准
-- **实时计算**：拖拽过程中动态计算最佳约束角度
-
-**使用方法示例**：
-
+**使用示例**：
 ```python
-import os
-import sys
-
-# 设置 Qt API（必须在导入任何 Qt 相关模块之前）
-from version import QT_API
-os.environ['QT_API'] = QT_API
-
+# 创建绘制组件
 from ui.gestures.drawing_widget import GestureDrawingWidget
-from qtpy.QtWidgets import QApplication
 
-# 创建Qt应用程序
-app = QApplication(sys.argv)
-
-# 创建手势绘制组件实例
+# 创建组件实例
 drawing_widget = GestureDrawingWidget()
 
-# 信号连接示例
-def on_path_completed(path):
+# 连接信号处理
+def on_path_completed(path_data):
     """处理路径完成事件"""
-    points_count = len(path.get('points', []))
-    connections_count = len(path.get('connections', []))
-    print(f"绘制完成并自动使用: {points_count}个点, {connections_count}个连接")
+    points = path_data['points']
+    connections = path_data['connections']
+    print(f"路径完成: {len(points)}个点, {len(connections)}个连接")
     
-def on_test_similarity():
-    """处理相似度测试事件"""
-    print("用户要求测试相似度")
+    # 保存路径到手势库
+    from ui.gestures.gestures import get_gesture_library
+    gesture_lib = get_gesture_library()
+    # 处理路径数据...
 
-# 连接信号
+def on_test_similarity():
+    """处理相似度测试请求"""
+    # 打开相似度测试对话框
+    current_path = drawing_widget.completed_paths[-1] if drawing_widget.completed_paths else None
+    if current_path:
+        # 启动相似度测试...
+        pass
+
 drawing_widget.pathCompleted.connect(on_path_completed)
 drawing_widget.testSimilarity.connect(on_test_similarity)
 
-# 示例1：加载现有手势路径进行编辑
-gesture_path = {
-    'points': [(100, 100), (200, 150), (300, 100), (250, 200)],
-    'connections': [
-        {'from': 0, 'to': 1, 'type': 'line'},
-        {'from': 1, 'to': 2, 'type': 'line'},
-        {'from': 2, 'to': 3, 'type': 'line'}
+# 设置工具模式
+drawing_widget.select_brush_tool()    # 切换到画笔工具
+drawing_widget.select_pointer_tool()  # 切换到点击工具
+
+# 程序化操作
+drawing_widget.undo_action()          # 撤回
+drawing_widget.redo_action()          # 还原
+drawing_widget.clear_drawing()        # 清空
+drawing_widget.test_similarity()      # 测试相似度
+
+# 加载已有路径
+existing_path = {
+    "points": [[10, 10], [50, 50], [90, 10]],
+    "connections": [
+        {"from": 0, "to": 1, "type": "line"},
+        {"from": 1, "to": 2, "type": "line"}
     ]
 }
-drawing_widget.load_path(gesture_path)  # 自动重置视图到最佳状态
+drawing_widget.load_path(existing_path)
 
-# 示例2：程序化工具切换
-drawing_widget.select_brush_tool()      # 切换到画笔工具（自由绘制）
-drawing_widget.select_pointer_tool()    # 切换到点击工具（精确编辑）
-
-# 示例3：历史记录操作
-drawing_widget.undo_action()           # 撤销上一步操作
-drawing_widget.redo_action()           # 重做上一步操作
-
-# 示例4：编程式视图控制
-drawing_widget._reset_view()           # 重置视图到合适状态
-
-# 示例5：点位编辑操作
-# 在点击工具模式下：
-# 1. 点击任意点位进行选择（显示黄色圆环）
-# 2. 正常拖拽：移动点位到任意位置
-# 3. 左/右Shift+拖拽：启用角度约束，基于不同连接点的标准角度线
-# 4. 按DELETE键删除选中的点位
-# 注：删除中间点时自动建立桥接连接
-
-# 示例6：清除内容
-drawing_widget.clear_drawing()         # 清除所有绘制内容
-
-# 显示组件
-drawing_widget.resize(600, 400)        # 设置窗口大小
-drawing_widget.show()                  # 显示窗口
-
-# 运行应用程序
-sys.exit(app.exec())
+# 获取当前状态
+current_tool = drawing_widget.current_tool      # "brush" 或 "pointer"
+is_drawing = drawing_widget.drawing             # 是否正在绘制
+scale = drawing_widget.view_scale               # 当前缩放比例
+has_content = len(drawing_widget.completed_paths) > 0  # 是否有绘制内容
 ```
 
-**交互操作指南**：
+###### 2.1.2.6 手势绘制组件 (ui/gestures/drawing_widget.py)
 
-**工具栏交互**：
-- **画笔工具按钮**：单击切换到自由绘制模式（默认选中，蓝色高亮）
-- **点击工具按钮**：单击切换到编辑模式（未选中时为灰色）
-- **撤销按钮**：撤销上一步操作（有历史记录时启用，否则禁用）
-- **重做按钮**：重做上一步操作（有可重做操作时启用）
-- **测试按钮**：触发相似度测试（有路径内容时启用）
-- **按钮反馈**：悬停时高亮，点击时按下效果
+**功能说明**：
+手势绘制组件，提供可视化的手势路径绘制和编辑功能。支持多种绘制工具、历史记录、视图变换和路径测试等功能。
 
-**画笔工具操作流程**：
-1. **开始绘制**：在绘制区域内按下左键，自动清除之前的内容
-2. **连续绘制**：拖拽鼠标绘制连续轨迹，实时显示红色预览线
-3. **完成绘制**：释放左键完成绘制，自动执行以下操作：
-   - 轨迹格式化处理（提取关键点）
-   - 视图重置（合适缩放和居中）
-   - 发送`pathCompleted`信号
-   - 保存到历史记录
+**主要类和信号**：
+- `GestureDrawingWidget`：手势绘制组件类
+  - `pathCompleted = Signal(dict)`：路径完成信号，发送格式化的路径数据
+  - `testSimilarity = Signal()`：测试相似度信号
 
-**点击工具操作流程**：
-1. **添加点位**：在空白区域单击添加新路径点
-2. **选择点位**：在现有点位附近单击（15像素容忍度）进入拖拽模式
-3. **拖拽移动**：按住并拖拽移动选中的点位
-4. **完成编辑**：释放鼠标完成点位移动，自动保存到历史记录
+**主要方法**：
+- **初始化和UI**：
+  - `__init__(self, parent=None)`：初始化绘制组件
+  - `initUI(self)`：初始化用户界面，创建工具栏和绘制区域
+  - `create_toolbar(self)`：创建左侧工具栏
 
-**视图操作**：
+- **工具管理**：
+  - `load_svg_icon(self, filename)`：加载SVG图标
+  - `select_brush_tool(self)`：选择画笔工具
+  - `select_pointer_tool(self)`：选择点击工具
+  - `update_toolbar_buttons(self)`：更新工具栏按钮状态
 
-**基础导航**：
-- **中键拖拽**：在绘制区域内按住中键并拖拽进行画布平移
-- **空格+左键**：按住空格键后左键拖拽进行画布平移（备用方式）
-- **Alt+滚轮**：按住Alt键并滚动鼠标滚轮进行缩放操作
+- **历史记录**：
+  - `undo_action(self)`：撤回操作（Ctrl+Z）
+  - `redo_action(self)`：还原操作（Ctrl+Y）
+  - `save_to_history(self)`：保存当前状态到历史记录
 
-**其他操作**：
-- **双击中键**：重置视图到合适显示状态（300ms双击检测）
-- **缩放中心**：滚轮缩放以鼠标位置为中心，保持视觉连续性
-- **边界限制**：缩放范围限制在0.1-5.0倍之间
+- **事件处理**：
+  - `keyPressEvent(self, event)`：键盘按下事件（支持Ctrl+Z/Y、Space等）
+  - `keyReleaseEvent(self, event)`：键盘释放事件
+  - `wheelEvent(self, event)`：滚轮事件（缩放和平移）
+  - `mousePressEvent(self, event)`：鼠标按下事件
+  - `mouseMoveEvent(self, event)`：鼠标移动事件
+  - `mouseReleaseEvent(self, event)`：鼠标释放事件
+
+- **视图变换**：
+  - `_screen_to_view(self, screen_pos)`：屏幕坐标转视图坐标
+  - `_reset_view(self)`：重置视图变换
+
+- **点操作（点击工具）**：
+  - `_handle_pointer_click(self, screen_pos)`：处理点击工具的点击
+  - `_find_point_at_position(self, screen_pos, tolerance=15)`：查找指定位置的点
+  - `_add_new_point(self, screen_pos)`：添加新点
+  - `_update_dragging_point(self, screen_pos)`：更新拖拽的点
+  - `_apply_angle_snap(self, path_index, point_index, new_pos, use_left_shift)`：应用角度吸附
+  - `_delete_selected_point(self)`：删除选中的点
+
+- **绘制和显示**：
+  - `paintEvent(self, event)`：绘制事件，渲染所有路径和UI元素
+  - `_get_point_position(self, point)`：获取点的位置
+  - `_draw_formatted_path(self, painter, path)`：绘制格式化路径
+  - `_draw_direction_arrow(self, painter, start_point, end_point)`：绘制方向箭头
+
+- **路径管理**：
+  - `clear_drawing(self)`：清空绘制内容
+  - `load_path(self, path)`：加载路径到绘制区域
+  - `test_similarity(self)`：发送测试相似度信号
+
+**工具栏功能**：
+- **画笔工具**：绘制连续路径
+- **点击工具**：添加和编辑单个点
+- **撤回/还原**：支持历史记录操作
+- **测试相似度**：测试当前路径的相似度
+
+**交互功能**：
+- **绘制模式**：
+  - 左键拖拽：绘制连续路径（画笔工具）
+  - 左键点击：添加单个点（点击工具）
+  - 右键点击：删除选中点（点击工具）
+  - 双击：完成路径绘制
+
+- **视图操作**：
+  - 滚轮：缩放视图
+  - Space+拖拽：平移视图
+  - Shift+滚轮：水平滚动
+
+- **角度吸附**：
+  - 左Shift+拖拽：45度角度吸附
+  - 右Shift+拖拽：自由角度吸附
 
 **键盘快捷键**：
-- **Ctrl+Z**：撤销操作（最多50级撤销）
-- **Ctrl+Y**：重做操作（撤销后可重做）
-- **空格键**：临时启用拖拽模式（配合左键使用）
-- **焦点管理**：组件获得焦点后才响应键盘事件
+- `Ctrl+Z`：撤回
+- `Ctrl+Y`：还原
+- `Space`：启用平移模式
+- `Delete`：删除选中点
+- `Left Shift`：45度角度吸附
+- `Right Shift`：自由角度吸附
 
-**可视化解读**：
+**使用方法**：
+```python
+# 创建绘制组件
+from ui.gestures.drawing_widget import GestureDrawingWidget
 
-**点位识别**：
-- **绿色大圆点**（12px）：手势起点
-- **红色圆点**：手势终点，大小自适应
-  - 多点路径：8px直径，独立显示
-  - 单点路径：6px直径，嵌套在绿色起点内
-- **蓝色小圆点**（4px）：中间关键点，标识转折位置
+# 创建组件实例
+drawing_widget = GestureDrawingWidget()
 
-**方向和连接指示**：
-- **橙色三角箭头**：绘制方向指示，仅在线段>20px时显示
-- **蓝色连接线**（2px）：路径骨架，连接所有关键点
-- **实时红色轨迹**：绘制过程中的预览线条
+# 连接信号
+drawing_widget.pathCompleted.connect(on_path_completed)      # 路径完成处理
+drawing_widget.testSimilarity.connect(on_test_similarity)   # 相似度测试处理
 
-**背景和边框**：
-- **白色画布**：绘制背景
-- **灰色边框**：定义绘制区域边界
-- **工具栏分割**：功能区域划分
+def on_path_completed(path):
+    """处理路径完成事件"""
+    print(f"路径完成: {len(path['points'])}个点")
+    print(f"连接数: {len(path['connections'])}")
 
-**特性详解**：
+def on_test_similarity():
+    """处理测试相似度请求"""
+    print("用户请求测试相似度")
 
-**坐标系统**：
-- 所有鼠标操作使用统一的坐标转换
-- 绘制区域偏移自动补偿
-- 视图变换实时同步
+# 设置工具模式
+drawing_widget.current_tool = "brush"     # 画笔工具
+drawing_widget.current_tool = "pointer"   # 点击工具
 
-**视图自适应**：
-- 路径边界框自动计算
-- 缩放比例选择
-- 居中位置计算
-- 安全边距自动保留
+# 加载路径
+path_data = {
+    "points": [[10, 10], [50, 50], [90, 10]],
+    "connections": [
+        {"from": 0, "to": 1, "type": "line"},
+        {"from": 1, "to": 2, "type": "line"}
+    ]
+}
+drawing_widget.load_path(path_data)
 
-**历史管理**：
-- 分支历史支持（撤销后新操作创建分支）
-- 内存使用优化（限制历史深度）
-- 状态完整性保证（深拷贝机制）
-- 按钮状态实时同步
+# 清空绘制
+drawing_widget.clear_drawing()
 
-**性能优化特性**：
-- 重绘区域优化（仅更新必要区域）
-- 事件处理优化（避免不必要的计算）
-- 内存管理优化（限制历史记录数量）
-- 渲染质量优化（抗锯齿和高DPI支持）
+# 手动操作
+drawing_widget.undo_action()              # 撤回
+drawing_widget.redo_action()              # 还原
+drawing_widget.test_similarity()          # 测试相似度
+
+# 访问状态
+current_tool = drawing_widget.current_tool           # 当前工具
+is_drawing = drawing_widget.drawing                  # 是否正在绘制
+completed_paths = drawing_widget.completed_paths     # 已完成的路径
+view_scale = drawing_widget.view_scale               # 当前缩放比例
+```
 
 ##### 2.1.3 设置模块
 
