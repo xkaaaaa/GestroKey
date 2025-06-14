@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import sys
+import copy
 
 try:
     from core.logger import get_logger
@@ -15,7 +16,13 @@ except ImportError:
 
 
 class GestureLibrary:
-    """手势库管理器，负责保存和加载用户手势库"""
+    """手势库管理器，负责保存和加载用户手势库
+    
+    新的手势库结构分为三部分：
+    1. trigger_paths: 触发路径（绘制的轨迹）
+    2. execute_actions: 执行操作（要执行的动作）
+    3. gesture_mappings: 手势映射（将路径和操作关联起来）
+    """
 
     def __init__(self):
         self.logger = get_logger("GestureLibrary")
@@ -24,26 +31,20 @@ class GestureLibrary:
 
         # 检查系统平台并调整默认手势快捷键格式
         import sys
-
         if sys.platform != "win32":
             self.logger.info(f"初始化默认手势库：检测到非Windows系统({sys.platform})，调整默认快捷键格式...")
-            for name, gesture in self.DEFAULT_GESTURES.items():
-                action = gesture.get("action", {})
-                if action.get("type") == "shortcut":
-                    action_value = action.get("value", "")
-                    if action_value and "+" in action_value:
-                        # 转换为当前平台的快捷键格式
-                        new_value = self._convert_shortcut_for_current_platform(
-                            action_value
-                        )
-                        if new_value != action_value:
-                            self.logger.info(
-                                f"转换默认快捷键格式: {name}: {action_value} -> {new_value}"
-                            )
-                            action["value"] = new_value
+            self._convert_actions_for_current_platform()
 
-        self.gestures = self.DEFAULT_GESTURES.copy()
-        self.saved_gestures = self.DEFAULT_GESTURES.copy()  # 初始化saved_gestures为默认手势库的副本
+        # 初始化手势库数据
+        self.trigger_paths = self.DEFAULT_GESTURES.get("trigger_paths", {}).copy()
+        self.execute_actions = self.DEFAULT_GESTURES.get("execute_actions", {}).copy()
+        self.gesture_mappings = self.DEFAULT_GESTURES.get("gesture_mappings", {}).copy()
+        
+        # 保存已保存状态的副本（使用深拷贝避免引用共享）
+        self.saved_trigger_paths = copy.deepcopy(self.trigger_paths)
+        self.saved_execute_actions = copy.deepcopy(self.execute_actions)
+        self.saved_gesture_mappings = copy.deepcopy(self.gesture_mappings)
+        
         self.gestures_file = self._get_gestures_file_path()
         self.load()
 
@@ -57,9 +58,6 @@ class GestureLibrary:
                 with open(default_gestures_path, "r", encoding="utf-8") as f:
                     gestures = json.load(f)
 
-                # 确保所有手势都有正确的ID
-                self._ensure_valid_ids(gestures)
-
                 self.logger.info(f"已从 {default_gestures_path} 加载默认手势库")
                 return gestures
             else:
@@ -69,50 +67,40 @@ class GestureLibrary:
             self.logger.error(f"加载默认手势库失败: {e}")
             raise
 
-    def _ensure_valid_ids(self, gestures):
-        """确保所有手势都有有效的整数ID，并且ID是连续的
+    def _convert_actions_for_current_platform(self):
+        """转换操作的快捷键格式为当前平台格式"""
+        actions = self.DEFAULT_GESTURES.get("execute_actions", {})
+        for action_key, action_data in actions.items():
+            if action_data.get("type") == "shortcut":
+                action_value = action_data.get("value", "")
+                if action_value and "+" in action_value:
+                    new_value = self._convert_shortcut_for_current_platform(action_value)
+                    if new_value != action_value:
+                        self.logger.info(
+                            f"转换默认快捷键格式: {action_data.get('name', action_key)}: {action_value} -> {new_value}"
+                        )
+                        action_data["value"] = new_value
 
-        Args:
-            gestures: 手势字典
-        """
-        # 按现有ID排序手势，没有ID的放在最后
-        gestures_with_ids = []
-        gestures_without_ids = []
-        
-        for name, gesture in gestures.items():
-            if "id" in gesture and isinstance(gesture["id"], int) and gesture["id"] > 0:
-                gestures_with_ids.append((name, gesture))
-            else:
-                gestures_without_ids.append((name, gesture))
-        
-        # 按ID排序已有ID的手势
-        gestures_with_ids.sort(key=lambda x: x[1]["id"])
-        
-        # 重新分配连续的ID
-        next_id = 1
-        for name, gesture in gestures_with_ids + gestures_without_ids:
-            if gesture.get("id") != next_id:
-                old_id = gesture.get("id", "无")
-                gesture["id"] = next_id
-                self.logger.debug(f"重新分配手势ID: {name}, {old_id} -> {next_id}")
-            next_id += 1
-
-    def _get_next_id(self):
-        """获取下一个可用的ID"""
-        ids = [gesture.get("id", 0) for gesture in self.gestures.values()]
-        ids = [id for id in ids if isinstance(id, int)]
-        return max(ids + [0]) + 1
+    def _convert_shortcut_for_current_platform(self, shortcut):
+        """将快捷键转换为当前平台的格式"""
+        import sys
+        if sys.platform == "darwin":
+            # macOS系统转换
+            shortcut = shortcut.replace("Ctrl+", "Cmd+")
+            shortcut = shortcut.replace("ctrl+", "cmd+")
+        elif sys.platform.startswith("linux"):
+            # Linux系统转换（通常与Windows相同）
+            pass
+        return shortcut
 
     def _get_gestures_file_path(self):
         """获取手势库文件路径"""
         if sys.platform.startswith("win"):
-            # Windows系统使用用户文档目录
             user_dir = os.path.expanduser("~")
             config_dir = os.path.join(
                 user_dir, f".{AUTHOR}", APP_NAME.lower(), "config"
             )
         elif sys.platform.startswith("darwin"):
-            # macOS系统使用Library/Application Support目录
             user_dir = os.path.expanduser("~")
             config_dir = os.path.join(
                 user_dir,
@@ -123,15 +111,12 @@ class GestureLibrary:
                 "config",
             )
         else:
-            # Linux和其他系统遵循XDG标准，使用~/.config/目录
             xdg_config_home = os.environ.get(
                 "XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")
             )
             config_dir = os.path.join(xdg_config_home, f"{AUTHOR}", APP_NAME, "config")
 
-        # 确保配置目录存在
         os.makedirs(config_dir, exist_ok=True)
-
         return os.path.join(config_dir, "gestures.json")
 
     def load(self):
@@ -139,130 +124,100 @@ class GestureLibrary:
         try:
             if os.path.exists(self.gestures_file):
                 with open(self.gestures_file, "r", encoding="utf-8") as f:
-                    loaded_gestures = json.load(f)
+                    loaded_data = json.load(f)
 
                 # 检查系统平台并调整加载的手势快捷键格式
                 import sys
-
                 if sys.platform != "win32":
                     self.logger.info(f"加载手势库：检测到非Windows系统({sys.platform})，检查快捷键格式...")
-                    format_converted = False
-                    for name, gesture in loaded_gestures.items():
-                        action = gesture.get("action", {})
-                        if action.get("type") == "shortcut":
-                            action_value = action.get("value", "")
-                            if action_value and "+" in action_value:
-                                # 检查是否需要转换（排除已经是平台特定格式的情况）
-                                is_windows_format = True
-                                for part in action_value.split("+"):
-                                    # 检测macOS符号
-                                    if (
-                                        part in ["⌃", "⌥", "⇧", "⌘"]
-                                        or " " in action_value
-                                    ):
-                                        is_windows_format = False
-                                        break
-                                    # 检测Linux格式
-                                    if part == "Super":
-                                        is_windows_format = False
-                                        break
+                    self._convert_loaded_actions_for_current_platform(loaded_data)
 
-                                if is_windows_format:
-                                    # 转换为当前平台的快捷键格式
-                                    new_value = (
-                                        self._convert_shortcut_for_current_platform(
-                                            action_value
-                                        )
-                                    )
-                                    if new_value != action_value:
-                                        self.logger.info(
-                                            f"转换加载的快捷键格式: {name}: {action_value} -> {new_value}"
-                                        )
-                                        action["value"] = new_value
-                                        format_converted = True
-
-                    # 如果有转换，需要保存
-                    if format_converted:
-                        self.save()  # 自动保存转换后的格式
-
-                # 更新手势库，确保所有默认手势都存在
-                for name, gesture in loaded_gestures.items():
-                    self.gestures[name] = gesture
-
-                # 确保所有手势都有有效的ID
-                self._ensure_valid_ids(self.gestures)
+                # 加载三个部分的数据
+                self.trigger_paths = loaded_data.get("trigger_paths", {})
+                self.execute_actions = loaded_data.get("execute_actions", {})
+                self.gesture_mappings = loaded_data.get("gesture_mappings", {})
 
                 self.logger.info(f"已从 {self.gestures_file} 加载手势库")
-                # 保存当前加载的手势库到saved_gestures
-                self.saved_gestures = self.gestures.copy()
+                # 保存当前加载的手势库状态
+                self._update_saved_state()
             else:
                 self.logger.info("未找到手势库文件，使用默认手势库")
                 self.save()  # 保存默认手势库
         except Exception as e:
             self.logger.error(f"加载手势库失败: {e}")
             import traceback
-
             self.logger.error(traceback.format_exc())
             raise
+
+    def _convert_loaded_actions_for_current_platform(self, loaded_data):
+        """转换加载的操作快捷键格式为当前平台格式"""
+        actions = loaded_data.get("execute_actions", {})
+        format_converted = False
+        for action_key, action_data in actions.items():
+            if action_data.get("type") == "shortcut":
+                action_value = action_data.get("value", "")
+                if action_value and "+" in action_value:
+                    new_value = self._convert_shortcut_for_current_platform(action_value)
+                    if new_value != action_value:
+                        self.logger.info(
+                            f"转换快捷键格式: {action_data.get('name', action_key)}: {action_value} -> {new_value}"
+                        )
+                        action_data["value"] = new_value
+                        format_converted = True
+        
+        if format_converted:
+            self.logger.info("快捷键格式已转换，将自动保存")
+
+    def _update_saved_state(self):
+        """更新已保存状态"""
+        self.saved_trigger_paths = copy.deepcopy(self.trigger_paths)
+        self.saved_execute_actions = copy.deepcopy(self.execute_actions)
+        self.saved_gesture_mappings = copy.deepcopy(self.gesture_mappings)
 
     def save(self):
         """保存手势库到文件"""
         try:
-            # 确保目录存在
             os.makedirs(os.path.dirname(self.gestures_file), exist_ok=True)
 
-            # 确保所有手势都有有效的ID
-            self._ensure_valid_ids(self.gestures)
+            data = {
+                "trigger_paths": self.trigger_paths,
+                "execute_actions": self.execute_actions,
+                "gesture_mappings": self.gesture_mappings
+            }
 
             with open(self.gestures_file, "w", encoding="utf-8") as f:
-                json.dump(self.gestures, f, indent=4, ensure_ascii=False)
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            
             self.logger.info(f"手势库已保存到 {self.gestures_file}")
-            # 保存当前手势库到saved_gestures
-            self.saved_gestures = self.gestures.copy()
+            self._update_saved_state()
             return True
         except Exception as e:
             self.logger.error(f"保存手势库失败: {e}")
             return False
 
-    def get_gesture(self, name):
-        """获取指定名称的手势"""
-        return self.gestures.get(name)
+    def has_changes(self):
+        """检查是否有未保存的更改"""
+        return (
+            self.trigger_paths != self.saved_trigger_paths or
+            self.execute_actions != self.saved_execute_actions or
+            self.gesture_mappings != self.saved_gesture_mappings
+        )
 
-    def get_gesture_by_id(self, gesture_id):
-        """根据ID获取手势"""
-        for name, gesture in self.gestures.items():
-            if gesture.get("id") == gesture_id:
-                return name, gesture
-        return None, None
-
-    def get_all_gestures(self, use_saved=False):
-        """获取所有手势
-
-        Args:
-            use_saved: 是否使用已保存的手势库，默认为False表示返回当前手势库
-        """
-        return self.saved_gestures if use_saved else self.gestures
-
-    def get_gesture_by_direction(self, direction):
-        """根据方向序列获取匹配的手势（向后兼容）"""
-        self.logger.debug(f"尝试查找方向为 {direction} 的手势（向后兼容模式）")
-        # 从已保存的手势库中查找，而不是从当前可能未保存的手势库中查找
-        for name, gesture in self.saved_gestures.items():
-            if gesture.get("direction") == direction:
-                self.logger.debug(f"找到匹配手势: {name}")
-                return name, gesture
-        self.logger.debug(f"未找到匹配方向 {direction} 的手势")
-        return None, None
-    
     def get_gesture_by_path(self, drawn_path, similarity_threshold=0.70):
         """根据绘制的路径获取匹配的手势
+        
+        核心逻辑：
+        1. 将绘制路径与所有触发路径对比
+        2. 找到相似度最高且超过阈值的触发路径
+        3. 通过映射关系找到对应的执行操作
+        4. 返回操作信息给执行器
         
         Args:
             drawn_path: 绘制的路径 {'points': [...], 'connections': [...]}
             similarity_threshold: 相似度阈值
             
         Returns:
-            tuple: (手势名称, 手势数据, 相似度) 或 (None, None, 0.0)
+            tuple: (手势名称, 操作数据, 相似度) 或 (None, None, 0.0)
         """
         if not drawn_path or not drawn_path.get('points'):
             self.logger.debug("绘制路径为空")
@@ -271,223 +226,198 @@ class GestureLibrary:
         # 归一化绘制路径
         normalized_drawn = self.path_analyzer.normalize_path_scale(drawn_path)
         
-        best_match = None
+        best_match_path_id = None
         best_similarity = 0.0
-        best_gesture = None
+        best_trigger_path = None
         
         self.logger.debug(f"开始路径匹配，相似度阈值: {similarity_threshold}")
         
-        # 从已保存的手势库中查找
-        for name, gesture in self.saved_gestures.items():
-            # 检查手势是否有路径数据
-            gesture_path = gesture.get("path")
-            if not gesture_path:
-                # 如果没有路径数据，跳过这个手势（可能是旧格式）
+        # 步骤1：将当前绘制路径与触发路径库中的每个路径对比
+        for path_key, path_data in self.saved_trigger_paths.items():
+            trigger_path = path_data.get("path")
+            if not trigger_path:
                 continue
             
-            # 归一化手势路径
-            normalized_gesture = self.path_analyzer.normalize_path_scale(gesture_path)
+            # 归一化触发路径
+            normalized_trigger = self.path_analyzer.normalize_path_scale(trigger_path)
             
             # 计算相似度
-            similarity = self.path_analyzer.calculate_similarity(normalized_drawn, normalized_gesture)
+            similarity = self.path_analyzer.calculate_similarity(normalized_drawn, normalized_trigger)
             
-            self.logger.debug(f"手势 '{name}' 相似度: {similarity:.3f}")
+            path_name = path_data.get("name", path_key)
+            self.logger.debug(f"触发路径 '{path_name}' 相似度: {similarity:.3f}")
             
             if similarity > best_similarity:
                 best_similarity = similarity
-                best_match = name
-                best_gesture = gesture
+                best_match_path_id = path_data.get("id")
+                best_trigger_path = path_data
         
         # 检查是否达到阈值
-        if best_similarity >= similarity_threshold:
-            self.logger.info(f"找到匹配手势: {best_match}，相似度: {best_similarity:.3f}")
-            return best_match, best_gesture, best_similarity
-        else:
-            self.logger.debug(f"没有手势达到相似度阈值 {similarity_threshold}，最高相似度: {best_similarity:.3f}")
+        if best_similarity < similarity_threshold:
+            self.logger.debug(f"没有触发路径达到相似度阈值 {similarity_threshold}，最高相似度: {best_similarity:.3f}")
             return None, None, best_similarity
 
-    def add_gesture(self, name, direction_or_path, action_type, action_value, gesture_id=None):
-        """添加新手势
-
-        Args:
-            name: 手势名称
-            direction_or_path: 手势方向字符串（旧格式）或路径字典（新格式）
-            action_type: 动作类型
-            action_value: 动作值
-            gesture_id: 手势ID，如果不提供则自动生成
-        """
-        # 如果没有指定ID，生成新的
-        if gesture_id is None:
-            gesture_id = self._get_next_id()
-
-        # 确保ID是整数
-        if not isinstance(gesture_id, int):
-            try:
-                gesture_id = int(gesture_id)
-            except (ValueError, TypeError):
-                gesture_id = self._get_next_id()
-
-        # 新的手势数据
-        new_gesture = {
-            "id": gesture_id,
-            "action": {"type": action_type, "value": action_value},
-        }
-        
-        # 根据输入类型设置方向或路径
-        if isinstance(direction_or_path, dict) and 'points' in direction_or_path:
-            # 新格式：路径字典
-            new_gesture["path"] = direction_or_path
-            self.logger.info(
-                f"添加手势: {name}, ID: {gesture_id}, 路径点数: {len(direction_or_path.get('points', []))}, 动作: {action_type}:{action_value}"
-            )
-        else:
-            # 旧格式：方向字符串（向后兼容）
-            new_gesture["direction"] = direction_or_path
-            self.logger.info(
-                f"添加手势: {name}, ID: {gesture_id}, 方向: {direction_or_path}, 动作: {action_type}:{action_value}"
-            )
-
-        # 添加手势
-        self.gestures[name] = new_gesture
-        return True
-
-    def update_gesture_by_id(self, gesture_id, name, direction_or_path, action_type, action_value):
-        """通过ID更新手势的所有属性
-
-        Args:
-            gesture_id: 手势ID
-            name: 新的手势名称
-            direction_or_path: 新的手势方向字符串（旧格式）或路径字典（新格式）
-            action_type: 新的动作类型
-            action_value: 新的动作值
-
-        Returns:
-            bool: 操作是否成功
-        """
-        # 找到具有指定ID的手势
-        old_name = None
-        for gesture_name, gesture_data in self.gestures.items():
-            if gesture_data.get("id") == gesture_id:
-                old_name = gesture_name
+        # 步骤2：通过映射关系找到对应的手势
+        matched_gesture = None
+        for mapping_key, mapping_data in self.saved_gesture_mappings.items():
+            if mapping_data.get("trigger_path_id") == best_match_path_id:
+                matched_gesture = mapping_data
                 break
         
-        if old_name is None:
-            self.logger.warning(f"尝试更新不存在的手势ID: {gesture_id}")
-            return False
+        if not matched_gesture:
+            self.logger.warning(f"找到匹配的触发路径(ID:{best_match_path_id})，但没有找到对应的手势映射")
+            return None, None, best_similarity
         
-        # 如果名称发生了变化，检查新名称是否已被其他手势使用
-        if name != old_name:
-            for other_name, other_data in self.gestures.items():
-                if other_name == name and other_data.get("id") != gesture_id:
-                    self.logger.warning(f"无法更新手势，新名称已被其他手势使用: {name}")
-                    return False
+        # 步骤3：获取对应的执行操作
+        execute_action_id = matched_gesture.get("execute_action_id")
+        execute_action = None
+        for action_key, action_data in self.saved_execute_actions.items():
+            if action_data.get("id") == execute_action_id:
+                execute_action = action_data
+                break
         
-        # 创建新的手势数据
-        new_gesture = {
-            "id": gesture_id,
-            "action": {"type": action_type, "value": action_value},
+        if not execute_action:
+            self.logger.warning(f"找到手势映射，但没有找到对应的执行操作(ID:{execute_action_id})")
+            return None, None, best_similarity
+        
+        gesture_name = matched_gesture.get("name", f"手势{matched_gesture.get('id')}")
+        
+        # 构造兼容旧格式的操作数据
+        action_data = {
+            "action": {
+                "type": execute_action.get("type"),
+                "value": execute_action.get("value")
+            }
         }
         
-        # 根据输入类型设置方向或路径
-        if isinstance(direction_or_path, dict) and 'points' in direction_or_path:
-            # 新格式：路径字典
-            new_gesture["path"] = direction_or_path
-            log_info = f"路径点数: {len(direction_or_path.get('points', []))}"
-        else:
-            # 旧格式：方向字符串（向后兼容）
-            new_gesture["direction"] = direction_or_path
-            log_info = f"方向: {direction_or_path}"
-        
-        # 如果名称发生了变化，需要删除旧的键并添加新的键
-        if name != old_name:
-            del self.gestures[old_name]
-        
-        # 更新手势数据
-        self.gestures[name] = new_gesture
-        
-        self.logger.info(
-            f"通过ID更新手势: ID={gesture_id}, {old_name} -> {name}, {log_info}, 动作: {action_type}:{action_value}"
-        )
-        return True
+        self.logger.info(f"识别到手势: {gesture_name}，相似度: {best_similarity:.3f}，操作: {execute_action.get('name')}")
+        return gesture_name, action_data, best_similarity
 
-    def remove_gesture(self, name):
-        """删除手势并重新排序剩余手势的ID以保持连续"""
-        if name not in self.gestures:
-            self.logger.warning(f"尝试删除不存在的手势: {name}")
+    def get_all_gestures(self, use_saved=False):
+        """获取所有手势，转换为旧格式以保持兼容性"""
+        if use_saved:
+            trigger_paths = self.saved_trigger_paths
+            execute_actions = self.saved_execute_actions
+            gesture_mappings = self.saved_gesture_mappings
+        else:
+            trigger_paths = self.trigger_paths
+            execute_actions = self.execute_actions
+            gesture_mappings = self.gesture_mappings
+        
+        # 转换为旧格式
+        old_format_gestures = {}
+        for mapping_key, mapping_data in gesture_mappings.items():
+            gesture_name = mapping_data.get("name", f"手势{mapping_data.get('id')}")
+            
+            # 获取触发路径
+            trigger_path_id = mapping_data.get("trigger_path_id")
+            trigger_path_data = None
+            for path_key, path_data in trigger_paths.items():
+                if path_data.get("id") == trigger_path_id:
+                    trigger_path_data = path_data
+                    break
+            
+            # 获取执行操作
+            execute_action_id = mapping_data.get("execute_action_id")
+            execute_action_data = None
+            for action_key, action_data in execute_actions.items():
+                if action_data.get("id") == execute_action_id:
+                    execute_action_data = action_data
+                    break
+            
+            if trigger_path_data and execute_action_data:
+                old_format_gestures[gesture_name] = {
+                    "id": mapping_data.get("id"),
+                    "path": trigger_path_data.get("path"),
+                    "action": {
+                        "type": execute_action_data.get("type"),
+                        "value": execute_action_data.get("value")
+                    }
+                }
+        
+        return old_format_gestures
+
+    def get_gesture(self, name):
+        """获取指定名称的手势（转换为旧格式）"""
+        all_gestures = self.get_all_gestures()
+        return all_gestures.get(name)
+
+    def get_gesture_by_id(self, gesture_id):
+        """根据ID获取手势（转换为旧格式）"""
+        for mapping_key, mapping_data in self.gesture_mappings.items():
+            if mapping_data.get("id") == gesture_id:
+                gesture_name = mapping_data.get("name")
+                gesture_data = self.get_gesture(gesture_name)
+                return gesture_name, gesture_data
+        return None, None
+
+    def add_gesture(self, name, direction_or_path, action_type, action_value, gesture_id=None):
+        """添加新手势（保持API兼容性）"""
+        if gesture_id is None:
+            gesture_id = self._get_next_mapping_id()
+        
+        # 添加触发路径
+        path_id = self._get_next_path_id()
+        path_key = f"path_{path_id}"
+        
+        if isinstance(direction_or_path, dict) and 'points' in direction_or_path:
+            path_name = f"路径{path_id}"
+            self.trigger_paths[path_key] = {
+                "id": path_id,
+                "name": path_name,
+                "path": direction_or_path
+            }
+        else:
+            # 向后兼容旧的方向格式
+            path_name = f"方向{path_id}({direction_or_path})"
+            # 这里需要根据方向生成路径，暂时跳过
+            self.logger.warning(f"旧的方向格式已不支持: {direction_or_path}")
             return False
 
-        # 获取要删除的手势ID
-        deleted_id = self.gestures[name].get("id")
-
-        # 删除手势
-        del self.gestures[name]
-
-        # 重新排序所有手势的ID以保持连续
-        self._ensure_valid_ids(self.gestures)
-
-        self.logger.info(f"删除手势: {name}, ID: {deleted_id}，已重新排序剩余手势ID以保持连续")
+        # 添加执行操作
+        action_id = self._get_next_action_id()
+        action_key = f"action_{action_id}"
+        action_name = action_value if action_type == "shortcut" else f"操作{action_id}"
+        
+        self.execute_actions[action_key] = {
+            "id": action_id,
+            "name": action_name,
+            "type": action_type,
+            "value": action_value
+        }
+        
+        # 添加映射关系
+        mapping_key = f"gesture_{gesture_id}"
+        self.gesture_mappings[mapping_key] = {
+            "id": gesture_id,
+            "name": name,
+            "trigger_path_id": path_id,
+            "execute_action_id": action_id
+        }
+        
+        self.logger.info(f"添加手势: {name}, ID: {gesture_id}, 路径ID: {path_id}, 操作ID: {action_id}")
         return True
 
-    def _convert_shortcut_for_current_platform(self, shortcut_str):
-        """根据当前操作系统转换快捷键格式
+    def _get_next_mapping_id(self):
+        """获取下一个映射ID"""
+        max_id = 0
+        for mapping_data in self.gesture_mappings.values():
+            max_id = max(max_id, mapping_data.get("id", 0))
+        return max_id + 1
 
-        Args:
-            shortcut_str: Windows格式的快捷键字符串(如'Ctrl+C')
+    def _get_next_path_id(self):
+        """获取下一个路径ID"""
+        max_id = 0
+        for path_data in self.trigger_paths.values():
+            max_id = max(max_id, path_data.get("id", 0))
+        return max_id + 1
 
-        Returns:
-            str: 当前平台适用的快捷键格式
-        """
-        import sys
-
-        # 如果是Windows，保持原样
-        if sys.platform == "win32":
-            return shortcut_str
-
-        # 将快捷键分解为各个部分
-        parts = shortcut_str.split("+")
-        result_parts = []
-
-        # macOS特殊映射
-        if sys.platform == "darwin":
-            # macOS使用特殊符号
-            mac_mapping = {
-                "Ctrl": "⌃",
-                "Control": "⌃",
-                "Alt": "⌥",
-                "Shift": "⇧",
-                "Win": "⌘",
-                "Cmd": "⌘",
-                "Command": "⌘",
-                "Meta": "⌘",
-            }
-
-            for part in parts:
-                if part in mac_mapping:
-                    result_parts.append(mac_mapping[part])
-                else:
-                    result_parts.append(part)
-
-            # macOS使用空格而不是加号连接
-            return " ".join(result_parts)
-
-        # Linux特殊映射
-        else:
-            # Linux平台映射
-            linux_mapping = {
-                "Win": "Super",
-                "Cmd": "Super",
-                "Command": "Super",
-                "Meta": "Super",
-            }
-
-            for part in parts:
-                if part in linux_mapping:
-                    result_parts.append(linux_mapping[part])
-                else:
-                    result_parts.append(part)
-
-            # Linux仍使用加号连接
-            return "+".join(result_parts)
+    def _get_next_action_id(self):
+        """获取下一个操作ID"""
+        max_id = 0
+        for action_data in self.execute_actions.values():
+            max_id = max(max_id, action_data.get("id", 0))
+        return max_id + 1
 
     def reset_to_default(self):
         """重置为默认手势库"""
@@ -497,72 +427,29 @@ class GestureLibrary:
 
             # 根据操作系统调整快捷键格式
             import sys
-
             if sys.platform != "win32":
                 self.logger.info(f"检测到非Windows系统({sys.platform})，调整快捷键格式...")
-                for name, gesture in default_gestures.items():
-                    action = gesture.get("action", {})
-                    if action.get("type") == "shortcut":
-                        action_value = action.get("value", "")
-                        if action_value and "+" in action_value:
-                            # 转换为当前平台的快捷键格式
-                            new_value = self._convert_shortcut_for_current_platform(
-                                action_value
-                            )
-                            if new_value != action_value:
-                                self.logger.info(
-                                    f"转换快捷键格式: {name}: {action_value} -> {new_value}"
-                                )
-                                action["value"] = new_value
+                self._convert_actions_for_current_platform()
 
-            if self.gestures != default_gestures:
-                self.gestures = default_gestures.copy()
+            # 重置三个部分的数据
+            if (self.trigger_paths != default_gestures.get("trigger_paths", {}) or
+                self.execute_actions != default_gestures.get("execute_actions", {}) or
+                self.gesture_mappings != default_gestures.get("gesture_mappings", {})):
+                
+                self.trigger_paths = default_gestures.get("trigger_paths", {}).copy()
+                self.execute_actions = default_gestures.get("execute_actions", {}).copy()
+                self.gesture_mappings = default_gestures.get("gesture_mappings", {}).copy()
 
-            # 保存并更新saved_gestures
+            # 保存并更新已保存状态
             success = self.save()
             if success:
-                self.saved_gestures = self.gestures.copy()
+                self._update_saved_state()
 
             return success
         except Exception as e:
             self.logger.error(f"重置为默认手势库失败: {e}")
             import traceback
-
             self.logger.error(traceback.format_exc())
-            return False
-
-    def has_changes(self):
-        """检查是否有未保存的更改"""
-        # 如果没有已保存的手势库记录，则认为有未保存的更改
-        if not self.saved_gestures:
-            result = True if self.gestures else False
-            self.logger.debug(f"手势库检查变更: 没有已保存手势记录, 结果={result}")
-            return result
-
-        # 检查手势数量是否相同
-        if len(self.gestures) != len(self.saved_gestures):
-            self.logger.debug(f"手势库检查变更: 数量不同 - 当前={len(self.gestures)}, 已保存={len(self.saved_gestures)}")
-            return True
-
-        # 逐一比较手势
-        for name, gesture in self.gestures.items():
-            if name not in self.saved_gestures:
-                self.logger.debug(f"手势库检查变更: 新手势 - {name}")
-                return True
-
-            if self.saved_gestures[name] != gesture:
-                self.logger.debug(f"手势库检查变更: 手势内容不同 - {name}")
-                self.logger.debug(f"  当前: {gesture}")
-                self.logger.debug(f"  已保存: {self.saved_gestures[name]}")
-                return True
-
-        # 检查是否有已保存的手势在当前手势库中不存在
-        for name in self.saved_gestures:
-            if name not in self.gestures:
-                self.logger.debug(f"手势库检查变更: 已保存的手势在当前库中不存在 - {name}")
-                return True
-
-        self.logger.debug("手势库检查变更: 没有发现差异")
         return False
 
 

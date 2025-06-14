@@ -205,6 +205,12 @@ class GestureExecutor:
     def execute_gesture_by_path(self, drawn_path):
         """根据绘制路径执行对应的手势动作
         
+        使用新的手势库核心逻辑：
+        1. 绘制结束后，将当前手势和手势库的触发路径逐一对比
+        2. 选出相似度大于阈值中相似度最高的一个手势
+        3. 找到它的执行操作部分
+        4. 将执行操作部分的内容交给操作执行模块执行
+        
         Args:
             drawn_path: 绘制的路径 {'points': [...], 'connections': [...]}
             
@@ -236,17 +242,17 @@ class GestureExecutor:
             self.logger.warning(f"无法获取相似度阈值设置，使用默认值0.70: {e}")
             similarity_threshold = 0.70
 
-        # 查找匹配的手势
-        name, gesture, similarity = self.gesture_library.get_gesture_by_path(drawn_path, similarity_threshold)
+        # 使用手势库的新核心逻辑查找匹配的手势
+        gesture_name, action_data, similarity = self.gesture_library.get_gesture_by_path(drawn_path, similarity_threshold)
 
-        if not gesture:
+        if not action_data:
             self.logger.info(f"未找到匹配的手势，最高相似度: {similarity:.3f}，阈值: {similarity_threshold}")
             return False
 
-        self.logger.info(f"识别到手势: {name}，相似度: {similarity:.3f}")
+        self.logger.info(f"识别到手势: {gesture_name}，相似度: {similarity:.3f}")
 
-        # 获取动作类型和值
-        action = gesture.get("action", {})
+        # 获取动作类型和值（兼容旧格式）
+        action = action_data.get("action", {})
         action_type = action.get("type")
         action_value = action.get("value")
 
@@ -448,6 +454,54 @@ class GestureExecutor:
         except Exception as e:
             self.logger.error(f"刷新手势库失败: {e}")
             self.logger.error(traceback.format_exc())
+            
+    def find_similar_paths(self, test_path):
+        """查找与测试路径相似的所有触发路径
+        
+        Args:
+            test_path: 要测试的路径 {'points': [...], 'total_distance': ..., 'direction': ...}
+            
+        Returns:
+            list: 相似路径列表，格式为 [(path_key, similarity, path_data), ...]
+        """
+        if not self.gesture_library:
+            self.logger.error("手势库未正确加载，无法测试相似度")
+            return []
+            
+        if not test_path or not test_path.get('points'):
+            self.logger.warning("测试路径为空")
+            return []
+            
+        try:
+            # 使用手势库的路径匹配功能获取所有相似路径
+            results = []
+            trigger_paths = self.gesture_library.trigger_paths
+            
+            # 逐个对比所有触发路径
+            for path_key, path_data in trigger_paths.items():
+                stored_path = path_data.get('path')
+                if not stored_path:
+                    continue
+                    
+                # 归一化路径用于比较
+                normalized_test = self.gesture_library.path_analyzer.normalize_path_scale(test_path)
+                normalized_stored = self.gesture_library.path_analyzer.normalize_path_scale(stored_path)
+                
+                # 计算相似度
+                similarity = self.gesture_library.path_analyzer.calculate_similarity(normalized_test, normalized_stored)
+                
+                # 添加到结果中（不设阈值，显示所有结果）
+                results.append((path_key, similarity, path_data))
+            
+            # 按相似度降序排序
+            results.sort(key=lambda x: x[1], reverse=True)
+            
+            self.logger.info(f"找到 {len(results)} 个路径进行相似度比较")
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"查找相似路径时出错: {e}")
+            return []
 
 
 # 提供全局访问函数
