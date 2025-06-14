@@ -144,14 +144,8 @@ class GestureExecutor:
             self.logger.info("手势库加载成功")
 
             # 获取所有手势 - 使用已保存的手势库
-            gestures = self.gesture_library.get_all_gestures(use_saved=True)
-            self.logger.info(f"成功加载已保存的手势库，包含 {len(gestures)} 个手势")
-
-            # 打印所有已加载的手势
-            for name, gesture in gestures.items():
-                self.logger.debug(
-                    f"已加载手势: {name}, 方向: {gesture.get('direction', '未知')}, 动作: {gesture.get('action', {}).get('value', '未知')}"
-                )
+            gesture_count = self.gesture_library.get_gesture_count(use_saved=True)
+            self.logger.info(f"成功加载已保存的手势库，包含 {gesture_count} 个手势")
 
         except ImportError as e:
             self.gesture_library = None
@@ -161,46 +155,6 @@ class GestureExecutor:
         GestureExecutor._instance = self
 
         self.logger.info("手势执行器初始化完成")
-
-    def execute_gesture(self, direction):
-        """根据方向序列执行对应的手势动作（向后兼容）"""
-        if not direction or direction in ["无方向", "无明显方向"]:
-            self.logger.debug("无法识别的方向序列，不执行任何动作")
-            return False
-
-        self.logger.info(f"准备执行方向为 {direction} 的手势")
-
-        # 检查手势库是否正确加载
-        if not self.gesture_library:
-            self.logger.error("手势库未正确加载，无法执行手势")
-            return False
-
-        # 检查键盘控制器是否正确加载
-        if not self.keyboard:
-            self.logger.error("键盘控制器未正确加载，无法执行手势")
-            return False
-
-        # 查找匹配的手势
-        name, gesture = self.gesture_library.get_gesture_by_direction(direction)
-
-        if not gesture:
-            self.logger.info(f"未找到匹配的手势: {direction}")
-            return False
-
-        self.logger.info(f"识别到手势: {name}，方向: {direction}")
-
-        # 获取动作类型和值
-        action = gesture.get("action", {})
-        action_type = action.get("type")
-        action_value = action.get("value")
-
-        self.logger.debug(f"手势动作类型: {action_type}, 值: {action_value}")
-
-        if action_type == "shortcut":
-            return self._execute_shortcut(action_value)
-        else:
-            self.logger.warning(f"不支持的动作类型: {action_type}")
-            return False
 
     def execute_gesture_by_path(self, drawn_path):
         """根据绘制路径执行对应的手势动作
@@ -243,18 +197,17 @@ class GestureExecutor:
             similarity_threshold = 0.70
 
         # 使用手势库的新核心逻辑查找匹配的手势
-        gesture_name, action_data, similarity = self.gesture_library.get_gesture_by_path(drawn_path, similarity_threshold)
+        gesture_name, execute_action, similarity = self.gesture_library.get_gesture_by_path(drawn_path, similarity_threshold)
 
-        if not action_data:
+        if not execute_action:
             self.logger.info(f"未找到匹配的手势，最高相似度: {similarity:.3f}，阈值: {similarity_threshold}")
             return False
 
         self.logger.info(f"识别到手势: {gesture_name}，相似度: {similarity:.3f}")
 
-        # 获取动作类型和值（兼容旧格式）
-        action = action_data.get("action", {})
-        action_type = action.get("type")
-        action_value = action.get("value")
+        # 获取动作类型和值
+        action_type = execute_action.get("type")
+        action_value = execute_action.get("value")
 
         self.logger.debug(f"手势动作类型: {action_type}, 值: {action_value}")
 
@@ -447,8 +400,8 @@ class GestureExecutor:
         """刷新手势库，确保使用最新的已保存手势库"""
         try:
             if self.gesture_library:
-                gestures = self.gesture_library.get_all_gestures(use_saved=True)
-                self.logger.info(f"已刷新手势库，共有 {len(gestures)} 个保存的手势")
+                gesture_count = self.gesture_library.get_gesture_count(use_saved=True)
+                self.logger.info(f"已刷新手势库，共有 {gesture_count} 个保存的手势")
             else:
                 self.logger.warning("手势库实例不存在，无法刷新")
         except Exception as e:
@@ -517,7 +470,7 @@ if __name__ == "__main__":
 
     # 模拟执行手势动作
     print("测试执行'复制'手势...")
-    result = executor.execute_gesture("右-下")
+    result = executor.execute_gesture_by_path({"points": [[0, 0], [1, 1]], "connections": [[0, 1]]})
     print(f"执行结果: {'成功' if result else '失败'}")
 
     # 等待一段时间以便测试手势效果
@@ -527,5 +480,5 @@ if __name__ == "__main__":
 
     # 测试不存在的手势
     print("测试执行不存在的手势...")
-    result = executor.execute_gesture("上-上-上")
+    result = executor.execute_gesture_by_path({"points": [[0, 0], [1, 1], [2, 2]], "connections": [[0, 1], [1, 2]]})
     print(f"执行结果: {'成功' if result else '失败'}")

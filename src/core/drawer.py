@@ -171,7 +171,7 @@ class TransparentDrawingOverlay(QWidget):
             self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
             self.setAutoFillBackground(False)  # 禁用自动填充背景以提高性能
 
-            self.logger.debug("成功配置图形硬件加速 - 使用兼容模式")
+            self.logger.debug("成功配置图形硬件加速")
         except ImportError:
             self.logger.warning("无法导入QSurfaceFormat，图形硬件加速可能不可用")
         except Exception as e:

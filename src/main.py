@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-# 设置 Qt API
+
 from version import QT_API
 os.environ['QT_API'] = QT_API
 
@@ -32,13 +32,11 @@ def show_dialog(parent, message_type="warning", title_text=None, message="",
     title = title_text or "提示"
     
     if message_type == "question" and custom_buttons:
-        # 使用自定义按钮
         msg_box = QMessageBox(parent)
         msg_box.setWindowTitle(title)
         msg_box.setText(message)
         msg_box.setIcon(QMessageBox.Icon.Question)
         
-        # 添加自定义按钮
         buttons = []
         for btn_text in custom_buttons:
             btn = msg_box.addButton(btn_text, QMessageBox.ButtonRole.ActionRole)
@@ -46,7 +44,6 @@ def show_dialog(parent, message_type="warning", title_text=None, message="",
         
         msg_box.exec()
         
-        # 检查哪个按钮被点击
         clicked_button = msg_box.clickedButton()
         if callback and clicked_button:
             for i, btn in enumerate(buttons):
@@ -93,10 +90,7 @@ def get_system_tray(parent):
     if not QSystemTrayIcon.isSystemTrayAvailable():
         return None
     
-    # 创建托盘图标
     tray_icon = QSystemTrayIcon(parent)
-    
-    # 设置图标
     icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "icon.svg")
     if os.path.exists(icon_path):
         tray_icon.setIcon(QIcon(icon_path))
@@ -104,10 +98,7 @@ def get_system_tray(parent):
         # 使用默认图标
         tray_icon.setIcon(parent.style().standardIcon(parent.style().StandardPixmap.SP_ComputerIcon))
     
-    # 创建右键菜单
     menu = QMenu()
-    
-    # 显示窗口
     show_action = QAction("显示窗口", parent)
     show_action.triggered.connect(parent.show_and_activate)
     menu.addAction(show_action)
@@ -349,10 +340,9 @@ class GestroKeyApp(QMainWindow):
 
     def initUI(self):
         """初始化用户界面"""
-        # 设置窗口属性
         self.setWindowTitle(APP_NAME)
-        self.setGeometry(300, 300, 1000, 680)  # 增大默认窗口大小，宽度从850增加到1000，高度从650增加到680
-        self.setMinimumSize(800, 500)  # 增加最小窗口大小，宽度从640增加到800，高度从480增加到500
+        self.setGeometry(300, 300, 1000, 680)
+        self.setMinimumSize(800, 500)
 
         icon_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "assets", "images", "icon.svg"
@@ -407,7 +397,6 @@ class GestroKeyApp(QMainWindow):
             self.settings_btn.setIcon(QIcon(settings_icon_path))
         self.settings_btn.clicked.connect(lambda: self.switch_page(2))
         
-        # 设置选项卡按钮样式
         from qtpy.QtCore import QSize
         tab_buttons = [self.console_btn, self.gestures_btn, self.settings_btn]
         for btn in tab_buttons:
@@ -600,18 +589,15 @@ class GestroKeyApp(QMainWindow):
         # 停止绘制和释放按键
         self._prepare_for_close()
         
-        # 获取设置
         from ui.settings.settings import get_settings
         settings = get_settings()
         
-        # 如果是窗口关闭事件，检查是否显示退出对话框
         if is_window_close:
             show_exit_dialog = settings.get("app.show_exit_dialog", True)
             if show_exit_dialog:
                 self._show_exit_dialog()
                 return
             
-            # 不显示对话框时使用默认行为
             default_action = settings.get("app.default_close_action", "minimize")
             if default_action == "minimize":
                 self._minimize_to_tray()
@@ -675,7 +661,6 @@ class GestroKeyApp(QMainWindow):
                         unsaved_settings = True
                 else:
                     # 如果没有设置页面，只检查后端
-                    from ui.settings.settings import get_settings
                     settings = get_settings()
                     settings_has_changes = settings.has_changes()
                     self.logger.debug(f"设置后端是否有未保存更改: {settings_has_changes}")
@@ -687,20 +672,11 @@ class GestroKeyApp(QMainWindow):
                 self.logger.error(traceback.format_exc())
 
             try:
-                # 检查手势：既检查前端UI状态，也检查后端数据
-                if hasattr(self, "gestures_page"):
-                    frontend_changes = self.gestures_page.has_unsaved_changes()
-                    self.logger.debug(f"手势页面前端是否有未保存更改: {frontend_changes}")
-                    if frontend_changes:
-                        unsaved_gestures = True
-                else:
-                    # 如果没有手势页面，只检查后端
-                    from ui.gestures.gestures import get_gesture_library
-                    gesture_library = get_gesture_library()
-                    gestures_has_changes = gesture_library.has_changes()
-                    self.logger.debug(f"手势库后端是否有未保存更改: {gestures_has_changes}")
-                    if gestures_has_changes:
-                        unsaved_gestures = True
+                gesture_library = get_gesture_library()
+                gestures_has_changes = gesture_library.has_changes()
+                self.logger.debug(f"手势库是否有未保存更改: {gestures_has_changes}")
+                if gestures_has_changes:
+                    unsaved_gestures = True
             except Exception as e:
                 self.logger.error(f"检查手势库变更时出错: {e}")
                 import traceback
@@ -760,11 +736,15 @@ class GestroKeyApp(QMainWindow):
                 show_error(self, f"保存设置时出错: {str(e)}，取消退出")
 
             try:
-                # 保存手势（如果手势页面有未保存的更改）
-                if save_success and hasattr(self, "gestures_page") and self.gestures_page.has_unsaved_changes():
+                gesture_library = get_gesture_library()
+                if save_success and gesture_library.has_changes():
                     self.logger.info("正在保存手势库...")
-                    self.gestures_page._save_gestures()
-                    self.logger.info("手势库已保存")
+                    if gesture_library.save():
+                        self.logger.info("手势库已保存")
+                    else:
+                        self.logger.error("保存手势库失败")
+                        save_success = False
+                        show_error(self, "保存手势库失败，取消退出")
             except Exception as e:
                 self.logger.error(f"保存手势库时出现异常: {e}")
                 save_success = False

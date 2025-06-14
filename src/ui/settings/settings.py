@@ -135,15 +135,7 @@ class Settings:
                     return default
             return value
         else:
-            # 向后兼容，支持旧的直接键访问
-            if key in self.settings:
-                return self.settings[key]
-            # 尝试在brush或app分组中查找
-            if "brush" in self.settings and key in self.settings["brush"]:
-                return self.settings["brush"][key]
-            if "app" in self.settings and key in self.settings["app"]:
-                return self.settings["app"][key]
-            return default
+            return self.settings.get(key, default)
 
     def set(self, key, value):
         """设置设置项，支持点号分隔的嵌套键"""
@@ -175,26 +167,12 @@ class Settings:
                 self.logger.debug(f"嵌套设置项已更新: {key}={value} (类型: {type(value)})")
             return True
         else:
-            # 向后兼容，支持旧的直接键设置
-            # 尝试在brush或app分组中设置
-            if key in ["pen_width", "pen_color"]:
-                self.logger.debug(f"重定向画笔设置: {key} -> brush.{key}")
-                return self.set(f"brush.{key}", value)
-            elif key in ["show_exit_dialog", "default_close_action"]:
-                self.logger.debug(f"重定向应用设置: {key} -> app.{key}")
-                return self.set(f"app.{key}", value)
-            else:
-                # 直接设置顶级键
-                if key in self.settings:
-                    if self.settings[key] != value:
-                        self.settings[key] = value
-                        self.logger.debug(f"顶级设置项已更新: {key}={value} (类型: {type(value)})")
-                    else:
-                        self.logger.debug(f"顶级设置项值未变: {key}={value}")
-                    return True
-                else:
-                    self.logger.debug(f"顶级设置项不存在: {key}")
-                    return False
+            # 直接设置顶级键
+            old_value = self.settings.get(key)
+            if old_value != value:
+                self.settings[key] = value
+                self.logger.debug(f"设置项已更新: {key}={value} (类型: {type(value)})")
+            return True
 
     def reset_to_default(self):
         """重置为默认设置"""

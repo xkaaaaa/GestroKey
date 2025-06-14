@@ -6,12 +6,7 @@ from typing import List, Tuple, Dict  # 确保所有需要的类型都被导入
 import numpy as np
 from numpy.linalg import svd, norm
 
-try:
-    from core.logger import get_logger
-except ImportError:
-    # 兼容性：如果直接运行此文件或在不同结构中，确保能找到logger
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from core.logger import get_logger
+from core.logger import get_logger
 
 
 class PathAnalyzer:
@@ -84,18 +79,13 @@ class PathAnalyzer:
         if len(coords) <= 2:
             return coords
         
-        # 1. 初步简化
         simplified = self._douglas_peucker(coords, tolerance=8.0)
-        # 2. 细化分析，保留重要转角和特征点
         key_points = self._analyze_direction_changes(simplified)
         
-        # 3. 确保起点和终点始终存在
         if not key_points or key_points[0] != coords[0]:
             key_points.insert(0, coords[0])
         if key_points[-1] != coords[-1]:
             key_points.append(coords[-1])
-        
-        # 4. 去除连续的重复点
         unique_points = [key_points[0]]
         for point in key_points[1:]:
             if point != unique_points[-1]:
@@ -148,12 +138,10 @@ class PathAnalyzer:
         """
         计算两条格式化路径的相似度，结果范围 [0, 1]，值越大越相似。
         """
-        # 1. 安全检查
         if not all([path1, path2, path1.get("points", []), path2.get("points", [])]) or \
            len(path1["points"]) < 2 or len(path2["points"]) < 2:
             return 0.0
         
-        # 2. 预处理：归一化与重采样
         try:
             pts1 = self._preprocess_for_comparison(path1)
             pts2 = self._preprocess_for_comparison(path2)
@@ -164,24 +152,16 @@ class PathAnalyzer:
         if pts1 is None or pts2 is None:
             return 0.0
         
-        # 3. 正向比较
         shape_fwd, dir_fwd = self._compute_scores(pts1, pts2)
-        # 权重调整：更平衡形状和方向，以体现笔顺的重要性
         sim_forward = 0.55 * shape_fwd + 0.45 * dir_fwd
 
-        # 4. 反向比较 (处理反向绘制但形状相同的情况)
         pts2_rev = np.flipud(pts2)
         shape_rev, dir_rev = self._compute_scores(pts1, pts2_rev)
         sim_reverse_raw = 0.55 * shape_rev + 0.45 * dir_rev
-        # 惩罚加重：对反向绘制给予更严厉的惩罚，因为笔顺是手势的关键
         REVERSE_PENALTY = 0.25
         sim_reverse = sim_reverse_raw * REVERSE_PENALTY
-
-        # 5. 最终得分
         final_sim = max(sim_forward, sim_reverse)
         final_sim = np.clip(final_sim, 0.0, 1.0)
-
-        # 6. 调试日志 (只记录有意义的匹配)
         if final_sim > 0.1:
             match_type = "Forward" if abs(final_sim - sim_forward) < 1e-6 else "Reverse (Penalized)"
             shape, direction = (shape_fwd, dir_fwd) if match_type == "Forward" else (shape_rev, dir_rev)

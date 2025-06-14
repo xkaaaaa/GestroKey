@@ -341,11 +341,7 @@ class GestureDrawingWidget(QWidget):
         """滚轮事件 - Alt+滚轮缩放"""
         if event.modifiers() & Qt.KeyboardModifier.AltModifier:
             # 计算缩放中心点（鼠标位置）
-            try:
-                zoom_center = event.position().toPoint()
-            except:
-                # 兼容性处理
-                zoom_center = event.pos()
+            zoom_center = event.position().toPoint()
             
             # 计算缩放因子 - 使用angleDelta().y()或pixelDelta().y()
             angle_delta = event.angleDelta()
@@ -931,13 +927,9 @@ class GestureDrawingWidget(QWidget):
                 painter.drawLine(self.current_path[i], self.current_path[i + 1])
         
     def _get_point_position(self, point):
-        """获取点的位置，兼容不同的数据格式"""
+        """获取点的位置"""
         if isinstance(point, (list, tuple)) and len(point) >= 2:
             return QPoint(int(point[0]), int(point[1]))
-        elif isinstance(point, dict):
-            return QPoint(int(point.get('x', 0)), int(point.get('y', 0)))
-        else:
-            self.logger.warning(f"未知的点格式: {point} (类型: {type(point)})")
         return None
 
     def _draw_formatted_path(self, painter, path):
