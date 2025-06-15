@@ -5,8 +5,8 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
 ## 主要功能特性
 
 - **全局手势识别**：支持在任何应用程序中绘制手势
-- **智能路径分析**：精确的手势方向识别和相似度匹配
-- **可视化手势编辑**：直观的手势绘制和编辑界面
+- **路径分析**：手势方向识别和相似度匹配
+- **可视化手势编辑**：手势绘制和编辑界面
 - **系统托盘集成**：支持最小化到托盘，后台运行
 - **静默启动模式**：支持`--silent`参数，适用于开机自启动
 - **跨平台兼容**：支持Windows、macOS和Linux系统
@@ -61,6 +61,7 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
 src/
 ├── core/                    # 核心功能模块
 │   ├── brush/               # 画笔绘制模块
+│   │   ├── __init__.py      # 包初始化文件
 │   │   ├── manager.py       # 绘制管理器
 │   │   ├── overlay.py       # 绘制覆盖层
 │   │   ├── drawing.py       # 画笔绘制逻辑
@@ -70,6 +71,7 @@ src/
 │   ├── system_monitor.py    # 系统监测模块
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
+│   ├── __init__.py          # 包初始化文件
 │   ├── console.py           # 控制台选项卡
 │   ├── settings/            # 设置模块
 │   │   ├── settings_tab.py  # 设置选项卡
@@ -199,19 +201,13 @@ sys.exit(app.exec())
 - `APP_DESCRIPTION`：应用程序描述
 - `BUILD_DATE`：构建日期，格式为"YYYY-MM-DD"，使用当前日期自动生成
 - `AUTHOR`：作者信息
-- `LICENSE`：许可证信息，如"GPL-3.0"
-- `REPO_URL`：仓库地址，基于作者和应用名称自动生成
-- `VERSION_TYPE_RELEASE`：正式发布版本的类型标识
-- `VERSION_TYPE_PREVIEW`：预览版本的类型标识
-- `VERSION_TYPE_DEVELOPMENT`：未发布版本的类型标识
-- `CURRENT_VERSION_TYPE`：当前版本的类型，可设置为上述三种类型之一
-
-**Qt API 配置**：
-- `QT_API`：指定使用的 Qt API，支持以下值：
-  - `"pyqt6"`：使用 PyQt6（默认）
-  - `"pyqt5"`：使用 PyQt5
-  - `"pyside6"`：使用 PySide6
-  - `"pyside2"`：使用 PySide2
+- `LICENSE`：许可证类型，固定为"GPL-3.0"
+- `REPO_URL`：仓库URL地址
+- `QT_API`：Qt API配置，支持"pyqt5"、"pyqt6"、"pyside2"、"pyside6"
+- `VERSION_TYPE_RELEASE`：正式版类型标识，值为"正式版"
+- `VERSION_TYPE_PREVIEW`：预览版类型标识，值为"预览版"
+- `VERSION_TYPE_DEVELOPMENT`：开发版类型标识，值为"未发布版"
+- `CURRENT_VERSION_TYPE`：当前版本类型，默认为开发版
 
 **打包配置变量**：
 - `ENABLE_PACKAGING`：是否启用打包流程
@@ -365,16 +361,16 @@ console_page.update_system_info(system_data)
   - `_convert_shortcut_for_current_platform(self, shortcut)`：将快捷键转换为当前平台的格式
   - `_get_gestures_file_path(self)`：获取手势库文件路径，支持多平台
   - `load(self)`：从文件加载手势库
-  - `_convert_loaded_actions_for_current_platform(self, loaded_data)`：转换加载的操作快捷键格式
-  - `_update_saved_state(self)`：更新已保存状态（深拷贝）
-  - `save(self)`：保存手势库到文件
-  - `has_changes(self)`：检查是否有未保存的更改
-  - `get_gesture_by_path(self, drawn_path, similarity_threshold=0.70)`：根据绘制路径获取匹配的手势，返回手势名称、操作数据和相似度
-  - `get_gesture_count(self, use_saved=False)`：获取手势数量
-  - `_get_next_mapping_id(self)`：获取下一个可用的映射ID
-  - `_get_next_path_id(self)`：获取下一个可用的路径ID
-  - `_get_next_action_id(self)`：获取下一个可用的操作ID
-  - `reset_to_default(self)`：重置手势库为默认设置
+  - `_convert_loaded_actions_for_current_platform(self, loaded_data)`：转换加载的操作快捷键格式为当前平台格式
+  - `_update_saved_state(self)`：更新已保存状态，深拷贝当前数据作为保存状态基准
+  - `save(self)`：保存手势库到文件，返回保存成功状态
+  - `has_changes(self)`：检查是否有未保存的更改，对比当前数据与保存状态
+  - `get_gesture_by_path(self, drawn_path, similarity_threshold=0.70)`：根据绘制路径获取匹配的手势，核心逻辑包括路径对比、相似度计算、映射查找和操作获取，返回手势名称、操作数据和相似度
+  - `get_gesture_count(self, use_saved=False)`：获取手势数量，可选择获取当前数据或已保存数据的数量
+  - `_get_next_mapping_id(self)`：获取下一个可用的映射ID，遍历现有映射获取最大ID后加1
+  - `_get_next_path_id(self)`：获取下一个可用的路径ID，遍历现有路径获取最大ID后加1
+  - `_get_next_action_id(self)`：获取下一个可用的操作ID，遍历现有操作获取最大ID后加1
+  - `reset_to_default(self)`：重置手势库为默认设置，重新加载默认手势并保存
 
 - `get_gesture_library()`：单例函数，获取手势库实例
 
@@ -1266,35 +1262,234 @@ manager.stop()
 
 #### 3.2 core/path_analyzer.py
 
+**功能说明**：
+路径分析模块，负责将用户绘制的原始轨迹转换为结构化路径数据，并提供手势相似度计算。该模块是GestroKey手势识别系统的核心，专注于形状轮廓识别和绘制顺序分析。
+
+**主要类和方法**：
+
+**PathAnalyzer 路径分析器类**：
+- `__init__(self)`：初始化路径分析器，设置日志记录器
+- `format_raw_path(self, raw_points: List[Tuple]) -> Dict`：将原始绘制点转换为格式化路径，流程包括缩放、简化、提取关键点、生成连接
+- `calculate_similarity(self, path1: Dict, path2: Dict) -> float`：计算两个路径的相似度，结果范围[0,1]，综合考虑形状轮廓和笔画顺序
+- `normalize_path_scale(self, path: Dict, target_size: int = 100) -> Dict`：将路径归一化到指定尺寸，保持宽高比
+- `_scale_small_path(self, coords: List[Tuple]) -> List[Tuple]`：对尺寸过小的路径进行等比放大，提高处理精度
+- `_extract_key_points(self, coords: List[Tuple]) -> List[Tuple]`：从坐标点中提取关键点，保留路径核心特征
+- `_douglas_peucker(self, points: List[Tuple], tolerance: float) -> List[Tuple]`：使用道格拉斯-普克算法简化路径
+- `_analyze_direction_changes(self, points: List[Tuple]) -> List[Tuple]`：通过分析角度和距离变化识别重要转折点
+- `_preprocess_for_comparison(self, path: Dict, target_size: int, resample_n: int) -> np.ndarray`：为相似度计算准备路径，归一化和重采样
+- `_resample_points(self, pts: np.ndarray, target_n: int) -> np.ndarray`：沿曲线总长度等距采样指定数量的点
+- `_compute_scores(self, pts1: np.ndarray, pts2: np.ndarray) -> Tuple[float, float]`：计算形状和方向得分
+- `_procrustes_align(self, A: np.ndarray, B: np.ndarray) -> np.ndarray`：使用Procrustes分析对齐两个点集
+- `_get_path_bbox(self, points: List[Tuple]) -> Dict`：计算路径边界框
+- `_calculate_path_length(self, points: List[Tuple]) -> float`：计算路径总长度
+- `_calculate_angle_change(self, p1: Tuple, p2: Tuple, p3: Tuple) -> float`：计算三点夹角变化
+- `_distance_to_line(self, p1: Tuple, p2: Tuple, point: Tuple) -> float`：计算点到线段的距离
+
+**核心算法特性**：
+- **路径预处理**：自动识别并放大小于50像素的微小路径至200像素，提高识别精度
+- **关键点提取**：道格拉斯-普克算法（容忍度8.0像素）结合转折点检测（角度阈值30度）
+- **相似度计算**：综合形状轮廓（55%权重）和笔画顺序（45%权重），支持正向和反向匹配
+- **路径归一化**：保持宽高比的尺寸标准化，支持多种目标尺寸
+- **重采样技术**：沿路径等距采样64个点，确保比较的一致性
+
+**路径数据结构**：
+```python
+# 输入原始点格式
+raw_points = [(x, y, pressure, tilt, button), ...]
+
+# 输出格式化路径
+formatted_path = {
+    'points': [(x1, y1), (x2, y2), ...],    # 关键点坐标列表
+    'connections': [                         # 连接关系列表
+        {'from': 0, 'to': 1, 'type': 'line'},
+        {'from': 1, 'to': 2, 'type': 'line'},
+        ...
+    ]
+}
+```
+
+**使用方法**：
+```python
+from core.path_analyzer import PathAnalyzer
+
+# 创建路径分析器实例
+analyzer = PathAnalyzer()
+
+# 格式化原始绘制轨迹
+raw_points = [(100, 100, 0.5, 0.0, 1), (150, 120, 0.6, 0.0, 1), ...]
+formatted_path = analyzer.format_raw_path(raw_points)
+
+# 计算两个路径的相似度
+similarity = analyzer.calculate_similarity(path1, path2)
+print(f"相似度: {similarity:.3f}")
+
+# 归一化路径尺寸
+normalized_path = analyzer.normalize_path_scale(path, target_size=200)
+```
+
 #### 3.3 core/gesture_executor.py
 
 **功能说明**：
-手势执行模块，负责执行识别到的手势对应的操作，如快捷键、程序启动等。
+手势执行模块，负责执行识别到的手势对应的操作，主要支持快捷键操作。采用单例模式确保全局唯一实例，基于pynput库实现跨平台键盘控制。
 
 **主要类和方法**：
-- `GestureExecutor`：手势执行器类
-  - `execute_action(self, action_data)`：执行指定的操作
-  - `execute_shortcut(self, shortcut)`：执行快捷键操作
+- `GestureExecutor`：手势执行器类（单例模式）
+  - `get_instance()`：类方法，获取手势执行器的全局唯一实例
+  - `__init__(self)`：初始化手势执行器，设置键盘控制器和特殊键映射
+  - `execute_gesture_by_path(self, drawn_path)`：根据绘制路径执行对应的手势动作，核心执行入口
+  - `_execute_shortcut(self, shortcut_str)`：执行快捷键操作，支持多种快捷键格式
+  - `_press_keys(self, modifier_keys, regular_keys)`：按下并释放快捷键组合
+  - `release_all_keys(self)`：释放所有可能按下的键，用于程序退出前的清理
+  - `refresh_gestures(self)`：刷新手势库，确保使用最新的已保存手势库
+  - `find_similar_paths(self, test_path)`：查找与测试路径相似的所有触发路径，返回相似度排序结果
+
+**全局函数**：
+- `get_gesture_executor()`：获取手势执行器的全局实例
+
+**手势执行流程**：
+1. **路径匹配**：将绘制路径与手势库中的触发路径逐一对比
+2. **相似度计算**：选出相似度大于阈值中相似度最高的手势
+3. **操作查找**：通过映射关系找到对应的执行操作
+4. **动作执行**：将执行操作交给相应的执行模块处理
+
+**支持的快捷键格式**：
+- **修饰键**：ctrl, alt, shift, win/cmd/command/meta/super
+- **功能键**：f1-f12, esc, tab, enter, space, backspace, delete等
+- **方向键**：up/↑, down/↓, left/←, right/→
+- **特殊键**：home, end, page_up, page_down, insert等
+- **符号键**：支持Unicode符号如⌃⌥⇧⌘
+
+**特殊键映射字典**：
+包含100+个键位的映射关系，支持多种别名和Unicode符号，确保跨平台兼容性。
+
+**使用方法**：
+```python
+from core.gesture_executor import get_gesture_executor
+
+# 获取执行器实例
+executor = get_gesture_executor()
+
+# 根据路径执行手势
+drawn_path = {
+    'points': [(100, 100), (200, 100)],
+    'connections': [{'from': 0, 'to': 1, 'type': 'line'}]
+}
+success = executor.execute_gesture_by_path(drawn_path)
+
+# 查找相似路径
+similar_paths = executor.find_similar_paths(test_path)
+for path_key, similarity, path_data in similar_paths:
+    print(f"路径: {path_data['name']}, 相似度: {similarity:.3f}")
+
+# 程序退出前清理
+executor.release_all_keys()
+```
 
 #### 3.4 core/system_monitor.py
 
 **功能说明**：
-系统监测模块，提供CPU、内存使用率等系统信息的实时监测功能。
+系统监测模块，基于psutil库提供CPU、内存使用率等系统信息的实时监测功能，使用Qt信号机制进行数据更新通知。
 
 **主要类和方法**：
-- `SystemMonitor`：系统监测器类
-  - `start(self)`：开始监测
-  - `stop(self)`：停止监测
-  - `get_system_info(self)`：获取系统信息
+- `SystemMonitor`：系统监测器类，继承自QObject
+  - `dataUpdated`：数据更新信号，参数为包含系统信息的字典
+  - `__init__(self, update_interval=1000)`：初始化系统监测器，设置更新间隔（毫秒）
+  - `start(self)`：开始监测，启动定时器，返回启动成功状态
+  - `stop(self)`：停止监测，停止定时器，返回停止成功状态
+  - `is_running(self)`：检查监测器是否正在运行
+  - `get_data(self)`：获取当前系统信息数据的副本
+  - `_update_data(self)`：内部方法，更新系统数据并发送信号
+  - `set_update_interval(self, interval)`：设置更新间隔，运行中会重启定时器
+  - `get_update_interval(self)`：获取当前更新间隔
+  - `reset_start_time(self)`：重置运行时间计算的起始时间
+
+**监测数据结构**：
+```python
+{
+    "cpu_percent": 25.5,        # CPU使用率百分比
+    "memory_percent": 60.2,     # 内存使用率百分比
+    "memory_used": 8589934592,  # 已用内存字节数
+    "memory_total": 17179869184, # 总内存字节数
+    "runtime": "01:23:45",      # 运行时间字符串
+    "process_memory": 2.1,      # 当前进程内存使用率
+    "process_cpu": 1.5          # 当前进程CPU使用率
+}
+```
+
+**辅助函数**：
+- `format_bytes(bytes_value)`：将字节数格式化为可读的单位（B, KB, MB, GB, TB, PB）
+
+**使用方法**：
+```python
+from core.system_monitor import SystemMonitor, format_bytes
+
+# 创建监测器实例
+monitor = SystemMonitor(update_interval=1500)  # 1.5秒更新一次
+
+# 连接数据更新信号
+monitor.dataUpdated.connect(lambda data: print(f"CPU: {data['cpu_percent']:.1f}%"))
+
+# 启动监测
+monitor.start()
+
+# 获取当前数据
+current_data = monitor.get_data()
+print(f"内存使用: {format_bytes(current_data['memory_used'])}")
+
+# 停止监测
+monitor.stop()
+```
 
 #### 3.5 core/logger.py
 
 **功能说明**：
-日志记录模块，提供统一的日志记录功能，支持不同级别的日志输出。
+日志记录模块，提供统一的日志记录功能，支持多平台的日志文件存储和控制台输出。
 
-**主要函数**：
-- `get_logger(name)`：获取指定名称的日志记录器
-- `setup_logging()`：设置日志记录配置
+**主要类和方法**：
+- `Logger`：日志记录器类
+  - `__init__(self, module_name=None)`：初始化日志记录器，设置模块名称
+  - `setup_logger(self)`：设置日志记录器，配置文件和控制台处理器
+  - `debug(self, message)`：记录调试级别日志
+  - `info(self, message)`：记录信息级别日志
+  - `warning(self, message)`：记录警告级别日志
+  - `error(self, message)`：记录错误级别日志
+  - `critical(self, message)`：记录严重错误级别日志
+  - `exception(self, message)`：记录异常信息，包含堆栈跟踪
+
+**全局函数**：
+- `get_logger(module_name=None)`：获取指定模块名称的日志记录器实例
+
+**日志存储路径**：
+- **Windows**: `~/.{AUTHOR}/{APP_NAME}/log/`
+- **macOS**: `~/Library/Application Support/{AUTHOR}/{APP_NAME}/log/`
+- **Linux**: `~/.config/{AUTHOR}/{APP_NAME}/log/`
+
+**日志文件格式**：
+- 文件名：按日期命名，如 `2024-01-01.log`
+- 格式：`[时间戳] [级别] [模块名] - 消息内容`
+- 编码：UTF-8
+- 级别：文件记录DEBUG及以上，控制台记录INFO及以上
+
+**使用方法**：
+```python
+from core.logger import get_logger
+
+# 获取日志记录器
+logger = get_logger("MyModule")
+
+# 记录不同级别的日志
+logger.debug("调试信息")
+logger.info("一般信息")
+logger.warning("警告信息")
+logger.error("错误信息")
+logger.critical("严重错误")
+
+# 记录异常
+try:
+    1 / 0
+except Exception as e:
+    logger.exception(f"发生异常: {e}")
+```
 
 **集成到主程序**：
 在main.py中，系统托盘图标被初始化并连接到相应的处理方法：
@@ -1323,262 +1518,48 @@ def on_drawing_state_changed(self, is_active):
 
 ### 3. 核心功能模块
 
-#### 3.1 core/path_analyzer.py
+#### 3.1 core/brush/
 
 **功能说明**：
-路径分析模块，负责将用户绘制的原始轨迹转换为结构化路径数据，并提供手势相似度计算。该模块是GestroKey手势识别系统的核心，专注于形状轮廓识别和绘制顺序分析。
+画笔绘制模块，负责在屏幕上创建透明覆盖层并处理用户的绘制操作。该模块包含绘制管理器、透明覆盖层、画笔实现和淡出效果等组件。
+
+##### 3.1.1 core/brush/manager.py
+
+**功能说明**：
+绘制管理器，负责管理绘制功能的启动、停止和设置更新，协调鼠标监听和绘制覆盖层的工作。
 
 **主要类和方法**：
+- `DrawingManager`：绘制管理器类
+  - `__init__(self)`：初始化绘制管理器，创建信号对象和透明覆盖层，设置鼠标事件限流
+  - `start(self)`：开始绘制功能，从设置中加载参数并启动鼠标监听器
+  - `update_settings(self)`：更新设置参数，无需重启绘制功能即可应用修改的参数
+  - `stop(self)`：停止绘制功能，关闭绘制窗口并停止监听
+  - `_init_mouse_hook(self)`：初始化全局鼠标监听，设置右键绘制逻辑
+  - `_calculate_simulated_pressure(self, x, y)`：计算模拟压力值，基于移动速度动态调整
+  - `get_last_direction(self)`：获取最后一次绘制的方向信息
 
-**PathAnalyzer 路径分析器类**：
-- `__init__(self)`：初始化路径分析器，设置日志记录器
-- `format_raw_path(self, raw_points: List[Tuple]) -> Dict`：将原始绘制点转换为格式化路径
-- `calculate_similarity(self, path1: Dict, path2: Dict) -> float`：计算两个路径的相似度（当前版本固定返回1.0）
-- `normalize_path_scale(self, path: Dict, target_size: int = 100) -> Dict`：将路径归一化到指定尺寸
-
-**核心路径格式化流程**：
-1. **路径预处理**：`_scale_small_path(coords)` - 对过小路径进行智能缩放
-2. **关键点提取**：`_extract_key_points(coords)` - 提取路径的核心特征点
-3. **路径简化**：`_douglas_peucker(points, tolerance)` - 道格拉斯-普克算法简化
-4. **方向分析**：`_analyze_direction_changes(points)` - 检测重要的转折点
-
-**路径预处理功能**：
-- **小路径检测**：自动识别尺寸小于50像素的微小路径
-- **路径缩放**：将小路径等比放大到200像素，保持形状比例
-- **中心对称缩放**：以路径几何中心为基准进行缩放，避免位置偏移
-- **精度提升**：改善小手势的识别准确性和关键点提取效果
-
-**关键点提取算法**：
-- **道格拉斯-普克简化**：
-  - 容忍度设置为8.0像素，平衡简化效果与细节保留
-  - 递归算法自动去除冗余的中间点
-  - 保持路径的整体形状特征
-  
-- **转折点检测**：
-  - 角度变化阈值：30度，识别重要的方向改变
-  - 动态距离阈值：基于路径总长度的10%或最小20像素
-  - 特征点保留：确保关键的几何特征不被过度简化
-
-- **起点终点保护**：
-  - 强制保留原始路径的起点和终点
-  - 去除连续重复的点位，避免数据冗余
-  - 确保路径连通性和完整性
-
-**路径数据结构**：
-输入原始点格式：`[(x, y, pressure, tilt, button), ...]`
-输出格式化路径：
-```python
-{
-    'points': [(x1, y1), (x2, y2), ...],    # 关键点坐标列表
-    'connections': [                         # 连接关系列表
-        {'from': 0, 'to': 1, 'type': 'line'},
-        {'from': 1, 'to': 2, 'type': 'line'},
-        ...
-    ]
-}
-```
-
-**几何计算工具方法**：
-- `_calculate_path_length(points)`：计算路径总长度
-- `_calculate_angle_change(p1, p2, p3)`：计算三点夹角变化
-- `_distance_to_line(p1, p2, point)`：点到线段的距离计算
-- `_get_path_bbox(points)`：计算路径边界框
-
-**相似度计算系统**：
-- **当前实现**：`calculate_similarity()` 固定返回1.0
-- **设计意图**：为开发者预留的相似度算法接口
-- **输入输出规范**：
-  - 输入：两个标准格式的路径字典
-  - 输出：0.0-1.0范围的相似度值
-  - 阈值建议：≥0.7认为相似，<0.5认为不相似
-
-**使用方法示例**：
-```python
-from core.path_analyzer import PathAnalyzer
-
-# 创建路径分析器实例
-analyzer = PathAnalyzer()
-
-# 示例1：格式化原始绘制轨迹
-raw_points = [
-    (100, 100, 0.5, 0.0, 1),  # (x, y, pressure, tilt, button)
-    (150, 100, 0.6, 0.1, 1),
-    (200, 150, 0.7, 0.2, 1),
-    (200, 200, 0.5, 0.0, 1)
-]
-
-formatted_path = analyzer.format_raw_path(raw_points)
-print(f"格式化路径包含 {len(formatted_path['points'])} 个关键点")
-print(f"连接关系: {formatted_path['connections']}")
-
-# 示例2：路径归一化
-normalized_path = analyzer.normalize_path_scale(formatted_path, target_size=200)
-print(f"归一化后的路径: {normalized_path}")
-
-# 示例3：相似度计算
-path1 = {'points': [(0, 0), (100, 0), (100, 100)], 'connections': [...]}
-path2 = {'points': [(10, 5), (110, 5), (110, 105)], 'connections': [...]}
-similarity = analyzer.calculate_similarity(path1, path2)
-print(f"路径相似度: {similarity}")  # 当前固定输出 1.0
-```
-
-**应用场景**：
-- **手势识别前处理**：将用户绘制的轨迹转换为可比较的结构化数据
-- **路径优化**：去除绘制过程中的抖动和冗余点位
-- **几何分析**：提取手势的核心几何特征用于匹配
-- **尺寸标准化**：消除绘制尺寸差异对识别精度的影响
-
-**技术特点**：
-- **容错性**：能够处理各种不规则的用户输入
-- **性能优化**：算法复杂度经过优化，支持实时处理
-- **平台无关**：纯Python实现，跨平台兼容
-- **扩展性**：为未来的相似度算法预留了标准接口
-
-#### 3.2 core/gesture_executor.py
-
-**功能说明**：负责执行手势对应的动作，如模拟键盘快捷键、鼠标操作或启动程序等。设计为完全跨平台兼容，确保手势在不同操作系统上表现一致。
-
-**主要类和方法**：
-- `GestureExecutor`：手势执行器类
-  - `__init__(self)`：初始化手势执行器，检测平台并设置平台特定的按键映射
-  - `execute_gesture(self, gesture)`：执行手势动作，根据动作类型调用相应的执行方法
-  - `_execute_hotkey(self, gesture)`：执行快捷键，根据操作系统自动转换快捷键格式
-  - `_execute_mouse_action(self, gesture)`：执行鼠标动作
-  - `_execute_text(self, gesture)`：执行文本输入
-  - `_execute_command(self, gesture)`：执行系统命令
-  - `convert_hotkey_for_platform(self, hotkey_str)`：将通用格式的快捷键字符串转换为当前平台的特定格式
-  - `_parse_hotkey(self, hotkey_str)`：解析快捷键字符串，提取修饰键和主键
-  - `_is_special_key(self, key)`：检查是否为特殊键（如Ctrl、Alt等）
-  - `_get_platform_mapping(self, key)`：获取键的平台特定映射（例如Windows的"win"对应macOS的"command"）
-  - `send_keys(self, keys)`：发送键盘按键，使用适合当前平台的方法
-  - `release_all_keys(self)`：释放所有可能的按键状态，防止按键卡住
-
-- `get_gesture_executor()`：获取手势执行器的单例实例
-
-**平台特定实现**：
-- **Windows平台**：
-  - 使用`ctypes`和Windows API发送按键，支持特殊按键和组合键
-  - 支持Windows特有的键如`Win`键
-  - 实现windows注册表操作支持系统设置相关功能
-  - 快捷键通常格式为`Ctrl+C`，`Alt+Tab`等
-
-- **macOS平台**：
-  - 使用`AppKit`和`Quartz`库发送按键事件
-  - 支持macOS特有的键如`Command`(⌘)、`Option`(⌥)键
-  - 快捷键映射：Windows的`Ctrl`→macOS的`Command`，`Alt`→`Option`，`Win`→`Control`
-  - 快捷键通常以符号表示：如`⌘C`，`⌥⇥`等
-
-- **Linux平台**：
-  - 使用`Xlib`或`XTest`发送按键事件（X11环境）
-  - 在Wayland环境下使用替代方法
-  - 支持`Super`键（相当于Windows键）
-  - 快捷键通常格式为`Ctrl+C`，`Alt+Tab`等
-
-**键名映射表**：
-| 通用键名 | Windows | macOS | Linux |
-|---------|---------|-------|-------|
-| ctrl    | Ctrl    | ⌘ Command | Ctrl |
-| alt     | Alt     | ⌥ Option  | Alt  |
-| shift   | Shift   | ⇧ Shift   | Shift |
-| win     | Win     | ⌃ Control | Super |
-| escape  | Esc     | ⎋ Esc     | Escape |
-| return  | Enter   | ↩ Return  | Return |
-| space   | Space   | Space     | space |
+**核心功能**：
+- **设置集成**：自动从设置中加载笔尖粗细、颜色、画笔类型和强制置顶等参数
+- **鼠标监听**：使用pynput库实现全局鼠标监听，右键绘制逻辑
+- **性能优化**：鼠标移动事件限流（5ms间隔），减少处理频率
+- **压力模拟**：基于移动速度计算模拟压力值，速度越快压力越小
+- **信号通信**：使用Qt信号机制实现线程间安全通信
 
 **使用方法**：
 ```python
-# 获取手势执行器实例
-from core.gesture_executor import get_gesture_executor
+from core.brush.manager import DrawingManager
 
-# 执行手势
-executor = get_gesture_executor()
-executor.execute_gesture(gesture_object)
+# 创建绘制管理器
+manager = DrawingManager()
 
-# 转换快捷键格式（通用格式 → 平台特定格式）
-platform_hotkey = executor.convert_hotkey_for_platform("ctrl+c")
-# 在Windows上返回 "Ctrl+C"
-# 在macOS上返回 "Command+C"
-# 在Linux上返回 "Ctrl+C"
+# 启动绘制功能
+success = manager.start()
+if success:
+    print("绘制功能已启动")
 
-# 直接发送按键
-executor.send_keys(["ctrl", "c"])  # 发送Ctrl+C组合键
+# 更新设置
+manager.update_settings()
 
-# 确保释放所有按键
-executor.release_all_keys()  # 防止按键卡住
-```
-
-**执行流程**：
-1. 从`get_gesture_executor()`获取单例实例
-2. 调用`execute_gesture(gesture)`执行手势
-3. 根据手势的动作类型选择不同的执行方法
-4. 对于快捷键动作，自动将通用格式转换为平台特定格式
-5. 使用平台特定的方法发送按键或执行其他操作
-6. 完成后确保所有按键都已释放
-
-#### 3.3 core/system_monitor.py
-
-**功能说明**：系统监测模块，提供CPU、内存使用情况和程序运行时间等信息。
-
-**主要类和方法**：
-- `SystemMonitor`：系统监测器
-  - `__init__(self, update_interval=1000)`：初始化系统监测器
-  - `start(self)`：开始监测系统信息
-  - `stop(self)`：停止监测系统信息
-  - `get_data(self)`：获取当前监测数据
-  - `_update_data(self)`：更新系统信息数据，经过优化简化
-  - `set_update_interval(self, interval)`：设置更新间隔
-- `format_bytes(bytes_value)`：将字节数转换为可读格式
-
-**使用方法**：
-```python
-from core.system_monitor import SystemMonitor
-import time
-
-# 创建系统监测器
-monitor = SystemMonitor(update_interval=2000)  # 2秒更新一次
-
-# 定义数据更新回调
-def on_data_updated(data):
-    print(f"CPU: {data['cpu_percent']}%, 内存: {data['memory_percent']}%")
-
-# 连接信号
-monitor.dataUpdated.connect(on_data_updated)
-
-# 开始监测
-monitor.start()
-
-# 运行一段时间
-time.sleep(10)
-
-# 获取最新数据
-latest_data = monitor.get_data()
-print(f"运行时间: {latest_data['runtime']}")
-
-# 停止监测
-monitor.stop()
-```
-
-#### 3.4 core/logger.py
-
-**功能说明**：日志记录模块，提供统一的日志记录接口。
-
-**主要组件**：
-- `Logger`：日志工具类
-- `__init__(self, module_name=None)`：初始化日志记录器，默认使用APP_NAME
-- `setup_logger(self)`：设置日志记录器，经过优化简化
-- `debug(self, message)`、`info(self, message)`等：不同级别的日志记录方法
-- `get_logger(module_name=None)`：获取一个命名的日志记录器
-
-**使用方法**：
-```python
-from core.logger import get_logger
-
-# 获取日志记录器
-logger = get_logger("MyModule")
-
-# 记录不同级别的日志
-logger.debug("调试信息")
-logger.info("一般信息")
-logger.warning("警告信息")
-logger.error("错误信息")
+# 停止绘制功能
+manager.stop()
 ```
