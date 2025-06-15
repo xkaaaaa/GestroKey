@@ -93,6 +93,13 @@ class GesturesPage(QWidget):
         
         bottom_layout.addStretch()
         
+        # 放弃修改按钮
+        self.btn_discard = QPushButton("放弃修改")
+        self.btn_discard.setMinimumSize(100, 35)
+        self.btn_discard.clicked.connect(self._discard_changes)
+        self.btn_discard.setEnabled(False)
+        bottom_layout.addWidget(self.btn_discard)
+        
         # 保存手势库按钮
         self.btn_save_library = QPushButton("保存设置")
         self.btn_save_library.setMinimumSize(100, 35)
@@ -117,6 +124,7 @@ class GesturesPage(QWidget):
         """检查手势库是否有变更"""
         has_changes = self.gesture_library.has_changes()
         self.btn_save_library.setEnabled(has_changes)
+        self.btn_discard.setEnabled(has_changes)
         
     def _save_gesture_library(self):
         """保存手势库"""
@@ -183,6 +191,27 @@ class GesturesPage(QWidget):
                 self.logger.error(f"重置手势库时出错: {e}")
                 QMessageBox.critical(self, "错误", f"重置手势库失败: {str(e)}")
                 
+    def _discard_changes(self):
+        """放弃修改"""
+        reply = QMessageBox.question(
+            self, "确认放弃", 
+            "确定要放弃所有修改吗？这将丢失所有未保存的更改。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                # 重新加载手势库数据，放弃内存中的修改
+                self.gesture_library.load()
+                QMessageBox.information(self, "成功", "所有未保存的更改已放弃")
+                self.logger.info("已放弃所有修改")
+                
+                # 刷新所有选项卡
+                self._refresh_all()
+            except Exception as e:
+                self.logger.error(f"放弃修改时出错: {e}")
+                QMessageBox.critical(self, "错误", f"放弃修改失败: {str(e)}")
+
 
 class SimilarityTestDialog(QDialog):
     """相似度测试对话框"""

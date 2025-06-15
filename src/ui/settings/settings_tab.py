@@ -217,12 +217,19 @@ class SettingsPage(QWidget):
         self.reset_button.setMinimumSize(120, 35)
         self.reset_button.clicked.connect(self._reset_settings)
         
+        layout.addWidget(self.reset_button)
+        layout.addStretch()
+        
+        self.discard_button = QPushButton("放弃修改")
+        self.discard_button.setMinimumSize(100, 35)
+        self.discard_button.clicked.connect(self._discard_changes)
+        self.discard_button.setEnabled(False)
+        
         self.save_button = QPushButton("保存设置")
         self.save_button.setMinimumSize(100, 35)
         self.save_button.clicked.connect(self._save_settings)
 
-        layout.addWidget(self.reset_button)
-        layout.addStretch()
+        layout.addWidget(self.discard_button)
         layout.addWidget(self.save_button)
 
         return layout
@@ -393,6 +400,7 @@ class SettingsPage(QWidget):
         # 检查是否有未保存的更改
         has_changes = self._has_frontend_changes() or self.settings.has_changes()
         self.save_button.setEnabled(has_changes)
+        self.discard_button.setEnabled(has_changes)
 
     def _apply_pen_settings_to_drawing_module(self, width, color):
         """实时应用画笔设置到绘制模块"""
@@ -521,6 +529,23 @@ class SettingsPage(QWidget):
             except Exception as e:
                 self.logger.error(f"重置设置失败: {e}")
                 QMessageBox.critical(self, "错误", f"重置设置失败: {str(e)}")
+
+    def _discard_changes(self):
+        """放弃所有未保存的更改"""
+        reply = QMessageBox.question(
+            self, "确认放弃", 
+            "确定要放弃所有修改吗？这将丢失所有未保存的更改。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self._load_settings()
+                QMessageBox.information(self, "成功", "所有未保存的更改已放弃")
+                
+            except Exception as e:
+                self.logger.error(f"放弃更改失败: {e}")
+                QMessageBox.critical(self, "错误", f"放弃更改失败: {str(e)}")
 
     def has_unsaved_changes(self):
         """检查是否有未保存的更改"""
