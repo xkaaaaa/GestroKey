@@ -819,20 +819,30 @@ jobs:
                 chores="${chores}- ${description}\n"
                 added_chores["$description"]=1
               fi
-            elif [[ "$commit" =~ ^(build|ci|revert)(\(.+\))?:[[:space:]]*(.+)$ ]]; then
-              # 将 build、ci、revert 归类到其他变更
-              description="${BASH_REMATCH[3]}"
-              if [[ -z "${added_others[$description]}" ]]; then
-                others="${others}- ${description}\n"
-                added_others["$description"]=1
+            elif [[ "$commit" =~ ^build(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              # 构建相关
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_builds[$description]}" ]]; then
+                builds="${builds}- ${description}\n"
+                added_builds["$description"]=1
+              fi
+            elif [[ "$commit" =~ ^ci(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              # CI/CD相关
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_ci[$description]}" ]]; then
+                ci_changes="${ci_changes}- ${description}\n"
+                added_ci["$description"]=1
+              fi
+            elif [[ "$commit" =~ ^revert(\(.+\))?:[[:space:]]*(.+)$ ]]; then
+              # 代码回退
+              description="${BASH_REMATCH[2]}"
+              if [[ -z "${added_reverts[$description]}" ]]; then
+                reverts="${reverts}- ${description}\n"
+                added_reverts["$description"]=1
               fi
             else
-              # 不符合 Conventional Commits 格式的提交，归类到其他变更
-              description="$commit"
-              if [[ -z "${added_others[$description]}" ]]; then
-                others="${others}- ${description}\n"
-                added_others["$description"]=1
-              fi
+              # 不符合 Conventional Commits 格式的提交，忽略不显示
+              echo "忽略不符合格式的提交: $commit"
             fi
           done <<< "$commits"
           
@@ -884,8 +894,23 @@ jobs:
             changelog="${changelog}### 🔧 构建和维护\n\n${chores}\n"
           fi
           
+          # 构建相关
+          if [[ -n "$builds" ]]; then
+            changelog="${changelog}### 📦 构建相关\n\n${builds}\n"
+          fi
+          
+          # CI/CD相关
+          if [[ -n "$ci_changes" ]]; then
+            changelog="${changelog}### 🚀 CI/CD相关\n\n${ci_changes}\n"
+          fi
+          
+          # 代码回退
+          if [[ -n "$reverts" ]]; then
+            changelog="${changelog}### ⏪ 代码回退\n\n${reverts}\n"
+          fi
+          
           # 如果没有任何变更记录，显示提示信息
-          if [[ "$breaking_changes" == "" && "$features" == "" && "$fixes" == "" && "$docs" == "" && "$styles" == "" && "$refactors" == "" && "$performances" == "" && "$tests" == "" && "$chores" == "" ]]; then
+          if [[ "$breaking_changes" == "" && "$features" == "" && "$fixes" == "" && "$docs" == "" && "$styles" == "" && "$refactors" == "" && "$performances" == "" && "$tests" == "" && "$chores" == "" && "$builds" == "" && "$ci_changes" == "" && "$reverts" == "" ]]; then
             changelog="${changelog}*本次版本更新未包含符合 Conventional Commits 格式的提交信息*\n"
           fi
           
