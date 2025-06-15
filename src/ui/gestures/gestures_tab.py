@@ -50,6 +50,14 @@ class GesturesPage(QWidget):
     def initUI(self):
         """初始化用户界面"""
         layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 标题
+        title = QLabel("手势管理")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; padding: 10px;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
         
         # 创建选项卡控件
         self.tab_widget = QTabWidget()
@@ -75,24 +83,22 @@ class GesturesPage(QWidget):
         
         # 底部统一操作按钮
         bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(10)
         
-        # 添加说明标签
-        info_label = QLabel("提示：修改后需要保存手势库才能生效")
-        info_label.setStyleSheet("color: #666; font-size: 12px;")
-        bottom_layout.addWidget(info_label)
+        # 重置为默认手势库按钮
+        self.btn_reset = QPushButton("重置为默认")
+        self.btn_reset.setMinimumSize(120, 35)
+        self.btn_reset.clicked.connect(self._reset_to_default)
+        bottom_layout.addWidget(self.btn_reset)
         
         bottom_layout.addStretch()
         
         # 保存手势库按钮
-        self.btn_save_library = QPushButton("保存手势库")
+        self.btn_save_library = QPushButton("保存设置")
+        self.btn_save_library.setMinimumSize(100, 35)
         self.btn_save_library.clicked.connect(self._save_gesture_library)
         self.btn_save_library.setEnabled(False)
         bottom_layout.addWidget(self.btn_save_library)
-        
-        # 重置为默认手势库按钮
-        self.btn_reset = QPushButton("重置为默认手势库")
-        self.btn_reset.clicked.connect(self._reset_to_default)
-        bottom_layout.addWidget(self.btn_reset)
         
         layout.addLayout(bottom_layout)
         
@@ -117,17 +123,17 @@ class GesturesPage(QWidget):
         try:
             success = self.gesture_library.save()
             if success:
-                QMessageBox.information(self, "成功", "手势库已保存")
+                QMessageBox.information(self, "成功", "设置已保存")
                 self.logger.info("手势库已保存")
                 
                 # 刷新所有选项卡
                 self._refresh_all()
             else:
-                QMessageBox.critical(self, "错误", "保存手势库失败")
+                QMessageBox.critical(self, "错误", "保存设置失败")
                     
         except Exception as e:
             self.logger.error(f"保存手势库时出错: {e}")
-            QMessageBox.critical(self, "错误", f"保存手势库失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"保存设置失败: {str(e)}")
             
     def _refresh_all(self):
         """刷新所有选项卡"""
