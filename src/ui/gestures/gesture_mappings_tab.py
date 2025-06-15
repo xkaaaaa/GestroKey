@@ -270,10 +270,73 @@ class GestureMappingsTab(QWidget):
         
     def _add_new_mapping(self):
         """添加新映射"""
-        # 刷新下拉框选项（可能有新的路径或操作）
-        self._load_combo_options()
-        self._clear_form()
-        self.logger.info("开始添加新映射")
+        try:
+            # 刷新下拉框选项（可能有新的路径或操作）
+            self._load_combo_options()
+            
+            # 获取表单中的当前内容
+            current_name = self.edit_name.text().strip()
+            current_trigger_path_id = self.combo_trigger_path.currentData()
+            current_execute_action_id = self.combo_execute_action.currentData()
+            
+            # 生成新映射ID和默认名称
+            mapping_id = self.gesture_library._get_next_mapping_id()
+            mapping_key = f"mapping_{mapping_id}"
+            
+            # 使用用户填写的内容，如果为空则使用默认值
+            if not current_name:
+                current_name = f"映射{mapping_id}"
+            # 如果下拉框没有选择，保持None（将显示"请选择"）
+            
+            # 创建新映射数据
+            new_mapping_data = {
+                'id': mapping_id,
+                'name': current_name,
+                'trigger_path_id': current_trigger_path_id,
+                'execute_action_id': current_execute_action_id
+            }
+            
+            # 添加到手势库
+            self.gesture_library.gesture_mappings[mapping_key] = new_mapping_data
+            
+            # 更新当前编辑状态
+            self.current_mapping_key = mapping_key
+            
+            # 断开信号避免递归
+            self.edit_name.textChanged.disconnect()
+            self.combo_trigger_path.currentIndexChanged.disconnect()
+            self.combo_execute_action.currentIndexChanged.disconnect()
+            
+            # 更新表单内容
+            self.edit_name.setText(current_name)
+            # 设置触发路径下拉框
+            for i in range(self.combo_trigger_path.count()):
+                if self.combo_trigger_path.itemData(i) == current_trigger_path_id:
+                    self.combo_trigger_path.setCurrentIndex(i)
+                    break
+            # 设置执行操作下拉框
+            for i in range(self.combo_execute_action.count()):
+                if self.combo_execute_action.itemData(i) == current_execute_action_id:
+                    self.combo_execute_action.setCurrentIndex(i)
+                    break
+            
+            # 重新连接信号
+            self.edit_name.textChanged.connect(self._on_form_changed)
+            self.combo_trigger_path.currentIndexChanged.connect(self._on_form_changed)
+            self.combo_execute_action.currentIndexChanged.connect(self._on_form_changed)
+            
+            # 刷新列表并选中新添加的项
+            self._load_mapping_list()
+            self._select_mapping_in_list(mapping_key)
+            
+            # 更新按钮状态
+            self._update_button_states()
+            
+            self.logger.info(f"添加新映射: {current_name}, ID: {mapping_id}")
+            
+        except Exception as e:
+            self.logger.error(f"添加新映射时出错: {e}")
+            QMessageBox.critical(self, "错误", f"添加新映射失败: {str(e)}")
         
     def _select_mapping_in_list(self, mapping_key):
         """在列表中选择指定映射"""
@@ -329,9 +392,7 @@ class GestureMappingsTab(QWidget):
         
         self.logger.info("已清空表单")
                 
-    def has_unsaved_changes(self):
-        """检查是否有未保存的更改"""
-        return False  # 新架构中变更实时保存，无未保存状态
+
         
     def refresh_list(self):
         """刷新列表"""

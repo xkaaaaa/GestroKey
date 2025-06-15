@@ -126,9 +126,9 @@ class GestureLibrary:
                     self.logger.info(f"加载手势库：检测到非Windows系统({sys.platform})，检查快捷键格式...")
                     self._convert_loaded_actions_for_current_platform(loaded_data)
 
-                self.trigger_paths = loaded_data.get("trigger_paths", {})
-                self.execute_actions = loaded_data.get("execute_actions", {})
-                self.gesture_mappings = loaded_data.get("gesture_mappings", {})
+                self.trigger_paths = loaded_data.get("trigger_paths", {}) or {}
+                self.execute_actions = loaded_data.get("execute_actions", {}) or {}
+                self.gesture_mappings = loaded_data.get("gesture_mappings", {}) or {}
 
                 self.logger.info(f"已从 {self.gestures_file} 加载手势库")
                 self._update_saved_state()
@@ -286,22 +286,28 @@ class GestureLibrary:
     def _get_next_mapping_id(self):
         """获取下一个映射ID"""
         max_id = 0
-        for mapping_data in self.gesture_mappings.values():
-            max_id = max(max_id, mapping_data.get("id", 0))
+        if self.gesture_mappings:
+            for mapping_data in self.gesture_mappings.values():
+                if mapping_data and isinstance(mapping_data, dict):
+                    max_id = max(max_id, mapping_data.get("id", 0))
         return max_id + 1
 
     def _get_next_path_id(self):
         """获取下一个路径ID"""
         max_id = 0
-        for path_data in self.trigger_paths.values():
-            max_id = max(max_id, path_data.get("id", 0))
+        if self.trigger_paths:
+            for path_data in self.trigger_paths.values():
+                if path_data and isinstance(path_data, dict):
+                    max_id = max(max_id, path_data.get("id", 0))
         return max_id + 1
 
     def _get_next_action_id(self):
         """获取下一个操作ID"""
         max_id = 0
-        for action_data in self.execute_actions.values():
-            max_id = max(max_id, action_data.get("id", 0))
+        if self.execute_actions:
+            for action_data in self.execute_actions.values():
+                if action_data and isinstance(action_data, dict):
+                    max_id = max(max_id, action_data.get("id", 0))
         return max_id + 1
 
     def reset_to_default(self):

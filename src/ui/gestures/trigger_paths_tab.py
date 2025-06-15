@@ -110,7 +110,8 @@ class TriggerPathsTab(QWidget):
         for path_key, path_data in sorted_paths:
             path_id = path_data.get('id', 0)
             path_name = path_data.get('name', f'路径{path_id}')
-            path_points = path_data.get('path', {}).get('points', [])
+            path_obj = path_data.get('path', {}) or {}
+            path_points = path_obj.get('points', [])
             
             item_text = f"{path_id}. {path_name} ({len(path_points)}点)"
             item = QListWidgetItem(item_text)
@@ -189,39 +190,7 @@ class TriggerPathsTab(QWidget):
         except Exception as e:
             self.logger.error(f"自动保存路径时出错: {e}")
         
-    def _has_form_changes(self):
-        """检查表单是否有未保存的更改"""
-        if not self.current_path_key:
-            # 新路径，检查表单是否为空
-            name = self.edit_name.text().strip()
-            return bool(name or self.current_path)
-            
-        # 现有路径，比较表单内容与原数据
-        current_data = self.gesture_library.trigger_paths.get(self.current_path_key)
-        if not current_data:
-            return False
-            
-        form_name = self.edit_name.text().strip()
-        saved_name = current_data.get('name', '')
-        saved_path = current_data.get('path')
-        
-        name_changed = form_name != saved_name
-        path_changed = self._paths_different(self.current_path, saved_path)
-        
-        return name_changed or path_changed
-        
-    def _paths_different(self, path1, path2):
-        """比较两个路径是否不同"""
-        if path1 is None and path2 is None:
-            return False
-        if path1 is None or path2 is None:
-            return True
-            
-        import json
-        try:
-            return json.dumps(path1, sort_keys=True) != json.dumps(path2, sort_keys=True)
-        except:
-            return True
+
             
     def _on_path_completed(self, path):
         """处理路径绘制完成事件"""
@@ -288,17 +257,49 @@ class TriggerPathsTab(QWidget):
         
     def _add_new_path(self):
         """添加新路径"""
-        self.current_path_key = None
-        self.current_path = None
-        
-        # 清空表单
-        self.edit_name.setText("")
-        self.drawing_widget.clear_drawing()
-        
-        # 更新按钮状态
-        self.btn_delete_path.setEnabled(False)
-        
-        self.logger.info("开始添加新路径")
+        try:
+            # 获取表单中的当前内容
+            current_name = self.edit_name.text().strip()
+            current_path = self.current_path
+            
+            # 生成新路径ID和默认名称
+            path_id = self.gesture_library._get_next_path_id()
+            path_key = f"path_{path_id}"
+            
+            # 使用用户填写的名称，如果为空则使用默认名称
+            if not current_name:
+                current_name = f"路径{path_id}"
+            
+            # 创建新路径数据
+            new_path_data = {
+                'id': path_id,
+                'name': current_name,
+                'path': current_path if current_path else None
+            }
+            
+            # 添加到手势库
+            self.gesture_library.trigger_paths[path_key] = new_path_data
+            
+            # 更新当前编辑状态
+            self.current_path_key = path_key
+            
+            # 断开信号避免递归
+            self.edit_name.textChanged.disconnect()
+            self.edit_name.setText(current_name)
+            self.edit_name.textChanged.connect(self._on_form_changed)
+            
+            # 刷新列表并选中新添加的项
+            self._load_path_list()
+            self._select_path_in_list(path_key)
+            
+            # 更新按钮状态
+            self.btn_delete_path.setEnabled(True)
+            
+            self.logger.info(f"添加新路径: {current_name}, ID: {path_id}")
+            
+        except Exception as e:
+            self.logger.error(f"添加新路径时出错: {e}")
+            QMessageBox.critical(self, "错误", f"添加新路径失败: {str(e)}")
         
     def _clear_form(self):
         """清空表单"""
@@ -362,9 +363,7 @@ class TriggerPathsTab(QWidget):
                 self.logger.error(f"删除路径时出错: {e}")
                 QMessageBox.critical(self, "错误", f"删除路径失败: {str(e)}")
                 
-    def has_unsaved_changes(self):
-        """检查是否有未保存的更改"""
-        return False  # 新架构中变更实时保存，无未保存状态
+
         
     def refresh_list(self):
         """刷新列表"""
@@ -389,7 +388,3 @@ class TriggerPathsTab(QWidget):
             self.logger.error(f"打开相似度测试对话框时出错: {e}")
             QMessageBox.critical(self, "错误", f"无法打开相似度测试对话框: {str(e)}")
             
-    def _show_similarity_results(self, test_path, results):
-        """显示相似度测试结果"""
-        # 这个方法已不再需要，因为使用原有的对话框
-        pass 

@@ -209,32 +209,7 @@ class ExecuteActionsTab(QWidget):
         except Exception as e:
             self.logger.error(f"自动保存操作时出错: {e}")
         
-    def _has_form_changes(self):
-        """检查表单是否有未保存的更改"""
-        if not self.current_action_key:
-            # 新操作，检查表单是否为空
-            name = self.edit_name.text().strip()
-            value = self.edit_value.text().strip()
-            return bool(name or value)
-            
-        # 现有操作，比较表单内容与原数据
-        current_data = self.gesture_library.execute_actions.get(self.current_action_key)
-        if not current_data:
-            return False
-            
-        form_name = self.edit_name.text().strip()
-        form_type = self.combo_type.currentData()
-        form_value = self.edit_value.text().strip()
-        
-        saved_name = current_data.get('name', '')
-        saved_type = current_data.get('type', 'shortcut')
-        saved_value = current_data.get('value', '')
-        
-        name_changed = form_name != saved_name
-        type_changed = form_type != saved_type
-        value_changed = form_value != saved_value
-        
-        return name_changed or type_changed or value_changed
+
         
     def _clear_form(self):
         """清空表单"""
@@ -252,8 +227,69 @@ class ExecuteActionsTab(QWidget):
         
     def _add_new_action(self):
         """添加新操作"""
-        self._clear_form()
-        self.logger.info("开始添加新操作")
+        try:
+            # 获取表单中的当前内容
+            current_name = self.edit_name.text().strip()
+            current_type = self.combo_type.currentData()
+            current_value = self.edit_value.text().strip()
+            
+            # 生成新操作ID和默认名称
+            action_id = self.gesture_library._get_next_action_id()
+            action_key = f"action_{action_id}"
+            
+            # 使用用户填写的内容，如果为空则使用默认值
+            if not current_name:
+                current_name = f"操作{action_id}"
+            if not current_type:
+                current_type = "shortcut"  # 默认为快捷键
+            if not current_value:
+                current_value = ""  # 默认为空值
+            
+            # 创建新操作数据
+            new_action_data = {
+                'id': action_id,
+                'name': current_name,
+                'type': current_type,
+                'value': current_value
+            }
+            
+            # 添加到手势库
+            self.gesture_library.execute_actions[action_key] = new_action_data
+            
+            # 更新当前编辑状态
+            self.current_action_key = action_key
+            
+            # 断开信号避免递归
+            self.edit_name.textChanged.disconnect()
+            self.combo_type.currentTextChanged.disconnect()
+            self.edit_value.textChanged.disconnect()
+            
+            # 更新表单内容
+            self.edit_name.setText(current_name)
+            # 设置类型下拉框
+            for i in range(self.combo_type.count()):
+                if self.combo_type.itemData(i) == current_type:
+                    self.combo_type.setCurrentIndex(i)
+                    break
+            self.edit_value.setText(current_value)
+            
+            # 重新连接信号
+            self.edit_name.textChanged.connect(self._on_form_changed)
+            self.combo_type.currentTextChanged.connect(self._on_form_changed)
+            self.edit_value.textChanged.connect(self._on_form_changed)
+            
+            # 刷新列表并选中新添加的项
+            self._load_action_list()
+            self._select_action_in_list(action_key)
+            
+            # 更新按钮状态
+            self.btn_delete_action.setEnabled(True)
+            
+            self.logger.info(f"添加新操作: {current_name}, ID: {action_id}")
+            
+        except Exception as e:
+            self.logger.error(f"添加新操作时出错: {e}")
+            QMessageBox.critical(self, "错误", f"添加新操作失败: {str(e)}")
         
     def _select_action_in_list(self, action_key):
         """在列表中选择指定操作"""
@@ -297,9 +333,7 @@ class ExecuteActionsTab(QWidget):
                 self.logger.error(f"删除操作时出错: {e}")
                 QMessageBox.critical(self, "错误", f"删除操作失败: {str(e)}")
                 
-    def has_unsaved_changes(self):
-        """检查是否有未保存的更改"""
-        return False  # 新架构中变更实时保存，无未保存状态
+
         
     def refresh_list(self):
         """刷新列表"""

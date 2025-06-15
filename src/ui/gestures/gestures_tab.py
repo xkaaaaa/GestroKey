@@ -18,8 +18,6 @@ from qtpy.QtWidgets import (
     QFormLayout,
     QDoubleSpinBox,
     QTabWidget,
-    QDoubleSpinBox,
-    QTabWidget,
     QFrame,
     QDialog,
 )
