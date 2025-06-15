@@ -88,10 +88,11 @@ class TransparentDrawingOverlay(QWidget):
         self.last_drawing_points = []  # 存储最近的几个绘制点，用于平滑处理
         self.max_drawing_points = 3  # 最大存储点数
 
-        # 性能优化 - 预创建画笔
+        # 性能优化 - 预创建画笔和批量绘制
         self.painter_pen = QPen()
         self.painter_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         self.painter_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        self._batch_painter = None  # 批量绘制的QPainter实例
 
         # 强制置顶定时器
         self.force_topmost_timer = QTimer(self)
@@ -207,76 +208,119 @@ class TransparentDrawingOverlay(QWidget):
 
     def startDrawing(self, x, y, pressure=0.5):
         """开始绘制"""
+        # 验证坐标有效性
         if x <= 0 or y <= 0:
             return
 
-        self.logger.debug(f"开始绘制: ({x}, {y})")
+        self.logger.debug(f"开始绘制，坐标: ({x}, {y}), 压力: {pressure}")
 
-        # 如果正在淡出过程中，立即清除所有笔迹
+        # 如果正在消失过程中，立即停止消失并清除
         if self.fading:
-            self.logger.debug("检测到淡出过程中开始新绘制，立即清除所有笔迹")
-            self._clear_all_strokes()
+            self.logger.debug("检测到消失过程中开始新绘制，停止消失效果")
+            self.fading_module.stop_fade()
+            self.fading = False
+            # 清除所有旧数据
+            self.points = []
+            self.lines = []
+            self.current_line = []
 
-        # 创建画笔实例
-        self.current_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
-        if not self.current_brush:
-            self.logger.error("无法创建画笔实例")
-            return
+        # 创建全新的图像，彻底清除之前的内容
+        self.image = QPixmap(self.size())
+        self.image.fill(Qt.GlobalColor.transparent)
 
-        # 开始笔画
-        self.current_brush.start_stroke(x, y, pressure)
-
-        # 设置绘制状态
-        self.drawing = True
+        # 记录起始点
+        current_time = time.time()
         self.last_point = QPoint(x, y)
         self.current_stroke_id += 1
+        self.current_line = [[x, y, pressure, current_time, self.current_stroke_id]]
+        self.points.append([x, y, pressure, current_time])
 
-        # 初始化当前线条
-        self.current_line = [[x, y, pressure, time.time(), self.current_stroke_id]]
-        self.points.append([x, y, pressure, time.time()])
+        # 重置绘制优化参数
+        self.last_drawing_points = [(x, y)]
 
-        # 停止淡出效果并显示窗口
-        self.fading_module.stop_fade()
-        self.fading = False
+        self.drawing = True
 
-        # 启用强制置顶
+        # 创建新画笔
+        self.current_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
+        if self.current_brush:
+            self.current_brush.start_stroke(x, y, pressure)
+
+        # 停止更新计时器（如果正在运行）
+        if self.update_timer.isActive():
+            self.update_timer.stop()
+
+        # 显示窗口
+        self.show()
+
+        # 启动强制置顶定时器
         if self.force_topmost_enabled:
             self.force_topmost_timer.start(100)
 
-        # 显示窗口并开始更新
-        self.show()
-        self.update_timer.start()
-
-        # 立即更新显示
+        # 立即更新显示以确保新绘制可见
         self.update()
 
     def continueDrawing(self, x, y, pressure=0.5):
         """继续绘制"""
-        if not self.drawing or not self.current_brush:
+        if not self.drawing or not self.last_point:
             return
 
         # 验证坐标有效性
         if x <= 0 or y <= 0:
             return
 
-        # 检查距离，避免过于频繁的绘制
-        if self.last_point:
-            distance = math.sqrt(
-                (x - self.last_point.x()) ** 2 + (y - self.last_point.y()) ** 2
-            )
-            if distance < self.min_drawing_distance:
-                return
+        current_point = QPoint(x, y)
 
-        # 添加点到画笔
-        self.current_brush.add_point(x, y, pressure)
+        # 计算与上一个点的距离，如果太近，则忽略以减轻CPU负担
+        last_x, last_y = self.last_point.x(), self.last_point.y()
+        distance = math.sqrt((x - last_x) ** 2 + (y - last_y) ** 2)
 
-        # 更新数据
-        self.current_line.append([x, y, pressure, time.time(), self.current_stroke_id])
-        self.points.append([x, y, pressure, time.time()])
-        self.last_point = QPoint(x, y)
+        if distance < self.min_drawing_distance:
+            return
 
-        # 更新显示
-        self.update()
+        # 添加到历史点队列，保持队列长度
+        self.last_drawing_points.append((x, y))
+        if len(self.last_drawing_points) > self.max_drawing_points:
+            self.last_drawing_points.pop(0)
+
+        # 根据画笔类型选择绘制方式
+        brush_type = self.drawing_module.get_current_brush_type()
+        
+        if brush_type == "pencil":
+            # 铅笔使用批量绘制优化
+            if not hasattr(self, "_batch_painter") or self._batch_painter is None:
+                self._batch_painter = QPainter(self.image)
+                self._batch_painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+                # 设置画笔
+                self.painter_pen.setColor(self.pen_color)
+                self.painter_pen.setWidth(self.pen_width)
+                self._batch_painter.setPen(self.painter_pen)
+
+            # 绘制线段
+            self._batch_painter.drawLine(self.last_point, current_point)
+            
+            # 计算需要更新的区域（只更新绘制的线段区域）
+            update_rect = QRect(self.last_point, current_point).normalized()
+            padding = self.pen_width + 2
+            update_rect.adjust(-padding, -padding, padding, padding)
+            
+            # 仅更新需要重绘的区域
+            self.update(update_rect)
+        else:
+            # 水性笔等其他画笔类型使用原有方式保持动态效果
+            if self.current_brush:
+                self.current_brush.add_point(x, y, pressure)
+            
+            # 全屏更新以保持动态效果
+            self.update()
+
+        # 记录当前点
+        current_time = time.time()
+        self.current_line.append([x, y, pressure, current_time, self.current_stroke_id])
+        self.points.append([x, y, pressure, current_time])
+
+        # 更新上一个点的位置
+        self.last_point = current_point
 
     def stopDrawing(self):
         """停止绘制"""
@@ -284,6 +328,11 @@ class TransparentDrawingOverlay(QWidget):
             return
 
         self.logger.debug("停止绘制")
+
+        # 结束批量绘制
+        if hasattr(self, "_batch_painter") and self._batch_painter is not None:
+            self._batch_painter.end()
+            self._batch_painter = None
 
         # 结束当前笔画
         if self.current_brush:
@@ -357,35 +406,49 @@ class TransparentDrawingOverlay(QWidget):
         self.hide()
 
     def paintEvent(self, event):
-        """绘制事件"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        """绘制事件处理"""
+        if not self.image:
+            return
 
-        # 设置透明度
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        # 清除整个绘制区域（确保不会有残留）
+        if not self.fading:
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+            painter.fillRect(self.rect(), Qt.GlobalColor.transparent)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+
         if self.fading:
+            # 绘制淡出效果
             painter.setOpacity(self.fading_module.get_fade_alpha() / 255.0)
         else:
+            # 确保在正常绘制时完全不透明
             painter.setOpacity(1.0)
 
-        # 绘制已完成的线条
-        current_time = time.time()
-        for line in self.lines:
-            if line:
-                # 根据画笔类型绘制
-                brush_type = self.drawing_module.get_current_brush_type()
-                temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
-                
-                if brush_type == "water":
-                    temp_brush.draw(painter, line, current_time, True)  # 已结束的笔画
-                else:
-                    temp_brush.draw(painter, line)
+        # 绘制缓冲区内容（铅笔等直接绘制到缓冲区的画笔）
+        painter.drawPixmap(0, 0, self.image)
 
-        # 绘制当前正在绘制的线条
-        if self.drawing and self.current_brush and self.current_line:
-            if self.drawing_module.get_current_brush_type() == "water":
-                self.current_brush.draw(painter, self.current_line, current_time, False)
-            else:
-                self.current_brush.draw(painter, self.current_line)
+        # 为水性笔等需要动态效果的画笔单独绘制
+        brush_type = self.drawing_module.get_current_brush_type()
+        if brush_type != "pencil":
+            current_time = time.time()
+            
+            # 绘制已完成的线条
+            for line in self.lines:
+                if line:
+                    temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
+                    if brush_type == "water":
+                        temp_brush.draw(painter, line, current_time, True)  # 已结束的笔画
+                    else:
+                        temp_brush.draw(painter, line)
+
+            # 绘制当前正在绘制的线条
+            if self.drawing and self.current_brush and self.current_line:
+                if brush_type == "water":
+                    self.current_brush.draw(painter, self.current_line, current_time, False)
+                else:
+                    self.current_brush.draw(painter, self.current_line)
 
     def resizeEvent(self, event):
         """窗口大小改变时调整画布大小"""
@@ -447,5 +510,7 @@ class TransparentDrawingOverlay(QWidget):
         if self.image:
             self.image.fill(Qt.GlobalColor.transparent)
         self.hide()
+
+
 
 

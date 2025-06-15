@@ -74,6 +74,9 @@ class PencilBrush(BaseBrush):
         if len(draw_points) < 1:
             return
             
+        # 启用抗锯齿以获得平滑边缘
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        
         # 设置画笔
         pen = QPen(self.color)
         pen.setWidth(self.width)
@@ -151,6 +154,9 @@ class WaterBrush(BaseBrush):
         if current_time is None:
             current_time = time.time()
             
+        # 启用抗锯齿以获得平滑边缘
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        
         if len(draw_points) == 1:
             # 只有一个点，绘制圆点
             point = draw_points[0]
