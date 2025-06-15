@@ -27,6 +27,7 @@ class GestureDrawingWidget(QWidget):
     """手势绘制组件，用于在手势管理界面绘制手势路径"""
     
     pathCompleted = Signal(dict)  # 路径完成信号，发送格式化的路径
+    pathUpdated = Signal()  # 路径更新信号，用于通知路径已修改
     testSimilarity = Signal()  # 测试相似度信号
     
     def __init__(self, parent=None):
@@ -247,6 +248,8 @@ class GestureDrawingWidget(QWidget):
             self.update()
             self.update_toolbar_buttons()
             self.logger.info(f"撤回到历史记录 {self.history_index}，路径数量: {len(self.completed_paths)}")
+            # 发送路径更新信号
+            self.pathUpdated.emit()
             
     def redo_action(self):
         """还原操作"""
@@ -257,6 +260,8 @@ class GestureDrawingWidget(QWidget):
             self.update()
             self.update_toolbar_buttons()
             self.logger.info(f"还原到历史记录 {self.history_index}，路径数量: {len(self.completed_paths)}")
+            # 发送路径更新信号
+            self.pathUpdated.emit()
             
     def update_toolbar_buttons(self):
         """更新工具栏按钮状态"""
@@ -493,7 +498,9 @@ class GestureDrawingWidget(QWidget):
             # 保存到历史记录
             self.save_to_history()
             
-            # 不发送路径更新信号，避免路径被替换
+            # 发送路径更新信号，通知父组件路径已修改
+            self.pathUpdated.emit()
+            
             self.logger.info(f"完成拖拽点 {self.selected_point_index}")
             # 保持选中状态，不清除 self.selected_point_index
             
@@ -650,9 +657,7 @@ class GestureDrawingWidget(QWidget):
             # 如果没有路径，创建新路径，使用视图坐标
             new_path = {
                 'points': [(view_pos.x(), view_pos.y())],  # 使用视图坐标
-                'connections': [],  # 单点没有连接
-                'color': 'blue',  # 设置颜色属性
-                'width': 2  # 设置线宽属性
+                'connections': []  # 单点没有连接
             }
             self.completed_paths.append(new_path)
             updated_path = new_path
@@ -679,12 +684,6 @@ class GestureDrawingWidget(QWidget):
                 }
                 last_path['connections'].append(new_connection)
             
-            # 确保路径具有标准属性
-            if 'color' not in last_path:
-                last_path['color'] = 'blue'
-            if 'width' not in last_path:
-                last_path['width'] = 2
-            
             updated_path = last_path
             should_emit = False  # 修改现有路径不发送信号，避免替换整个路径
             
@@ -693,6 +692,9 @@ class GestureDrawingWidget(QWidget):
         # 只在创建新路径时发送信号
         if should_emit:
             self.pathCompleted.emit(updated_path)
+        else:
+            # 修改现有路径时发送路径更新信号
+            self.pathUpdated.emit()
         
         self.update()
         self.logger.info(f"添加新点: 视图坐标({view_pos.x()}, {view_pos.y()}), 发送信号: {should_emit}")
@@ -878,10 +880,11 @@ class GestureDrawingWidget(QWidget):
             # 保存到历史记录
             self.save_to_history()
             
-            # 更新显示
-            self.update()
+            # 发送路径更新信号
+            self.pathUpdated.emit()
             
-            self.logger.info(f"删除点 {point_index} from path {path_index}")
+            self.update()
+            self.logger.info(f"删除点完成，当前路径索引: {path_index}")
             
     def paintEvent(self, event):
         """绘制事件"""

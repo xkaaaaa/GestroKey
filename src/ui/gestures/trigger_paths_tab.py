@@ -83,6 +83,7 @@ class TriggerPathsTab(QWidget):
         self.drawing_widget = GestureDrawingWidget()
         self.drawing_widget.current_tool = "brush"
         self.drawing_widget.pathCompleted.connect(self._on_path_completed)
+        self.drawing_widget.pathUpdated.connect(self._on_path_updated)
         self.drawing_widget.testSimilarity.connect(self._on_test_similarity)
         layout.addWidget(self.drawing_widget)
         
@@ -235,6 +236,19 @@ class TriggerPathsTab(QWidget):
             self._auto_save_changes()
             
         self.logger.info(f"路径绘制完成，关键点数: {len(path.get('points', []))}")
+        
+    def _on_path_updated(self):
+        """处理路径更新事件（修改现有路径时触发）"""
+        if self.current_path_key and self.drawing_widget.completed_paths:
+            # 获取画板中的最新路径数据
+            if self.drawing_widget.completed_paths:
+                import copy
+                self.current_path = copy.deepcopy(self.drawing_widget.completed_paths[-1])
+                
+                # 触发自动保存
+                self._auto_save_changes()
+                
+                self.logger.info("路径已更新并自动保存")
         
     def _create_new_path_from_drawing(self):
         """从绘制创建新路径"""

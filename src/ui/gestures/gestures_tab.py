@@ -182,7 +182,7 @@ class GesturesPage(QWidget):
             except Exception as e:
                 self.logger.error(f"重置手势库时出错: {e}")
                 QMessageBox.critical(self, "错误", f"重置手势库失败: {str(e)}")
-
+                
 
 class SimilarityTestDialog(QDialog):
     """相似度测试对话框"""
