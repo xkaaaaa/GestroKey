@@ -76,6 +76,11 @@ class TransparentDrawingOverlay(QWidget):
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update)
         self.update_timer.setInterval(10)
+        
+        # 水性笔持续更新定时器
+        self.water_update_timer = QTimer(self)
+        self.water_update_timer.timeout.connect(self._update_water_brush)
+        self.water_update_timer.setInterval(16)  # 约60FPS
 
         # 消失模块
         self.fading_module = FadingModule(self)
@@ -256,6 +261,10 @@ class TransparentDrawingOverlay(QWidget):
         if self.force_topmost_enabled:
             self.force_topmost_timer.start(100)
 
+        # 如果是水性笔，启动持续更新定时器
+        if self.drawing_module.get_current_brush_type() == "water":
+            self.water_update_timer.start()
+
         # 立即更新显示以确保新绘制可见
         self.update()
 
@@ -351,6 +360,7 @@ class TransparentDrawingOverlay(QWidget):
         # 停止强制置顶和更新定时器
         self.force_topmost_timer.stop()
         self.update_timer.stop()
+        self.water_update_timer.stop()
 
         # 第一步：分析路径并发送给手势执行器
         if self.points:
@@ -507,9 +517,18 @@ class TransparentDrawingOverlay(QWidget):
         self.fading_module.stop_fade()
         self.force_topmost_timer.stop()
         self.update_timer.stop()
+        self.water_update_timer.stop()
         if self.image:
             self.image.fill(Qt.GlobalColor.transparent)
         self.hide()
+
+    def _update_water_brush(self):
+        """水性笔持续更新，让停留的点也能逐渐变粗"""
+        if not self.drawing or self.drawing_module.get_current_brush_type() != "water":
+            return
+            
+        # 只要在绘制水性笔，就持续更新以显示变粗效果
+        self.update()
 
 
 

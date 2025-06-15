@@ -172,7 +172,7 @@ class WaterBrush(BaseBrush):
             return
         
         if is_stroke_ended:
-            # 笔画结束后，绘制为统一的连续路径
+            # 笔画结束后，绘制为统一的连续路径（用于消失效果）
             path = QPainterPath()
             path.moveTo(draw_points[0][0], draw_points[0][1])
             
@@ -187,7 +187,7 @@ class WaterBrush(BaseBrush):
             painter.setPen(pen)
             painter.drawPath(path)
         else:
-            # 绘制过程中，保持动态效果
+            # 绘制过程中，使用动态效果，让点持续变粗
             for i in range(1, len(draw_points)):
                 current_point = draw_points[i]
                 prev_point = draw_points[i-1]
