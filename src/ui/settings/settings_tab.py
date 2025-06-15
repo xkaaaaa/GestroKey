@@ -76,6 +76,8 @@ class SettingsPage(QWidget):
         app_group = self._create_app_settings_group()
         content_layout.addWidget(app_group)
 
+
+
         content_layout.addStretch()
 
         scroll_area.setWidget(content_widget)
@@ -125,6 +127,29 @@ class SettingsPage(QWidget):
         color_layout.addStretch()
         
         form_layout.addRow("笔尖颜色:", color_layout)
+
+        # 画笔类型
+        brush_type_layout = QHBoxLayout()
+        
+        self.brush_type_group = QButtonGroup()
+        self.pencil_radio = QRadioButton("铅笔")
+        self.water_radio = QRadioButton("水性笔")
+        
+        self.brush_type_group.addButton(self.pencil_radio, 0)
+        self.brush_type_group.addButton(self.water_radio, 1)
+        
+        self.pencil_radio.toggled.connect(self._on_brush_type_changed)
+        self.water_radio.toggled.connect(self._on_brush_type_changed)
+        
+        brush_type_layout.addWidget(self.pencil_radio)
+        brush_type_layout.addWidget(self.water_radio)
+        brush_type_layout.addStretch()
+        
+        brush_type_widget = QWidget()
+        brush_type_widget.setLayout(brush_type_layout)
+        brush_type_widget.setToolTip("选择画笔类型：铅笔为传统绘制效果，水性笔的线条会由细变粗")
+        
+        form_layout.addRow("画笔类型:", brush_type_widget)
 
         # 强制置顶
         self.force_topmost_checkbox = QCheckBox("绘制时强制置顶")
@@ -239,8 +264,9 @@ class SettingsPage(QWidget):
         self.is_loading = True
         
         try:
-            pen_width = self.settings.get("pen_width", 3)
-            pen_color = self.settings.get("pen_color", [0, 120, 255])
+            pen_width = self.settings.get("brush.pen_width", 3)
+            pen_color = self.settings.get("brush.pen_color", [0, 120, 255])
+            brush_type = self.settings.get("brush.brush_type", "pencil")
             force_topmost = self.settings.get("brush.force_topmost", True)
             
             self.thickness_slider.setValue(pen_width)
@@ -248,6 +274,12 @@ class SettingsPage(QWidget):
             
             self.color_preview.set_color(pen_color)
             self.pen_preview.update_pen(pen_width, pen_color)
+            
+            # 设置画笔类型（从英文配置值映射到UI显示）
+            if brush_type == "water":
+                self.water_radio.setChecked(True)
+            else:  # 默认为 "pencil"
+                self.pencil_radio.setChecked(True)
             
             self.force_topmost_checkbox.setChecked(force_topmost)
             
@@ -267,6 +299,8 @@ class SettingsPage(QWidget):
             # 加载手势相似度阈值
             threshold = self.settings.get("gesture.similarity_threshold", 0.70)
             self.threshold_spinbox.setValue(threshold)
+            
+
             
             self.logger.debug("设置已加载到界面")
             
@@ -333,12 +367,18 @@ class SettingsPage(QWidget):
             self._mark_changed()
 
     def _on_threshold_changed(self, value):
-        """手势相似度阈值变化"""
-        if not self.is_loading:
-            self._mark_changed()
+        """相似度阈值改变时的处理"""
+        threshold = value / 100.0
+        self.threshold_label.setText(f"{threshold:.2f}")
+        self._on_setting_changed()
 
     def _on_force_topmost_changed(self, state):
         """强制置顶设置变化"""
+        if not self.is_loading:
+            self._mark_changed()
+
+    def _on_brush_type_changed(self):
+        """画笔类型改变"""
         if not self.is_loading:
             self._mark_changed()
 
@@ -353,8 +393,9 @@ class SettingsPage(QWidget):
             # 定义所有设置项的映射关系：(UI组件获取方法, 设置键, 默认值)
             setting_mappings = [
                 # 画笔设置（使用与_load_settings一致的键名）
-                (lambda: self.thickness_slider.value(), "pen_width", 3),
-                (lambda: self.color_preview.get_color(), "pen_color", [0, 120, 255]),
+                (lambda: self.thickness_slider.value(), "brush.pen_width", 3),
+                (lambda: self.color_preview.get_color(), "brush.pen_color", [0, 120, 255]),
+                (lambda: "water" if self.water_radio.isChecked() else "pencil", "brush.brush_type", "pencil"),
                 (lambda: self.force_topmost_checkbox.isChecked(), "brush.force_topmost", True),
                 
                 # 应用设置
@@ -388,6 +429,8 @@ class SettingsPage(QWidget):
                     return True
             except Exception as e:
                 self.logger.warning(f"检查开机自启动设置时出错: {e}")
+            
+
             
             return False
             
@@ -433,6 +476,13 @@ class SettingsPage(QWidget):
             # 应用画笔设置
             thickness = self.thickness_slider.value()
             color = self.color_preview.get_color()
+            brush_type = "water" if self.water_radio.isChecked() else "pencil"
+            
+            # 保存画笔设置到配置
+            self.settings.set("brush.pen_width", thickness)
+            self.settings.set("brush.pen_color", color)
+            self.settings.set("brush.brush_type", brush_type)
+            
             self._apply_pen_settings_to_drawing_module(thickness, color)
             
             # 应用开机自启设置
@@ -460,6 +510,8 @@ class SettingsPage(QWidget):
             force_topmost = self.force_topmost_checkbox.isChecked()
             self.settings.set("brush.force_topmost", force_topmost)
             
+
+            
             # 立即更新绘制模块的强制置顶设置
             try:
                 main_window = self._find_main_window()
@@ -481,6 +533,7 @@ class SettingsPage(QWidget):
         """应用当前设置"""
         try:
             if self._apply_all_settings():
+                # 更新按钮状态
                 self._update_button_states()
                 QMessageBox.information(self, "成功", "设置已应用")
             
@@ -495,6 +548,8 @@ class SettingsPage(QWidget):
                 # 保存到文件
                 success = self.settings.save()
                 if success:
+                    # 更新按钮状态
+                    self._update_button_states()
                     QMessageBox.information(self, "成功", "设置已保存")
                     self.logger.info("设置已保存到文件")
                 else:
@@ -522,6 +577,8 @@ class SettingsPage(QWidget):
                     color = self.color_preview.get_color()
                     self._apply_pen_settings_to_drawing_module(thickness, color)
                     
+                    # 更新按钮状态
+                    self._update_button_states()
                     QMessageBox.information(self, "成功", "设置已重置为默认值")
                     self.logger.info("设置已重置为默认值")
                 else:
@@ -541,6 +598,8 @@ class SettingsPage(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 self._load_settings()
+                # 更新按钮状态
+                self._update_button_states()
                 QMessageBox.information(self, "成功", "所有未保存的更改已放弃")
                 
             except Exception as e:
@@ -555,6 +614,8 @@ class SettingsPage(QWidget):
         
         self.logger.debug(f"设置页面检查未保存更改: 前端变化={has_frontend_changes}, 后端变化={has_backend_changes}, 总变化={total_changes}")
         return total_changes
+
+
 
 
 class ColorPreviewWidget(QWidget):

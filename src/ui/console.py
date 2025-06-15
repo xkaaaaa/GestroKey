@@ -26,14 +26,14 @@ from qtpy.QtWidgets import (
 )
 
 try:
-    from core.drawer import DrawingManager
+    from core.brush.manager import DrawingManager
     from core.logger import get_logger
     from core.system_monitor import SystemMonitor, format_bytes
     # 原生PyQt6组件替换自定义组件
     from version import APP_NAME  # 导入应用名称
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
-    from core.drawer import DrawingManager
+    from core.brush.manager import DrawingManager
     from core.logger import get_logger
     from core.system_monitor import SystemMonitor, format_bytes
     # 原生PyQt6组件替换自定义组件
