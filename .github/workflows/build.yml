@@ -747,6 +747,9 @@ jobs:
           tests=""
           chores=""
           breaking_changes=""
+          builds=""
+          ci_changes=""
+          reverts=""
           others=""
           
           # 定义关联数组来存储已添加的描述，用于去重
@@ -759,6 +762,9 @@ jobs:
           declare -A added_performances
           declare -A added_tests
           declare -A added_chores
+          declare -A added_builds
+          declare -A added_ci
+          declare -A added_reverts
           declare -A added_others
           
           # 解析 Conventional Commits 格式的提交信息
