@@ -2,8 +2,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
   <defs>
     <linearGradient id="pointer_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3498db" />
-      <stop offset="100%" stop-color="#1a5f9e" />
+      <stop offset="0%" stop-color="#FF2288" />
+      <stop offset="100%" stop-color="#007BFF" />
     </linearGradient>
   </defs>
   <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" fill="url(#pointer_gradient)"/>

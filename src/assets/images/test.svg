@@ -2,24 +2,23 @@
 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="testGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3498db"/>
-      <stop offset="100%" style="stop-color:#1a5f9e"/>
+      <stop offset="0%" style="stop-color:#FF2288"/>
+      <stop offset="100%" style="stop-color:#007BFF"/>
     </linearGradient>
   </defs>
   
-  <!-- 测试图标：两个对比的路径 -->
-  <!-- 左侧路径 -->
-  <path d="M3 6L8 12L13 6" stroke="url(#testGradient)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 测试管图标 -->
+  <rect x="6" y="3" width="12" height="18" rx="2" ry="2" fill="none" stroke="url(#testGradient)" stroke-width="2"/>
   
-  <!-- 右侧路径 -->
-  <path d="M11 18L16 12L21 18" stroke="url(#testGradient)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 刻度线 -->
+  <line x1="9" y1="6" x2="15" y2="6" stroke="url(#testGradient)" stroke-width="1"/>
+  <line x1="9" y1="9" x2="15" y2="9" stroke="url(#testGradient)" stroke-width="1"/>
+  <line x1="9" y1="12" x2="15" y2="12" stroke="url(#testGradient)" stroke-width="1"/>
   
-  <!-- 对比箭头 -->
-  <path d="M13 9L11 15" stroke="url(#testGradient)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-  <path d="M10 13L11 15L13 14" stroke="url(#testGradient)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 液体填充 -->
+  <rect x="7" y="15" width="10" height="5" rx="1" ry="1" fill="url(#testGradient)" opacity="0.3"/>
   
-  <!-- 百分比符号 -->
-  <circle cx="17" cy="7" r="1.5" fill="url(#testGradient)"/>
-  <circle cx="7" cy="17" r="1.5" fill="url(#testGradient)"/>
-  <path d="M6 18L18 6" stroke="url(#testGradient)" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- 检查标记 -->
+  <circle cx="18" cy="6" r="3" fill="url(#testGradient)"/>
+  <path d="M16.5 6L17.5 7L19.5 5" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </svg> 
