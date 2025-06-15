@@ -1,7 +1,7 @@
 import math
 import sys
 import os
-from typing import List, Tuple, Dict  # 确保所有需要的类型都被导入
+from typing import List, Tuple, Dict
 
 import numpy as np
 from numpy.linalg import svd, norm
@@ -201,44 +201,43 @@ class PathAnalyzer:
 
     def _compute_scores(self, pts1: np.ndarray, pts2: np.ndarray) -> Tuple[float, float]:
         """计算两条点集的形状得分和方向得分。"""
-        # 形状得分 (Shape Score)
-        aligned_pts1 = self._procrustes_align(pts1, pts2)
-        shape_dist = np.mean(norm(aligned_pts1 - pts2, axis=1))
-        # 放宽标准：增大边界值，使得对微小形状偏差更宽容，尤其对复杂路径有益
-        shape_scale_boundary = 175.0
-        shape_score = max(0.0, 1.0 - shape_dist / shape_scale_boundary)
-
-        # 方向得分 (Direction Score)
-        vec1 = np.diff(aligned_pts1, axis=0)
-        vec2 = np.diff(pts2, axis=0)
-        
-        norm_vec1 = vec1 / (norm(vec1, axis=1, keepdims=True) + 1e-9)
-        norm_vec2 = vec2 / (norm(vec2, axis=1, keepdims=True) + 1e-9)
-        
-        cosines = np.sum(norm_vec1 * norm_vec2, axis=1)
-        direction_score = np.mean(np.clip((cosines + 1) / 2, 0, 1))
-
-        return shape_score, direction_score
+        try:
+            aligned_pts2 = self._procrustes_align(pts1, pts2)
+            
+            shape_score = np.exp(-norm(pts1 - aligned_pts2) / 50)
+            
+            velocity1 = np.diff(pts1, axis=0)
+            velocity2 = np.diff(aligned_pts2, axis=0)
+            
+            directions_sim = np.maximum(0, np.sum(velocity1 * velocity2, axis=1) / 
+                                       (np.linalg.norm(velocity1, axis=1) * np.linalg.norm(velocity2, axis=1) + 1e-8))
+            direction_score = np.mean(directions_sim)
+            
+            return float(shape_score), float(direction_score)
+        except Exception:
+            return 0.0, 0.0
 
     def _procrustes_align(self, A: np.ndarray, B: np.ndarray) -> np.ndarray:
         """通过旋转和平移将点集A对齐到点集B (Orthogonal Procrustes problem)。"""
-        A_centered = A - A.mean(axis=0)
-        B_centered = B - B.mean(axis=0)
+        A_centered = A - np.mean(A, axis=0)
+        B_centered = B - np.mean(B, axis=0)
 
-        # 计算协方差矩阵
-        C = A_centered.T @ B_centered
-        # SVD分解
-        U, _, Vt = svd(C)
-        # 计算最佳旋转矩阵R
-        R = Vt.T @ U.T
-
-        # 保证R是旋转矩阵而非反射矩阵 (det(R) = 1)
-        if np.linalg.det(R) < 0:
-            Vt[-1, :] *= -1
-            R = Vt.T @ U.T
-
-        # 应用旋转并移回B的中心
-        return A_centered @ R + B.mean(axis=0)
+        A_norm = np.linalg.norm(A_centered, 'fro')
+        B_norm = np.linalg.norm(B_centered, 'fro')
+        
+        if A_norm < 1e-10 or B_norm < 1e-10:
+            return B
+        
+        A_normalized = A_centered / A_norm
+        B_normalized = B_centered / B_norm
+        
+        U, _, Vt = svd(A_normalized.T @ B_normalized)
+        R = U @ Vt
+        
+        B_aligned = B_normalized @ R
+        B_scaled = B_aligned * A_norm + np.mean(A, axis=0)
+        
+        return B_scaled
 
     # ====================== 通用工具函数 ====================== #
 
@@ -249,20 +248,26 @@ class PathAnalyzer:
             return path
         
         bbox = self._get_path_bbox(points)
-        max_dim = max(bbox['width'], bbox['height'])
-        if max_dim == 0:
+        bbox_size = max(bbox['width'], bbox['height'])
+        
+        if bbox_size <= 0:
             return path
         
-        scale = target_size / max_dim
+        scale = target_size / bbox_size
+        center_x, center_y = bbox['center_x'], bbox['center_y']
         
         normalized_points = [
-            [
-                (p[0] - bbox['min_x']) * scale,
-                (p[1] - bbox['min_y']) * scale
-            ] for p in points
+            (
+                int((x - center_x) * scale + target_size // 2),
+                int((y - center_y) * scale + target_size // 2)
+            )
+            for x, y in points
         ]
         
-        return {'points': normalized_points, 'connections': path.get('connections', [])}
+        return {
+            'points': normalized_points,
+            'connections': path.get('connections', [])
+        }
 
     def _get_path_bbox(self, points: List[Tuple]) -> Dict:
         """计算路径的边界框。"""
@@ -274,7 +279,9 @@ class PathAnalyzer:
             'min_x': min_x, 'max_x': max_x,
             'min_y': min_y, 'max_y': max_y,
             'width': max_x - min_x,
-            'height': max_y - min_y
+            'height': max_y - min_y,
+            'center_x': (min_x + max_x) / 2,
+            'center_y': (min_y + max_y) / 2
         }
     
     def _calculate_path_length(self, points: List[Tuple[int, int]]) -> float:
@@ -283,13 +290,14 @@ class PathAnalyzer:
 
     def _calculate_angle_change(self, p1: Tuple, p2: Tuple, p3: Tuple) -> float:
         """计算三点构成的夹角变化。"""
-        v1 = (p2[0] - p1[0], p2[1] - p1[1])
+        v1 = (p1[0] - p2[0], p1[1] - p2[1])
         v2 = (p3[0] - p2[0], p3[1] - p2[1])
         
         dot_product = v1[0] * v2[0] + v1[1] * v2[1]
         cross_product = v1[0] * v2[1] - v1[1] * v2[0]
         
-        return math.degrees(math.atan2(cross_product, dot_product))
+        angle = math.degrees(math.atan2(cross_product, dot_product))
+        return angle
     
     def _distance_to_line(self, p1: Tuple, p2: Tuple, point: Tuple) -> float:
         """计算一个点到由另外两点确定的线段的距离。"""
@@ -297,12 +305,9 @@ class PathAnalyzer:
         x2, y2 = p2
         x0, y0 = point
         
-        line_len_sq = (x2 - x1)**2 + (y2 - y1)**2
-        if line_len_sq == 0:
-            return math.dist(p1, point)
+        line_length = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+        if line_length == 0:
+            return math.sqrt((x0 - x1) ** 2 + (y0 - y1) ** 2)
         
-        t = max(0, min(1, ((x0 - x1) * (x2 - x1) + (y0 - y1) * (y2 - y1)) / line_len_sq))
-        projection_x = x1 + t * (x2 - x1)
-        projection_y = y1 + t * (y2 - y1)
-        
-        return math.dist(point, (projection_x, projection_y))
+        distance = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / line_length
+        return distance

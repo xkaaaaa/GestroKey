@@ -17,41 +17,27 @@ except ImportError:
 
 
 class GestureExecutor:
-    """
-    手势执行器，根据识别的手势方向执行对应的动作
-
-    目前支持的动作类型：
-    - shortcut: 执行快捷键，如 "ctrl+c"、"alt+tab" 等
-    """
-
     _instance = None
 
     @classmethod
     def get_instance(cls):
-        """获取手势执行器的全局单例实例"""
         if cls._instance is None:
             cls._instance = GestureExecutor()
         return cls._instance
 
     def __init__(self):
-        """初始化手势执行器"""
         if GestureExecutor._instance is not None:
             raise Exception("GestureExecutor已经初始化，请使用get_instance()获取实例")
 
-        # 初始化日志记录器
         self.logger = get_logger("GestureExecutor")
 
-        # 初始化键盘控制器
         try:
             self.keyboard = Controller()
-            self.logger.info("键盘控制器初始化成功")
         except ImportError as e:
             self.keyboard = None
             self.logger.error(f"键盘控制器初始化失败: {e}")
 
-        # 初始化特殊键映射字典
         self.special_keys = {
-            # 修饰键 - 根据不同操作系统调整
             "ctrl": Key.ctrl,
             "control": Key.ctrl,
             "alt": Key.alt,
@@ -60,13 +46,11 @@ class GestureExecutor:
             "cmd": Key.cmd,
             "command": Key.cmd,
             "meta": Key.cmd,
-            "super": Key.cmd,  # Linux中的Super键
-            # macOS符号
-            "⌃": Key.ctrl,  # Control符号
-            "⌥": Key.alt,  # Option符号
-            "⇧": Key.shift,  # Shift符号
-            "⌘": Key.cmd,  # Command符号
-            # 功能键
+            "super": Key.cmd,
+            "⌃": Key.ctrl,
+            "⌥": Key.alt,
+            "⇧": Key.shift,
+            "⌘": Key.cmd,
             "tab": Key.tab,
             "esc": Key.esc,
             "escape": Key.esc,
@@ -76,7 +60,6 @@ class GestureExecutor:
             "delete": Key.delete,
             "del": Key.delete,
             "space": Key.space,
-            # 方向键
             "up": Key.up,
             "down": Key.down,
             "left": Key.left,
@@ -85,7 +68,6 @@ class GestureExecutor:
             "↓": Key.down,
             "←": Key.left,
             "→": Key.right,
-            # 分页键
             "page_up": Key.page_up,
             "pageup": Key.page_up,
             "pgup": Key.page_up,
@@ -94,12 +76,10 @@ class GestureExecutor:
             "pagedown": Key.page_down,
             "pgdn": Key.page_down,
             "pg_dn": Key.page_down,
-            # 位置键
             "home": Key.home,
             "end": Key.end,
             "insert": Key.insert,
             "ins": Key.insert,
-            # 锁定键
             "caps_lock": Key.caps_lock,
             "capslock": Key.caps_lock,
             "caps": Key.caps_lock,
@@ -111,8 +91,7 @@ class GestureExecutor:
             "scrolllock": Key.scroll_lock,
             "scrlk": Key.scroll_lock,
             "scr_lk": Key.scroll_lock,
-            # 特殊功能键
-            "print": Key.print_screen,  # PrintScreen键
+            "print": Key.print_screen,
             "print_screen": Key.print_screen,
             "printscreen": Key.print_screen,
             "prt_sc": Key.print_screen,
@@ -121,8 +100,7 @@ class GestureExecutor:
             "psc": Key.print_screen,
             "pause": Key.pause,
             "break": Key.pause,
-            "menu": Key.menu,  # 菜单键
-            # F1-F12 功能键
+            "menu": Key.menu,
             "f1": Key.f1,
             "f2": Key.f2,
             "f3": Key.f3,
@@ -136,25 +114,15 @@ class GestureExecutor:
             "f11": Key.f11,
             "f12": Key.f12,
         }
-        self.logger.debug("特殊键映射字典初始化完成")
 
-        # 加载手势库
         try:
             self.gesture_library = get_gesture_library()
-            self.logger.info("手势库加载成功")
-
-            # 获取所有手势 - 使用已保存的手势库
             gesture_count = self.gesture_library.get_gesture_count(use_saved=True)
-            self.logger.info(f"成功加载已保存的手势库，包含 {gesture_count} 个手势")
-
         except ImportError as e:
             self.gesture_library = None
             self.logger.error(f"手势库加载失败: {e}")
 
-        # 设置为单例实例
         GestureExecutor._instance = self
-
-        self.logger.info("手势执行器初始化完成")
 
     def execute_gesture_by_path(self, drawn_path):
         """根据绘制路径执行对应的手势动作

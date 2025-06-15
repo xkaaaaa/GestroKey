@@ -1,28 +1,28 @@
 import argparse
+import ctypes
 import os
 import sys
-
+from ctypes import wintypes
+from datetime import datetime
 
 from version import QT_API
 os.environ['QT_API'] = QT_API
 
-from qtpy.QtCore import Qt, QTimer
-from qtpy.QtGui import QIcon
+from qtpy.QtCore import Qt, QTimer, QSize
+from qtpy.QtGui import QIcon, QAction
 from qtpy.QtWidgets import (
-    QApplication,
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QPushButton,
-    QSizePolicy,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
+    QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton,
+    QSizePolicy, QStackedWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu,
+    QDialog, QCheckBox, QRadioButton, QButtonGroup
 )
 
 from core.logger import get_logger
 from ui.console import ConsolePage
+from ui.gestures.gestures import get_gesture_library
+from ui.gestures.gestures_tab import GesturesPage
+from ui.settings.settings import get_settings
+from ui.settings.settings_tab import SettingsPage
+from version import APP_NAME, get_version_string
 
 
 def show_dialog(parent, message_type="warning", title_text=None, message="", 
@@ -82,11 +82,6 @@ def show_error(parent, message):
 
 def get_system_tray(parent):
     """创建系统托盘图标"""
-    from qtpy.QtWidgets import QSystemTrayIcon, QMenu
-    from qtpy.QtGui import QIcon, QAction
-    from qtpy.QtCore import QTimer
-    import os
-    
     if not QSystemTrayIcon.isSystemTrayAvailable():
         return None
     
@@ -152,13 +147,6 @@ def get_toast_manager():
         def update_positions_on_resize(self):
             pass
     return DummyToastManager()
-
-
-from ui.gestures.gestures import get_gesture_library
-from ui.gestures.gestures_tab import GesturesPage
-from ui.settings.settings import get_settings
-from ui.settings.settings_tab import SettingsPage
-from version import APP_NAME, get_version_string
 
 
 class GestroKeyApp(QMainWindow):
@@ -261,9 +249,6 @@ class GestroKeyApp(QMainWindow):
             self.activateWindow()
 
             try:
-                import ctypes
-                from ctypes import wintypes
-
                 hwnd = int(self.winId())
                 user32 = ctypes.WinDLL("user32", use_last_error=True)
 
@@ -510,9 +495,6 @@ class GestroKeyApp(QMainWindow):
 
     def _show_exit_dialog(self):
         """显示退出确认对话框"""
-        from qtpy.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QRadioButton, QPushButton, QButtonGroup
-        from ui.settings.settings import get_settings
-        
         class ExitDialog(QDialog):
             def __init__(self, parent=None):
                 super().__init__(parent)
@@ -520,21 +502,17 @@ class GestroKeyApp(QMainWindow):
                 self.setFixedSize(350, 130)
                 self.setModal(True)
                 
-                # 获取当前设置
                 self.settings = get_settings()
                 
                 layout = QVBoxLayout(self)
                 
-                # 主要问题
                 question_label = QLabel("是否退出程序？")
                 question_label.setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px 0;")
                 layout.addWidget(question_label)
                 
-                # 不再显示复选框
                 self.dont_show_checkbox = QCheckBox("不再显示此对话框")
                 layout.addWidget(self.dont_show_checkbox)
                 
-                # 按钮区域
                 button_layout = QHBoxLayout()
                 
                 self.minimize_btn = QPushButton("最小化到托盘")
@@ -589,7 +567,6 @@ class GestroKeyApp(QMainWindow):
         # 停止绘制和释放按键
         self._prepare_for_close()
         
-        from ui.settings.settings import get_settings
         settings = get_settings()
         
         if is_window_close:

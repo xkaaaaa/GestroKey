@@ -337,9 +337,11 @@ class GestureLibrary:
         return False
 
 
-gesture_library = GestureLibrary()
-
+_gesture_library_instance = None
 
 def get_gesture_library():
     """获取手势库管理器实例"""
-    return gesture_library
+    global _gesture_library_instance
+    if _gesture_library_instance is None:
+        _gesture_library_instance = GestureLibrary()
+    return _gesture_library_instance
