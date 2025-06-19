@@ -134,20 +134,24 @@ class SettingsPage(QWidget):
         self.brush_type_group = QButtonGroup()
         self.pencil_radio = QRadioButton("铅笔")
         self.water_radio = QRadioButton("水性笔")
+        self.calligraphy_radio = QRadioButton("毛笔")
         
         self.brush_type_group.addButton(self.pencil_radio, 0)
         self.brush_type_group.addButton(self.water_radio, 1)
+        self.brush_type_group.addButton(self.calligraphy_radio, 2)
         
         self.pencil_radio.toggled.connect(self._on_brush_type_changed)
         self.water_radio.toggled.connect(self._on_brush_type_changed)
+        self.calligraphy_radio.toggled.connect(self._on_brush_type_changed)
         
         brush_type_layout.addWidget(self.pencil_radio)
         brush_type_layout.addWidget(self.water_radio)
+        brush_type_layout.addWidget(self.calligraphy_radio)
         brush_type_layout.addStretch()
         
         brush_type_widget = QWidget()
         brush_type_widget.setLayout(brush_type_layout)
-        brush_type_widget.setToolTip("选择画笔类型：铅笔为传统绘制效果，水性笔的线条会由细变粗")
+        brush_type_widget.setToolTip("选择画笔类型：铅笔为传统绘制效果，水性笔的线条会由细变粗，毛笔模拟书法效果")
         
         form_layout.addRow("画笔类型:", brush_type_widget)
 
@@ -278,6 +282,8 @@ class SettingsPage(QWidget):
             # 设置画笔类型（从英文配置值映射到UI显示）
             if brush_type == "water":
                 self.water_radio.setChecked(True)
+            elif brush_type == "calligraphy":
+                self.calligraphy_radio.setChecked(True)
             else:  # 默认为 "pencil"
                 self.pencil_radio.setChecked(True)
             
@@ -395,7 +401,7 @@ class SettingsPage(QWidget):
                 # 画笔设置（使用与_load_settings一致的键名）
                 (lambda: self.thickness_slider.value(), "brush.pen_width", 3),
                 (lambda: self.color_preview.get_color(), "brush.pen_color", [0, 120, 255]),
-                (lambda: "water" if self.water_radio.isChecked() else "pencil", "brush.brush_type", "pencil"),
+                (lambda: "water" if self.water_radio.isChecked() else ("calligraphy" if self.calligraphy_radio.isChecked() else "pencil"), "brush.brush_type", "pencil"),
                 (lambda: self.force_topmost_checkbox.isChecked(), "brush.force_topmost", True),
                 
                 # 应用设置
@@ -476,7 +482,7 @@ class SettingsPage(QWidget):
             # 应用画笔设置
             thickness = self.thickness_slider.value()
             color = self.color_preview.get_color()
-            brush_type = "water" if self.water_radio.isChecked() else "pencil"
+            brush_type = "water" if self.water_radio.isChecked() else ("calligraphy" if self.calligraphy_radio.isChecked() else "pencil")
             
             # 保存画笔设置到配置
             self.settings.set("brush.pen_width", thickness)

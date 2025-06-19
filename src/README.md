@@ -1054,6 +1054,7 @@ view_scale = drawing_widget.view_scale               # 当前缩放比例
 - 支持的设置项：
   - `pen_width`：笔尖粗细，范围1-20像素
   - `pen_color`：笔尖颜色，RGB格式数组
+  - `brush_type`：画笔类型，支持 "pencil"(铅笔)、"water"(水性笔)、"calligraphy"(毛笔)
   - `brush.force_topmost`：绘制时强制置顶，布尔值，默认true
   - `gesture.similarity_threshold`：手势相似度阈值，范围0.0-1.0，默认0.70
 
@@ -1210,7 +1211,7 @@ manager.stop()
   - `initUI(self)`：初始化UI，创建全屏透明窗口
   - `set_pen_width(self, width)`：设置笔尖粗细
   - `set_pen_color(self, color)`：设置笔尖颜色 [r, g, b] 格式
-  - `set_brush_type(self, brush_type)`：设置画笔类型 ("pencil" 或 "water")
+  - `set_brush_type(self, brush_type)`：设置画笔类型 ("pencil"、"water"或"calligraphy")
   - `set_force_topmost(self, enabled)`：设置是否启用强制置顶功能
   - `startDrawing(self, x, y, pressure=0.5)`：开始绘制，创建画笔实例并显示窗口
   - `continueDrawing(self, x, y, pressure=0.5)`：继续绘制，添加轨迹点
@@ -1240,10 +1241,22 @@ manager.stop()
 - `min_size_ratio = 0.1`：最小尺寸比例
 - 支持笔画结束后所有点保持最大尺寸
 
+**CalligraphyBrush (毛笔画笔)**：
+- 模拟毛笔书法效果，具有传统水墨韵味
+- 动态笔画宽度，根据速度和距离调整粗细
+- 墨色渐变效果，每个笔画段支持深浅变化
+- 毛丝效果，添加细小的毛笔纤维模拟
+- 随机墨滴和墨晕效果，增强真实感
+- 基于随机算法生成自然的毛笔质感
+
 **DrawingModule (绘制模块管理器)**：
 - `set_brush_type(self, brush_type)`：设置当前画笔类型
 - `create_brush(self, width, color)`：创建当前类型的画笔实例
 - `get_current_brush_type(self)`：获取当前画笔类型
+- 支持的画笔类型：
+  - `"pencil"`：铅笔，传统绘制效果
+  - `"water"`：水性笔，动态变粗效果
+  - `"calligraphy"`：毛笔，书法墨色效果
 
 ##### 3.1.4 core/brush/fading.py
 

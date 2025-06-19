@@ -294,23 +294,53 @@ class TransparentDrawingOverlay(QWidget):
         # 根据画笔类型选择绘制方式
         brush_type = self.drawing_module.get_current_brush_type()
         
-        if brush_type == "pencil":
-            # 铅笔使用批量绘制优化
+        if brush_type == "pencil" or brush_type == "calligraphy":
+            # 铅笔和毛笔使用批量绘制优化，直接绘制到image上
             if not hasattr(self, "_batch_painter") or self._batch_painter is None:
                 self._batch_painter = QPainter(self.image)
                 self._batch_painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-                # 设置画笔
+            if brush_type == "pencil":
+                # 设置铅笔画笔
                 self.painter_pen.setColor(self.pen_color)
                 self.painter_pen.setWidth(self.pen_width)
                 self._batch_painter.setPen(self.painter_pen)
-
-            # 绘制线段
-            self._batch_painter.drawLine(self.last_point, current_point)
+                # 绘制线段
+                self._batch_painter.drawLine(self.last_point, current_point)
+            else:  # calligraphy
+                # 使用毛笔绘制方法
+                if self.current_brush:
+                    self.current_brush.add_point(x, y, pressure)
+                    # 只绘制最新的线段
+                    if len(self.current_brush.points) >= 2:
+                        from_point = self.current_brush.points[-2]
+                        to_point = self.current_brush.points[-1]
+                        from_p = QPoint(int(from_point[0]), int(from_point[1]))
+                        to_p = QPoint(int(to_point[0]), int(to_point[1]))
+                        
+                        # 计算绘制参数
+                        duration = 0.01
+                        if len(from_point) >= 4 and len(to_point) >= 4:
+                            duration = to_point[3] - from_point[3]
+                        
+                        distance = math.hypot(to_p.x() - from_p.x(), to_p.y() - from_p.y())
+                        
+                        # 动态笔画宽度
+                        base = self.pen_width * 1.2
+                        delta = self.pen_width * 0.2
+                        width = base + delta * (1 - 2/(1+math.exp(-0.3*(distance-5))))
+                        
+                        # 平滑处理
+                        if hasattr(self.current_brush, 'last_width'):
+                            width = (width + self.current_brush.last_width) / 2
+                        self.current_brush.last_width = width
+                        
+                        # 绘制这一段
+                        self.current_brush._draw_brush_segment(self._batch_painter, from_p, to_p, width, duration)
             
             # 计算需要更新的区域（只更新绘制的线段区域）
             update_rect = QRect(self.last_point, current_point).normalized()
-            padding = self.pen_width + 2
+            padding = self.pen_width + 5  # 毛笔需要更大的padding
             update_rect.adjust(-padding, -padding, padding, padding)
             
             # 仅更新需要重绘的区域
@@ -343,21 +373,17 @@ class TransparentDrawingOverlay(QWidget):
         painter.setOpacity(1.0)
         painter.drawPixmap(0, 0, self.image)
         brush_type = self.drawing_module.get_current_brush_type()
-        if brush_type != "pencil":
+        if brush_type == "water":
+            # 只有水性笔需要重新绘制到fade_pixmap，因为它的效果是动态的
+            # 毛笔和铅笔已经绘制到image上了，不需要重复绘制
             current_time = time.time()
             for line in self.lines:
                 if line:
                     temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
-                    if brush_type == "water":
-                        temp_brush.draw(painter, line, current_time, False)
-                    else:
-                        temp_brush.draw(painter, line)
+                    temp_brush.draw(painter, line, current_time, False)
             if self.current_line:
                 temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
-                if brush_type == "water":
-                    temp_brush.draw(painter, self.current_line, current_time, False)
-                else:
-                    temp_brush.draw(painter, self.current_line)
+                temp_brush.draw(painter, self.current_line, current_time, False)
         painter.end()
         self.logger.debug("停止绘制")
 
@@ -458,24 +484,19 @@ class TransparentDrawingOverlay(QWidget):
             # 正常绘制
             painter.setOpacity(1.0)
             painter.drawPixmap(0, 0, self.image)
-            # 动态绘制水性笔等类型
+            # 动态绘制水性笔类型（毛笔和铅笔已经绘制到image上了）
             brush_type = self.drawing_module.get_current_brush_type()
-            if brush_type != "pencil":
+            if brush_type == "water":
+                # 只有水性笔需要重新绘制到fade_pixmap，因为它的效果是动态的
+                # 毛笔和铅笔已经绘制到image上了，不需要重复绘制
                 current_time = time.time()
-                # 绘制已完成的线条
                 for line in self.lines:
                     if line:
                         temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
-                        if brush_type == "water":
-                            temp_brush.draw(painter, line, current_time, True)
-                        else:
-                            temp_brush.draw(painter, line)
-                # 绘制当前正在绘制的线条
-                if self.drawing and self.current_brush and self.current_line:
-                    if brush_type == "water":
-                        self.current_brush.draw(painter, self.current_line, current_time, False)
-                    else:
-                        self.current_brush.draw(painter, self.current_line)
+                        temp_brush.draw(painter, line, current_time, False)
+                if self.current_line:
+                    temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
+                    temp_brush.draw(painter, self.current_line, current_time, False)
 
     def resizeEvent(self, event):
         """窗口大小改变时调整画布大小"""
