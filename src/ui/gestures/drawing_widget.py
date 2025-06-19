@@ -305,14 +305,14 @@ class GestureDrawingWidget(QWidget):
             self.space_pressed = True
             self.setCursor(Qt.CursorShape.OpenHandCursor)
         elif event.key() == Qt.Key.Key_Shift:
-            # 区分左右Shift键
-            if event.nativeVirtualKey() == 160:  # 左Shift的虚拟键码
+            if event.isAutoRepeat():
+                return
+            sc = event.nativeScanCode()
+            vk = event.nativeVirtualKey()
+            if sc == 42 or vk == 160:
                 self.left_shift_pressed = True
-            elif event.nativeVirtualKey() == 161:  # 右Shift的虚拟键码
+            elif sc == 54 or vk == 161:
                 self.right_shift_pressed = True
-            else:
-                # 如果无法区分，默认为左Shift
-                self.left_shift_pressed = True
         elif event.key() == Qt.Key.Key_Z and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             # Ctrl+Z 撤回
             self.undo_action()
@@ -331,14 +331,13 @@ class GestureDrawingWidget(QWidget):
             if not self.panning:
                 self.setCursor(Qt.CursorShape.ArrowCursor)
         elif event.key() == Qt.Key.Key_Shift:
-            # 重置Shift键状态
-            if event.nativeVirtualKey() == 160:  # 左Shift
+            if event.isAutoRepeat():
+                return
+            sc = event.nativeScanCode()
+            vk = event.nativeVirtualKey()
+            if sc == 42 or vk == 160:
                 self.left_shift_pressed = False
-            elif event.nativeVirtualKey() == 161:  # 右Shift
-                self.right_shift_pressed = False
-            else:
-                # 如果无法区分，重置所有Shift状态
-                self.left_shift_pressed = False
+            elif sc == 54 or vk == 161:
                 self.right_shift_pressed = False
         super().keyReleaseEvent(event)
         
@@ -716,10 +715,11 @@ class GestureDrawingWidget(QWidget):
             adjusted_pos = self._adjust_for_drawing_area(screen_pos)
             view_pos = self._screen_to_view(adjusted_pos)
             
-            # 如果按住Shift键，启用角度约束功能
-            if self.left_shift_pressed or self.right_shift_pressed:
-                use_left_shift = self.left_shift_pressed
-                view_pos = self._apply_angle_snap(path_index, point_index, view_pos, use_left_shift)
+            # 如果只按左Shift，吸附前一个点；只按右Shift，吸附后一个点；否则不吸附
+            if self.left_shift_pressed and not self.right_shift_pressed:
+                view_pos = self._apply_angle_snap(path_index, point_index, view_pos, True)
+            elif self.right_shift_pressed and not self.left_shift_pressed:
+                view_pos = self._apply_angle_snap(path_index, point_index, view_pos, False)
             
             # 更新点位置，使用视图坐标
             self.completed_paths[path_index]['points'][point_index] = (view_pos.x(), view_pos.y())
