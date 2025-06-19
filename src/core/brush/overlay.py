@@ -336,6 +336,29 @@ class TransparentDrawingOverlay(QWidget):
         if not self.drawing:
             return
 
+        self._fade_pixmap = QPixmap(self.size())
+        self._fade_pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(self._fade_pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setOpacity(1.0)
+        painter.drawPixmap(0, 0, self.image)
+        brush_type = self.drawing_module.get_current_brush_type()
+        if brush_type != "pencil":
+            current_time = time.time()
+            for line in self.lines:
+                if line:
+                    temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
+                    if brush_type == "water":
+                        temp_brush.draw(painter, line, current_time, False)
+                    else:
+                        temp_brush.draw(painter, line)
+            if self.current_line:
+                temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
+                if brush_type == "water":
+                    temp_brush.draw(painter, self.current_line, current_time, False)
+                else:
+                    temp_brush.draw(painter, self.current_line)
+        painter.end()
         self.logger.debug("停止绘制")
 
         # 结束批量绘制
@@ -368,8 +391,6 @@ class TransparentDrawingOverlay(QWidget):
                 formatted_path = self.path_analyzer.format_raw_path(self.points)
                 if formatted_path and formatted_path.get('points'):
                     self.logger.info(f"绘制完成，路径包含 {len(formatted_path.get('points', []))} 个关键点")
-                    
-                    # 发送给手势执行器进行识别
                     try:
                         from core.gesture_executor import get_gesture_executor
                         executor = get_gesture_executor()
@@ -388,8 +409,7 @@ class TransparentDrawingOverlay(QWidget):
             except Exception as e:
                 self.logger.error(f"路径分析失败: {e}")
 
-        # 第二步：开始淡出效果
-        self.logger.debug("开始淡出效果")
+        self.logger.debug("开始整体淡出效果")
         self.fading_module.start_fade()
         self.fading = True
 
@@ -430,35 +450,32 @@ class TransparentDrawingOverlay(QWidget):
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
 
         if self.fading:
-            # 绘制淡出效果
-            painter.setOpacity(self.fading_module.get_fade_alpha() / 255.0)
+            # 整体淡出像素
+            if hasattr(self, '_fade_pixmap') and self._fade_pixmap:
+                painter.setOpacity(self.fading_module.get_fade_alpha() / 255.0)
+                painter.drawPixmap(0, 0, self._fade_pixmap)
         else:
-            # 确保在正常绘制时完全不透明
+            # 正常绘制
             painter.setOpacity(1.0)
-
-        # 绘制缓冲区内容（铅笔等直接绘制到缓冲区的画笔）
-        painter.drawPixmap(0, 0, self.image)
-
-        # 为水性笔等需要动态效果的画笔单独绘制
-        brush_type = self.drawing_module.get_current_brush_type()
-        if brush_type != "pencil":
-            current_time = time.time()
-            
-            # 绘制已完成的线条
-            for line in self.lines:
-                if line:
-                    temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
+            painter.drawPixmap(0, 0, self.image)
+            # 动态绘制水性笔等类型
+            brush_type = self.drawing_module.get_current_brush_type()
+            if brush_type != "pencil":
+                current_time = time.time()
+                # 绘制已完成的线条
+                for line in self.lines:
+                    if line:
+                        temp_brush = self.drawing_module.create_brush(self.pen_width, self.pen_color)
+                        if brush_type == "water":
+                            temp_brush.draw(painter, line, current_time, True)
+                        else:
+                            temp_brush.draw(painter, line)
+                # 绘制当前正在绘制的线条
+                if self.drawing and self.current_brush and self.current_line:
                     if brush_type == "water":
-                        temp_brush.draw(painter, line, current_time, True)  # 已结束的笔画
+                        self.current_brush.draw(painter, self.current_line, current_time, False)
                     else:
-                        temp_brush.draw(painter, line)
-
-            # 绘制当前正在绘制的线条
-            if self.drawing and self.current_brush and self.current_line:
-                if brush_type == "water":
-                    self.current_brush.draw(painter, self.current_line, current_time, False)
-                else:
-                    self.current_brush.draw(painter, self.current_line)
+                        self.current_brush.draw(painter, self.current_line)
 
     def resizeEvent(self, event):
         """窗口大小改变时调整画布大小"""
