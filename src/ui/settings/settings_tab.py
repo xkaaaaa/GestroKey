@@ -374,9 +374,10 @@ class SettingsPage(QWidget):
 
     def _on_threshold_changed(self, value):
         """相似度阈值改变时的处理"""
-        threshold = value / 100.0
-        self.threshold_label.setText(f"{threshold:.2f}")
-        self._on_setting_changed()
+        if not self.is_loading:
+            threshold = value / 100.0
+            self.threshold_label.setText(f"{threshold:.2f}")
+            self._mark_changed()
 
     def _on_force_topmost_changed(self, state):
         """强制置顶设置变化"""
@@ -454,9 +455,6 @@ class SettingsPage(QWidget):
     def _apply_pen_settings_to_drawing_module(self, width, color):
         """实时应用画笔设置到绘制模块"""
         try:
-            self.settings.set("pen_width", width)
-            self.settings.set("pen_color", color)
-            
             main_window = self._find_main_window()
             if main_window and hasattr(main_window, 'console_page'):
                 console_page = main_window.console_page
@@ -577,11 +575,6 @@ class SettingsPage(QWidget):
                 success = self.settings.reset_to_default()
                 if success:
                     self._load_settings()
-                    
-                    # 重置后需要应用画笔设置到绘制模块
-                    thickness = self.thickness_slider.value()
-                    color = self.color_preview.get_color()
-                    self._apply_pen_settings_to_drawing_module(thickness, color)
                     
                     # 更新按钮状态
                     self._update_button_states()
