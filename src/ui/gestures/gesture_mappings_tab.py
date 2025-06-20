@@ -639,6 +639,8 @@ class GestureMappingsTab(QWidget):
                 'execute_action_id': action_id
             }
             
+            self.gesture_library.mark_data_changed("gesture_mappings")
+            
             path_card = self.path_cards_widget.get_path_card(path_id)
             if path_card:
                 path_card.set_mapped(True, action_name)
@@ -710,6 +712,8 @@ class GestureMappingsTab(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.gesture_library.gesture_mappings.clear()
             
+            self.gesture_library.mark_data_changed("gesture_mappings")
+            
             for path_card in self.path_cards_widget.path_cards.values():
                 path_card.set_mapped(False)
                 
@@ -732,6 +736,8 @@ class GestureMappingsTab(QWidget):
                 del self.gesture_library.gesture_mappings[mapping_key]
                 
             if mapping_keys_to_delete:
+                self.gesture_library.mark_data_changed("gesture_mappings")
+                
                 path_card = self.path_cards_widget.get_path_card(path_id)
                 if path_card:
                     path_card.set_mapped(False)
@@ -745,7 +751,7 @@ class GestureMappingsTab(QWidget):
             
         except Exception as e:
             self.logger.error(f"删除映射时出错: {e}")
-            
+        
     def refresh_list(self):
         """刷新列表"""
         self._load_data()

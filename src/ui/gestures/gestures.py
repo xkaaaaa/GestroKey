@@ -3,6 +3,7 @@ import os
 import pathlib
 import sys
 import copy
+import time
 
 try:
     from core.logger import get_logger
@@ -39,6 +40,9 @@ class GestureLibrary:
         self.trigger_paths = default_gestures.get("trigger_paths", {}).copy()
         self.execute_actions = default_gestures.get("execute_actions", {}).copy()
         self.gesture_mappings = default_gestures.get("gesture_mappings", {}).copy()
+
+        self.last_change_type = None
+        self.change_timestamp = 0
 
         self._update_saved_state()
         self.load()
@@ -132,6 +136,7 @@ class GestureLibrary:
 
                 self.logger.info(f"已从 {self.gestures_file} 加载手势库")
                 self._update_saved_state()
+                self.clear_change_marker()  # 加载后清除变更标记
             else:
                 self.logger.info("未找到手势库文件，使用默认手势库")
                 self.save()
@@ -182,6 +187,7 @@ class GestureLibrary:
             
             self.logger.info(f"手势库已保存到 {self.gestures_file}")
             self._update_saved_state()
+            self.clear_change_marker()  # 保存后清除变更标记
             return True
         except Exception as e:
             self.logger.error(f"保存手势库失败: {e}")
@@ -195,6 +201,21 @@ class GestureLibrary:
             self.gesture_mappings != self.saved_gesture_mappings
         )
     
+    def mark_data_changed(self, change_type):
+        """标记数据已变更"""
+        self.last_change_type = change_type
+        self.change_timestamp = time.time()
+        self.logger.debug(f"标记数据变更: {change_type}, 时间戳: {self.change_timestamp}")
+        
+    def get_last_change_info(self):
+        """获取最后变更信息"""
+        return self.last_change_type, self.change_timestamp
+        
+    def clear_change_marker(self):
+        """清除变更标记"""
+        self.last_change_type = None
+        self.change_timestamp = 0
+
     def get_gesture_by_path(self, drawn_path, similarity_threshold=0.70):
         """根据绘制的路径获取匹配的手势
         

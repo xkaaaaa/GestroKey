@@ -174,14 +174,18 @@ class TriggerPathsTab(QWidget):
             return
             
         name = self.edit_name.text().strip()
-        if not name or not self.current_path:
+        if not name:
             return
             
         try:
             # 自动更新到手势库变量中
             path_data = self.gesture_library.trigger_paths[self.current_path_key]
             path_data['name'] = name
-            path_data['path'] = self.current_path
+            if self.current_path:
+                path_data['path'] = self.current_path
+            
+            # 标记数据已变更
+            self.gesture_library.mark_data_changed("trigger_paths")
             
             # 刷新列表显示
             self._load_path_list()
@@ -236,6 +240,9 @@ class TriggerPathsTab(QWidget):
                 'path': self.current_path
             }
             
+            # 标记数据已变更
+            self.gesture_library.mark_data_changed("trigger_paths")
+            
             self.current_path_key = path_key
             
             # 断开信号避免递归
@@ -280,7 +287,9 @@ class TriggerPathsTab(QWidget):
             # 添加到手势库
             self.gesture_library.trigger_paths[path_key] = new_path_data
             
-            # 更新当前编辑状态
+            # 标记数据已变更
+            self.gesture_library.mark_data_changed("trigger_paths")
+            
             self.current_path_key = path_key
             
             # 断开信号避免递归
@@ -344,6 +353,9 @@ class TriggerPathsTab(QWidget):
             try:
                 del self.gesture_library.trigger_paths[self.current_path_key]
                 self.logger.info(f"删除路径: {path_name}")
+                
+                # 标记数据已变更
+                self.gesture_library.mark_data_changed("trigger_paths")
                 
                 # 清空编辑器
                 self.current_path_key = None

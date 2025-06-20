@@ -112,6 +112,8 @@ class GesturesPage(QWidget):
         self.check_timer.timeout.connect(self._check_library_changes)
         self.check_timer.start(1000)  # 每秒检查一次
         
+        self.last_checked_timestamp = 0
+        
     def _on_tab_changed(self, index):
         """选项卡切换事件"""
         tab_names = ["手势映射", "触发路径", "执行操作"]
@@ -123,6 +125,53 @@ class GesturesPage(QWidget):
         has_changes = self.gesture_library.has_changes()
         self.btn_save_library.setEnabled(has_changes)
         self.btn_discard.setEnabled(has_changes)
+        
+        change_type, change_timestamp = self.gesture_library.get_last_change_info()
+        if change_type and change_timestamp > self.last_checked_timestamp:
+            self.last_checked_timestamp = change_timestamp
+            self.logger.debug(f"检测到数据变更: {change_type}, 时间戳: {change_timestamp}")
+            self._refresh_other_tabs(change_type)
+            
+    def _refresh_other_tabs(self, change_type):
+        """刷新除当前活动页面外的其他页面"""
+        current_index = self.tab_widget.currentIndex()
+        refreshed = False
+        
+        try:
+            # 触发路径变更：刷新手势映射页面（除非当前就在手势映射页面）
+            if change_type == "trigger_paths":
+                if current_index != 0:  # 不在手势映射页面
+                    self.gesture_mappings_tab.refresh_list()
+                    self.logger.debug("触发路径变更，已刷新手势映射页面")
+                    refreshed = True
+                
+            # 执行操作变更：刷新手势映射页面（除非当前就在手势映射页面）
+            elif change_type == "execute_actions":
+                if current_index != 0:  # 不在手势映射页面
+                    self.gesture_mappings_tab.refresh_list()
+                    self.logger.debug("执行操作变更，已刷新手势映射页面")
+                    refreshed = True
+                
+            # 手势映射变更：刷新触发路径和执行操作页面
+            elif change_type == "gesture_mappings":
+                if current_index != 1:  # 不在触发路径页面
+                    self.trigger_paths_tab.refresh_list()
+                    self.logger.debug("手势映射变更，已刷新触发路径页面")
+                    refreshed = True
+                if current_index != 2:  # 不在执行操作页面
+                    self.execute_actions_tab.refresh_list()
+                    self.logger.debug("手势映射变更，已刷新执行操作页面")
+                    refreshed = True
+                
+            if refreshed:
+                self.logger.info(f"已执行跨页面刷新: {change_type}, 当前页面: {current_index}")
+            else:
+                self.logger.debug(f"当前页面无需刷新: {change_type}, 当前页面索引: {current_index}")
+                
+        except Exception as e:
+            self.logger.error(f"刷新其他页面时出错: {e}")
+        
+        self.gesture_library.clear_change_marker()
         
     def _save_gesture_library(self):
         """保存手势库"""
@@ -161,26 +210,10 @@ class GesturesPage(QWidget):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                # 重新加载默认手势库
-                default_gestures = self.gesture_library._load_default_gestures()
-                
-                # 根据操作系统调整快捷键格式
-                import sys
-                if sys.platform != "win32":
-                    self.gesture_library._convert_actions_for_current_platform()
-                
-                # 重置手势库数据
-                self.gesture_library.trigger_paths = default_gestures.get("trigger_paths", {}).copy()
-                self.gesture_library.execute_actions = default_gestures.get("execute_actions", {}).copy()
-                self.gesture_library.gesture_mappings = default_gestures.get("gesture_mappings", {}).copy()
-                
-                # 保存到文件
-                success = self.gesture_library.save()
+                success = self.gesture_library.reset_to_default()
                 if success:
                     QMessageBox.information(self, "成功", "已重置为默认手势库")
                     self.logger.info("手势库已重置为默认")
-                    
-                    # 刷新所有选项卡
                     self._refresh_all()
                 else:
                     QMessageBox.critical(self, "错误", "重置手势库失败")

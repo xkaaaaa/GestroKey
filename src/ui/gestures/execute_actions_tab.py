@@ -190,9 +190,9 @@ class ExecuteActionsTab(QWidget):
             
         name = self.edit_name.text().strip()
         action_type = self.combo_type.currentData()
-        action_value = self.edit_value.text().strip()
+        value = self.edit_value.text().strip()
         
-        if not name or not action_value:
+        if not name or not action_type or not value:
             return
             
         try:
@@ -200,7 +200,10 @@ class ExecuteActionsTab(QWidget):
             action_data = self.gesture_library.execute_actions[self.current_action_key]
             action_data['name'] = name
             action_data['type'] = action_type
-            action_data['value'] = action_value
+            action_data['value'] = value
+            
+            # 标记数据已变更
+            self.gesture_library.mark_data_changed("execute_actions")
             
             # 刷新列表显示
             self._load_action_list()
@@ -255,6 +258,9 @@ class ExecuteActionsTab(QWidget):
             
             # 添加到手势库
             self.gesture_library.execute_actions[action_key] = new_action_data
+            
+            # 标记数据已变更
+            self.gesture_library.mark_data_changed("execute_actions")
             
             # 更新当前编辑状态
             self.current_action_key = action_key
@@ -320,6 +326,9 @@ class ExecuteActionsTab(QWidget):
             try:
                 del self.gesture_library.execute_actions[self.current_action_key]
                 self.logger.info(f"删除操作: {action_name}")
+                
+                # 标记数据已变更
+                self.gesture_library.mark_data_changed("execute_actions")
                 
                 # 清空编辑器
                 self._clear_form()
