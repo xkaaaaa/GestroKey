@@ -536,6 +536,9 @@ class GestroKeyApp(QMainWindow):
                     self.settings.set("app.show_exit_dialog", False)
                     self.settings.set("app.default_close_action", "minimize")
                     self.settings.save()
+                    
+                    # 通知主窗口更新设置
+                    self.parent()._notify_settings_changed()
                 
                 self.accept()
                 self.parent()._minimize_to_tray()
@@ -547,6 +550,9 @@ class GestroKeyApp(QMainWindow):
                     self.settings.set("app.show_exit_dialog", False)
                     self.settings.set("app.default_close_action", "exit")
                     self.settings.save()
+                    
+                    # 通知主窗口更新设置
+                    self.parent()._notify_settings_changed()
                 
                 self.accept()
                 self.parent()._exit_with_save_check()
@@ -595,6 +601,18 @@ class GestroKeyApp(QMainWindow):
             self.logger.info("已释放所有可能的按键状态")
         except Exception as e:
             self.logger.error(f"释放按键状态时出错: {e}")
+
+    def _notify_settings_changed(self):
+        """通知设置已更改，需要更新内存和UI"""
+        # 重新加载设置到内存
+        settings = get_settings()
+        settings.load()
+        self.logger.info("已重新加载设置到内存")
+        
+        # 刷新设置页面UI
+        if hasattr(self, "settings_page"):
+            self.settings_page._load_settings()
+            self.logger.info("已刷新设置页面UI")
 
     def _minimize_to_tray(self):
         """最小化到托盘"""

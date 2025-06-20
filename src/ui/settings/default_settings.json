@@ -1,7 +1,11 @@
 {
     "brush": {
         "pen_width": 7,
-        "pen_color": [0, 120, 255],
+        "pen_color": [
+            0,
+            120,
+            255
+        ],
         "brush_type": "pencil",
         "force_topmost": true
     },
@@ -10,6 +14,6 @@
         "default_close_action": "minimize"
     },
     "gesture": {
-        "similarity_threshold": 0.70
+        "similarity_threshold": 0.7
     }
-} 
+}
