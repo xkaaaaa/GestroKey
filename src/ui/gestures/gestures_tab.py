@@ -70,9 +70,9 @@ class GesturesPage(QWidget):
         self.gesture_mappings_tab = GestureMappingsTab(self)
         
         # 添加选项卡
+        self.tab_widget.addTab(self.gesture_mappings_tab, "手势映射")
         self.tab_widget.addTab(self.trigger_paths_tab, "触发路径")
         self.tab_widget.addTab(self.execute_actions_tab, "执行操作")
-        self.tab_widget.addTab(self.gesture_mappings_tab, "手势映射")
         
         # 选项卡切换事件
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
@@ -114,7 +114,7 @@ class GesturesPage(QWidget):
         
     def _on_tab_changed(self, index):
         """选项卡切换事件"""
-        tab_names = ["触发路径", "执行操作", "手势映射"]
+        tab_names = ["手势映射", "触发路径", "执行操作"]
         if 0 <= index < len(tab_names):
             self.logger.debug(f"切换到选项卡: {tab_names[index]}")
             

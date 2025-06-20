@@ -1,161 +1,529 @@
-from qtpy.QtCore import Qt, QTimer
+from qtpy.QtCore import Qt, QTimer, QPoint, QRect, QSize, Signal
+from qtpy.QtGui import QPainter, QPen, QColor, QFont, QBrush
 from qtpy.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget, QListWidgetItem,
-    QLabel, QLineEdit, QGroupBox, QMessageBox, QComboBox
+    QLabel, QGroupBox, QMessageBox, QScrollArea, QFrame
 )
 
 from core.logger import get_logger
 from ui.gestures.gestures import get_gesture_library
 
 
+class ConnectionWidget(QWidget):
+    """连线绘制组件"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.connections = []
+        self.selected_connection = None
+        self.setMinimumHeight(400)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
+    def add_connection(self, action_id, path_id, start_point, end_point):
+        """添加连线"""
+        self.connections = [conn for conn in self.connections if conn[1] != path_id]
+        self.connections.append((action_id, path_id, start_point, end_point))
+        self.update()
+        
+    def remove_connection(self, path_id):
+        """移除连线"""
+        self.connections = [conn for conn in self.connections if conn[1] != path_id]
+        if self.selected_connection is not None:
+            if self.selected_connection >= len(self.connections):
+                self.selected_connection = None
+        self.update()
+        
+    def clear_connections(self):
+        """清空所有连线"""
+        self.connections = []
+        self.selected_connection = None
+        self.update()
+        
+    def mousePressEvent(self, event):
+        """鼠标点击事件 - 选择连线"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            click_pos = event.pos()
+            selected_index = self._get_connection_at_point(click_pos)
+            
+            if selected_index is not None:
+                self.selected_connection = selected_index
+                self.setFocus()
+                self.update()
+            else:
+                self.selected_connection = None
+                self.update()
+                
+        super().mousePressEvent(event)
+        
+    def keyPressEvent(self, event):
+        """键盘事件 - 删除选中的连线"""
+        if event.key() == Qt.Key.Key_Delete and self.selected_connection is not None:
+            if 0 <= self.selected_connection < len(self.connections):
+                action_id, path_id, _, _ = self.connections[self.selected_connection]
+                
+                parent_tab = self.parent()
+                while parent_tab and not isinstance(parent_tab, GestureMappingsTab):
+                    parent_tab = parent_tab.parent()
+                    
+                if parent_tab:
+                    parent_tab._delete_mapping_by_path_id(path_id)
+                    
+        super().keyPressEvent(event)
+        
+    def _get_connection_at_point(self, point):
+        """获取指定点位置的连线索引"""
+        for i, (action_id, path_id, start_point, end_point) in enumerate(self.connections):
+            if self._point_to_line_distance(point, start_point, end_point) < 10:
+                return i
+        return None
+        
+    def _point_to_line_distance(self, point, line_start, line_end):
+        """计算点到线段的距离"""
+        dx = line_end.x() - line_start.x()
+        dy = line_end.y() - line_start.y()
+        
+        if dx == 0 and dy == 0:
+            return ((point.x() - line_start.x()) ** 2 + (point.y() - line_start.y()) ** 2) ** 0.5
+            
+        t = ((point.x() - line_start.x()) * dx + (point.y() - line_start.y()) * dy) / (dx * dx + dy * dy)
+        t = max(0, min(1, t))
+        
+        closest_x = line_start.x() + t * dx
+        closest_y = line_start.y() + t * dy
+        
+        return ((point.x() - closest_x) ** 2 + (point.y() - closest_y) ** 2) ** 0.5
+        
+    def paintEvent(self, event):
+        """绘制连线"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        for i, (action_id, path_id, start_point, end_point) in enumerate(self.connections):
+            if i == self.selected_connection:
+                pen = QPen(QColor(220, 53, 69), 3)
+            else:
+                pen = QPen(QColor(0, 120, 215), 2)
+                
+            painter.setPen(pen)
+            painter.drawLine(start_point, end_point)
+            
+            self._draw_arrow(painter, start_point, end_point, i == self.selected_connection)
+            
+    def _draw_arrow(self, painter, start_point, end_point, is_selected=False):
+        """绘制箭头"""
+        dx = end_point.x() - start_point.x()
+        dy = end_point.y() - start_point.y()
+        length = (dx*dx + dy*dy) ** 0.5
+        
+        if length == 0:
+            return
+            
+        ux = dx / length
+        uy = dy / length
+        
+        arrow_length = 10
+        arrow_width = 5
+        
+        tip_x = end_point.x()
+        tip_y = end_point.y()
+        
+        base1_x = tip_x - arrow_length * ux + arrow_width * uy
+        base1_y = tip_y - arrow_length * uy - arrow_width * ux
+        base2_x = tip_x - arrow_length * ux - arrow_width * uy
+        base2_y = tip_y - arrow_length * uy + arrow_width * ux
+        
+        color = QColor(220, 53, 69) if is_selected else QColor(0, 120, 215)
+        painter.setBrush(QBrush(color))
+        points = [QPoint(int(tip_x), int(tip_y)), 
+                 QPoint(int(base1_x), int(base1_y)), 
+                 QPoint(int(base2_x), int(base2_y))]
+        painter.drawPolygon(points)
+
+
+class ActionCardWidget(QWidget):
+    """操作卡片组件"""
+    action_clicked = Signal(int, QPoint)
+    
+    def __init__(self, action_id, action_name, action_value, parent=None):
+        super().__init__(parent)
+        self.action_id = action_id
+        self.action_name = action_name
+        self.action_value = action_value
+        self.is_selected = False
+        self.mapped_paths_count = 0
+        
+        self.setFixedSize(200, 120)
+        self.setStyleSheet("""
+            ActionCardWidget {
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                background-color: white;
+            }
+            ActionCardWidget:hover {
+                border-color: #0078d4;
+                background-color: #f3f9ff;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        
+        name_label = QLabel(action_name)
+        name_label.setFont(QFont("", 10, QFont.Weight.Bold))
+        name_label.setWordWrap(True)
+        layout.addWidget(name_label)
+        
+        display_value = action_value if len(action_value) <= 30 else action_value[:30] + "..."
+        value_label = QLabel(f"内容: {display_value}")
+        value_label.setFont(QFont("", 9))
+        value_label.setStyleSheet("color: #666;")
+        value_label.setWordWrap(True)
+        value_label.setToolTip(action_value)
+        layout.addWidget(value_label)
+        
+        self.status_label = QLabel("可连接")
+        self.status_label.setFont(QFont("", 9))
+        self.status_label.setStyleSheet("color: #999;")
+        layout.addWidget(self.status_label)
+        
+        layout.addStretch()
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            global_pos = self.mapToGlobal(event.pos())
+            self.action_clicked.emit(self.action_id, global_pos)
+        super().mousePressEvent(event)
+        
+    def set_selected(self, is_selected):
+        """设置选中状态"""
+        self.is_selected = is_selected
+        
+        if is_selected:
+            self.setStyleSheet("""
+                ActionCardWidget {
+                    border: 3px solid #0078d4;
+                    border-radius: 8px;
+                    background-color: #e6f3ff;
+                }
+                ActionCardWidget:hover {
+                    border-color: #106ebe;
+                    background-color: #d1e9ff;
+                }
+            """)
+            self.status_label.setText("已选中 - 请选择路径")
+            self.status_label.setStyleSheet("color: #0078d4; font-weight: bold;")
+        else:
+            self.setStyleSheet("""
+                ActionCardWidget {
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    background-color: white;
+                }
+                ActionCardWidget:hover {
+                    border-color: #0078d4;
+                    background-color: #f3f9ff;
+                }
+            """)
+            if self.mapped_paths_count > 0:
+                self.status_label.setText(f"已连接 {self.mapped_paths_count} 个路径")
+                self.status_label.setStyleSheet("color: #28a745; font-weight: bold;")
+            else:
+                self.status_label.setText("可连接")
+                self.status_label.setStyleSheet("color: #999;")
+                
+    def set_mapped_count(self, count):
+        """设置映射的路径数量"""
+        self.mapped_paths_count = count
+        if not self.is_selected:
+            if count > 0:
+                self.status_label.setText(f"已连接 {count} 个路径")
+                self.status_label.setStyleSheet("color: #28a745; font-weight: bold;")
+            else:
+                self.status_label.setText("可连接")
+                self.status_label.setStyleSheet("color: #999;")
+
+
+class PathCardWidget(QWidget):
+    """路径卡片组件"""
+    path_clicked = Signal(int, QPoint)
+    
+    def __init__(self, path_id, path_name, path_directions, parent=None):
+        super().__init__(parent)
+        self.path_id = path_id
+        self.path_name = path_name
+        self.path_directions = path_directions
+        self.is_mapped = False
+        self.mapped_action_name = ""
+        
+        self.setFixedSize(200, 120)
+        self.setStyleSheet("""
+            PathCardWidget {
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                background-color: white;
+            }
+            PathCardWidget:hover {
+                border-color: #0078d4;
+                background-color: #f3f9ff;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        
+        name_label = QLabel(path_name)
+        name_label.setFont(QFont("", 10, QFont.Weight.Bold))
+        name_label.setWordWrap(True)
+        layout.addWidget(name_label)
+        
+        self.status_label = QLabel("未映射")
+        self.status_label.setFont(QFont("", 9))
+        self.status_label.setStyleSheet("color: #999;")
+        layout.addWidget(self.status_label)
+        
+        layout.addStretch()
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            global_pos = self.mapToGlobal(event.pos())
+            self.path_clicked.emit(self.path_id, global_pos)
+        super().mousePressEvent(event)
+        
+    def set_mapped(self, is_mapped, action_name=""):
+        """设置映射状态"""
+        self.is_mapped = is_mapped
+        self.mapped_action_name = action_name
+        
+        if is_mapped:
+            self.status_label.setText(f"→ {action_name}")
+            self.status_label.setStyleSheet("color: #0078d4; font-weight: bold;")
+            self.setStyleSheet("""
+                PathCardWidget {
+                    border: 2px solid #0078d4;
+                    border-radius: 8px;
+                    background-color: #f3f9ff;
+                }
+                PathCardWidget:hover {
+                    border-color: #106ebe;
+                    background-color: #e6f3ff;
+                }
+            """)
+        else:
+            self.status_label.setText("未映射")
+            self.status_label.setStyleSheet("color: #999;")
+            self.setStyleSheet("""
+                PathCardWidget {
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    background-color: white;
+                }
+                PathCardWidget:hover {
+                    border-color: #0078d4;
+                    background-color: #f3f9ff;
+                }
+            """)
+
+
+class ActionCardsWidget(QWidget):
+    """操作卡片容器组件"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.action_cards = {}
+        
+        self.cards_layout = QVBoxLayout(self)
+        self.cards_layout.setSpacing(10)
+        self.cards_layout.setContentsMargins(10, 10, 10, 10)
+        
+    def add_action_card(self, action_id, action_name, action_value):
+        """添加操作卡片"""
+        card = ActionCardWidget(action_id, action_name, action_value)
+        self.action_cards[action_id] = card
+        self.cards_layout.addWidget(card)
+        return card
+        
+    def remove_action_card(self, action_id):
+        """移除操作卡片"""
+        if action_id in self.action_cards:
+            card = self.action_cards[action_id]
+            self.cards_layout.removeWidget(card)
+            card.deleteLater()
+            del self.action_cards[action_id]
+            
+    def clear_action_cards(self):
+        """清空所有操作卡片"""
+        for card in self.action_cards.values():
+            self.cards_layout.removeWidget(card)
+            card.deleteLater()
+        self.action_cards.clear()
+        
+    def get_action_card(self, action_id):
+        """获取操作卡片"""
+        return self.action_cards.get(action_id)
+        
+    def clear_all_selections(self):
+        """清除所有选中状态"""
+        for card in self.action_cards.values():
+            card.set_selected(False)
+
+
+class PathCardsWidget(QWidget):
+    """路径卡片容器组件"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.path_cards = {}
+        
+        self.cards_layout = QVBoxLayout(self)
+        self.cards_layout.setSpacing(10)
+        self.cards_layout.setContentsMargins(10, 10, 10, 10)
+        
+    def add_path_card(self, path_id, path_name, path_directions):
+        """添加路径卡片"""
+        card = PathCardWidget(path_id, path_name, path_directions)
+        self.path_cards[path_id] = card
+        self.cards_layout.addWidget(card)
+        return card
+        
+    def remove_path_card(self, path_id):
+        """移除路径卡片"""
+        if path_id in self.path_cards:
+            card = self.path_cards[path_id]
+            self.cards_layout.removeWidget(card)
+            card.deleteLater()
+            del self.path_cards[path_id]
+            
+    def clear_path_cards(self):
+        """清空所有路径卡片"""
+        for card in self.path_cards.values():
+            self.cards_layout.removeWidget(card)
+            card.deleteLater()
+        self.path_cards.clear()
+        
+    def get_path_card(self, path_id):
+        """获取路径卡片"""
+        return self.path_cards.get(path_id)
+
+
 class GestureMappingsTab(QWidget):
-    """手势映射管理选项卡"""
+    """手势映射管理选项卡 - 连线式映射界面"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = get_logger("GestureMappingsTab")
         self.gesture_library = get_gesture_library()
         
-        self.current_mapping_key = None
+        self.selected_action_id = None
         
         self.initUI()
-        self._load_mapping_list()
+        self._load_data()
         
     def initUI(self):
         """初始化用户界面"""
-        layout = QHBoxLayout(self)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
-        # 左侧映射列表
-        left_panel = self._create_mapping_list_panel()
-        layout.addWidget(left_panel, 1)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(10, 10, 10, 10)
         
-        # 右侧映射编辑器
-        right_panel = self._create_mapping_editor_panel()
-        layout.addWidget(right_panel, 2)
+        title_layout = QVBoxLayout()
+        title = QLabel("手势映射")
+        title.setFont(QFont("", 14, QFont.Weight.Bold))
+        title_layout.addWidget(title)
         
-    def _create_mapping_list_panel(self):
-        """创建映射列表面板"""
-        panel = QGroupBox("手势映射列表")
-        layout = QVBoxLayout(panel)
+        instruction = QLabel("点击左侧操作卡片，然后点击右侧路径卡片进行映射。一个路径只能映射一个操作。")
+        instruction.setStyleSheet("color: #666; margin-bottom: 10px;")
+        instruction.setWordWrap(True)
+        title_layout.addWidget(instruction)
         
-        # 映射列表
-        self.mapping_list = QListWidget()
-        self.mapping_list.itemClicked.connect(self._on_mapping_selected)
-        layout.addWidget(self.mapping_list)
+        scroll_layout.addLayout(title_layout)
         
-        # 按钮组
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(20)
+        
+        left_panel = self._create_actions_panel()
+        content_layout.addWidget(left_panel)
+        
+        middle_panel = QWidget()
+        middle_layout = QVBoxLayout(middle_panel)
+        middle_layout.setContentsMargins(0, 0, 0, 0)
+        
+        connection_title = QLabel("映射连线")
+        connection_title.setFont(QFont("", 12, QFont.Weight.Bold))
+        connection_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        connection_title.setStyleSheet("color: #666; margin: 10px 0;")
+        middle_layout.addWidget(connection_title)
+        
+        self.connection_widget = ConnectionWidget()
+        middle_layout.addWidget(self.connection_widget, 1)
+        
+        content_layout.addWidget(middle_panel, 1)
+        
+        right_panel = self._create_paths_panel()
+        content_layout.addWidget(right_panel)
+        
+        scroll_layout.addLayout(content_layout, 1)
+        
         button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(10, 10, 10, 10)
         
-        self.btn_add_mapping = QPushButton("添加映射")
-        self.btn_add_mapping.clicked.connect(self._add_new_mapping)
-        button_layout.addWidget(self.btn_add_mapping)
-        
-        self.btn_delete_mapping = QPushButton("删除映射")
-        self.btn_delete_mapping.clicked.connect(self._delete_mapping)
-        self.btn_delete_mapping.setEnabled(False)
-        button_layout.addWidget(self.btn_delete_mapping)
-        
-        layout.addLayout(button_layout)
-        
-        return panel
-        
-    def _create_mapping_editor_panel(self):
-        """创建映射编辑器面板"""
-        panel = QGroupBox("映射编辑器")
-        layout = QVBoxLayout(panel)
-        
-        # 基本信息编辑
-        info_layout = QVBoxLayout()
-        
-        # 手势名称
-        name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel("手势名称:"))
-        self.edit_name = QLineEdit()
-        self.edit_name.textChanged.connect(self._on_form_changed)
-        name_layout.addWidget(self.edit_name)
-        info_layout.addLayout(name_layout)
-        
-        # 触发路径选择
-        path_layout = QHBoxLayout()
-        path_layout.addWidget(QLabel("触发路径:"))
-        self.combo_trigger_path = QComboBox()
-        self.combo_trigger_path.currentIndexChanged.connect(self._on_form_changed)
-        path_layout.addWidget(self.combo_trigger_path)
-        info_layout.addLayout(path_layout)
-        
-        # 执行操作选择
-        action_layout = QHBoxLayout()
-        action_layout.addWidget(QLabel("执行操作:"))
-        self.combo_execute_action = QComboBox()
-        self.combo_execute_action.currentIndexChanged.connect(self._on_form_changed)
-        action_layout.addWidget(self.combo_execute_action)
-        info_layout.addLayout(action_layout)
-        
-        layout.addLayout(info_layout)
-        
-        # 添加一些空间
-        layout.addStretch()
-        
-        # 按钮组
-        button_layout = QHBoxLayout()
-        
-        self.btn_clear = QPushButton("清空")
-        self.btn_clear.clicked.connect(self._clear_form)
-        button_layout.addWidget(self.btn_clear)
+        self.btn_clear_all = QPushButton("清空所有映射")
+        self.btn_clear_all.setMinimumSize(120, 35)
+        self.btn_clear_all.clicked.connect(self._clear_all_mappings)
+        button_layout.addWidget(self.btn_clear_all)
         
         button_layout.addStretch()
-        layout.addLayout(button_layout)
+        
+        scroll_layout.addLayout(button_layout)
+        
+        self.scroll_area.setWidget(scroll_content)
+        
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.scroll_area)
+        
+    def _create_actions_panel(self):
+        """创建操作卡片面板"""
+        panel = QGroupBox("执行操作")
+        panel.setMaximumWidth(250)
+        panel.setMinimumWidth(250)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(5, 10, 5, 10)
+        
+        self.action_cards_widget = ActionCardsWidget()
+        layout.addWidget(self.action_cards_widget)
+        
+        layout.addStretch()
         
         return panel
         
-    def _load_mapping_list(self):
-        """加载映射列表"""
-        self.mapping_list.clear()
+    def _create_paths_panel(self):
+        """创建路径卡片面板"""
+        panel = QGroupBox("触发路径")
+        panel.setMaximumWidth(250)
+        panel.setMinimumWidth(250)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(5, 10, 5, 10)
         
-        # 同时加载下拉框选项
-        self._load_combo_options()
+        self.path_cards_widget = PathCardsWidget()
+        layout.addWidget(self.path_cards_widget)
         
-        gesture_mappings = self.gesture_library.gesture_mappings
+        layout.addStretch()
         
-        # 按ID排序显示
-        sorted_mappings = sorted(gesture_mappings.items(), key=lambda x: x[1].get('id', 0))
+        return panel
         
-        for mapping_key, mapping_data in sorted_mappings:
-            mapping_id = mapping_data.get('id', 0)
-            mapping_name = mapping_data.get('name', f'手势{mapping_id}')
-            
-            # 获取触发路径名称
-            trigger_path_id = mapping_data.get('trigger_path_id')
-            trigger_path_name = self._get_path_name_by_id(trigger_path_id)
-            
-            # 获取执行操作名称
-            execute_action_id = mapping_data.get('execute_action_id')
-            execute_action_name = self._get_action_name_by_id(execute_action_id)
-            
-            item_text = f"{mapping_id}. {mapping_name} ({trigger_path_name} → {execute_action_name})"
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, mapping_key)
-            self.mapping_list.addItem(item)
-            
-        self.logger.debug(f"已加载 {len(gesture_mappings)} 个手势映射")
+    def _load_data(self):
+        """加载数据"""
+        self._load_actions()
+        self._load_paths()
+        self._load_existing_mappings()
         
-    def _load_combo_options(self):
-        """加载下拉框选项"""
-        # 加载触发路径选项
-        self.combo_trigger_path.clear()
-        self.combo_trigger_path.addItem("请选择触发路径", None)
-        
-        trigger_paths = self.gesture_library.trigger_paths
-        sorted_paths = sorted(trigger_paths.items(), key=lambda x: x[1].get('id', 0))
-        
-        for path_key, path_data in sorted_paths:
-            path_id = path_data.get('id')
-            path_name = path_data.get('name', f'路径{path_id}')
-            self.combo_trigger_path.addItem(f"{path_id}. {path_name}", path_id)
-            
-        # 加载执行操作选项
-        self.combo_execute_action.clear()
-        self.combo_execute_action.addItem("请选择执行操作", None)
+    def _load_actions(self):
+        """加载操作卡片"""
+        self.action_cards_widget.clear_action_cards()
         
         execute_actions = self.gesture_library.execute_actions
         sorted_actions = sorted(execute_actions.items(), key=lambda x: x[1].get('id', 0))
@@ -164,15 +532,58 @@ class GestureMappingsTab(QWidget):
             action_id = action_data.get('id')
             action_name = action_data.get('name', f'操作{action_id}')
             action_value = action_data.get('value', '')
-            display_text = f"{action_id}. {action_name} ({action_value})"
-            self.combo_execute_action.addItem(display_text, action_id)
             
-    def _get_path_name_by_id(self, path_id):
-        """根据ID获取路径名称"""
-        for path_data in self.gesture_library.trigger_paths.values():
-            if path_data.get('id') == path_id:
-                return path_data.get('name', f'路径{path_id}')
-        return f'路径{path_id}(未找到)'
+            card = self.action_cards_widget.add_action_card(action_id, action_name, action_value)
+            card.action_clicked.connect(self._on_action_clicked)
+            
+        self.logger.debug(f"已加载 {len(execute_actions)} 个执行操作")
+        
+    def _load_paths(self):
+        """加载路径卡片"""
+        self.path_cards_widget.clear_path_cards()
+        
+        trigger_paths = self.gesture_library.trigger_paths
+        sorted_paths = sorted(trigger_paths.items(), key=lambda x: x[1].get('id', 0))
+        
+        for path_key, path_data in sorted_paths:
+            path_id = path_data.get('id')
+            path_name = path_data.get('name', f'路径{path_id}')
+            directions = path_data.get('directions', [])
+            directions_str = " → ".join(directions) if directions else "无方向"
+            
+            card = self.path_cards_widget.add_path_card(path_id, path_name, directions_str)
+            card.path_clicked.connect(self._on_path_clicked)
+            
+        self.logger.debug(f"已加载 {len(trigger_paths)} 个触发路径")
+        
+    def _load_existing_mappings(self):
+        """加载现有映射"""
+        self.connection_widget.clear_connections()
+        
+        action_path_counts = {}
+        
+        gesture_mappings = self.gesture_library.gesture_mappings
+        
+        for mapping_key, mapping_data in gesture_mappings.items():
+            trigger_path_id = mapping_data.get('trigger_path_id')
+            execute_action_id = mapping_data.get('execute_action_id')
+            
+            if trigger_path_id and execute_action_id:
+                action_path_counts[execute_action_id] = action_path_counts.get(execute_action_id, 0) + 1
+                
+                path_card = self.path_cards_widget.get_path_card(trigger_path_id)
+                if path_card:
+                    action_name = self._get_action_name_by_id(execute_action_id)
+                    path_card.set_mapped(True, action_name)
+                    
+        for action_id, count in action_path_counts.items():
+            action_card = self.action_cards_widget.get_action_card(action_id)
+            if action_card:
+                action_card.set_mapped_count(count)
+                
+        QTimer.singleShot(100, lambda: self._update_connections())
+                
+        self.logger.debug(f"已加载 {len(gesture_mappings)} 个手势映射")
         
     def _get_action_name_by_id(self, action_id):
         """根据ID获取操作名称"""
@@ -181,219 +592,165 @@ class GestureMappingsTab(QWidget):
                 return action_data.get('name', f'操作{action_id}')
         return f'操作{action_id}(未找到)'
         
-    def _on_mapping_selected(self, item):
-        """映射选择事件"""
-        mapping_key = item.data(Qt.ItemDataRole.UserRole)
-        self._load_mapping_to_editor(mapping_key)
+    def _on_action_clicked(self, action_id, global_pos):
+        """操作被点击"""
+        self.action_cards_widget.clear_all_selections()
         
-    def _load_mapping_to_editor(self, mapping_key):
-        """将映射数据加载到编辑器"""
-        mapping_data = self.gesture_library.gesture_mappings.get(mapping_key)
-        if not mapping_data:
-            self.logger.error(f"找不到映射: {mapping_key}")
+        self.selected_action_id = action_id
+        action_card = self.action_cards_widget.get_action_card(action_id)
+        if action_card:
+            action_card.set_selected(True)
+        
+        self.logger.debug(f"选中操作: {action_id}")
+        
+    def _on_path_clicked(self, path_id, global_pos):
+        """路径被点击"""
+        if self.selected_action_id is None:
+            QMessageBox.information(self, "提示", "请先选择一个执行操作")
             return
             
-        self.logger.debug(f"开始加载映射到编辑器: {mapping_key}")
+        self._create_mapping(self.selected_action_id, path_id)
         
-        # 暂时断开信号连接
-        self.edit_name.textChanged.disconnect()
-        self.combo_trigger_path.currentIndexChanged.disconnect()
-        self.combo_execute_action.currentIndexChanged.disconnect()
+        self.selected_action_id = None
+        self.action_cards_widget.clear_all_selections()
         
+    def _create_mapping(self, action_id, path_id):
+        """创建映射"""
         try:
-            # 更新状态
-            self.current_mapping_key = mapping_key
+            existing_ids = [data.get('id', 0) for data in self.gesture_library.gesture_mappings.values()]
+            new_id = max(existing_ids, default=0) + 1
             
-            # 填充表单
-            mapping_name = mapping_data.get('name', '')
+            old_mapping_keys = []
+            for mapping_key, mapping_data in self.gesture_library.gesture_mappings.items():
+                if mapping_data.get('trigger_path_id') == path_id:
+                    old_mapping_keys.append(mapping_key)
+                    
+            for old_key in old_mapping_keys:
+                del self.gesture_library.gesture_mappings[old_key]
+            
+            mapping_key = f"mapping_{new_id}"
+            action_name = self._get_action_name_by_id(action_id)
+            path_name = self._get_path_name_by_id(path_id)
+            
+            self.gesture_library.gesture_mappings[mapping_key] = {
+                'id': new_id,
+                'name': f"{path_name} → {action_name}",
+                'trigger_path_id': path_id,
+                'execute_action_id': action_id
+            }
+            
+            path_card = self.path_cards_widget.get_path_card(path_id)
+            if path_card:
+                path_card.set_mapped(True, action_name)
+                
+            self._update_action_mapped_counts()
+                
+            self._update_connections()
+            
+            self.logger.info(f"创建映射: 操作{action_id} → 路径{path_id}")
+            
+        except Exception as e:
+            self.logger.error(f"创建映射时出错: {e}")
+            QMessageBox.critical(self, "错误", f"创建映射失败: {str(e)}")
+            
+    def _get_path_name_by_id(self, path_id):
+        """根据ID获取路径名称"""
+        for path_data in self.gesture_library.trigger_paths.values():
+            if path_data.get('id') == path_id:
+                return path_data.get('name', f'路径{path_id}')
+        return f'路径{path_id}(未找到)'
+        
+    def _update_action_mapped_counts(self):
+        """更新操作卡片的映射数量"""
+        action_path_counts = {}
+        
+        gesture_mappings = self.gesture_library.gesture_mappings
+        for mapping_data in gesture_mappings.values():
+            execute_action_id = mapping_data.get('execute_action_id')
+            if execute_action_id:
+                action_path_counts[execute_action_id] = action_path_counts.get(execute_action_id, 0) + 1
+        
+        for action_id, card in self.action_cards_widget.action_cards.items():
+            count = action_path_counts.get(action_id, 0)
+            card.set_mapped_count(count)
+        
+    def _update_connections(self):
+        """更新连线显示"""
+        self.connection_widget.clear_connections()
+        
+        gesture_mappings = self.gesture_library.gesture_mappings
+        
+        for mapping_data in gesture_mappings.values():
             trigger_path_id = mapping_data.get('trigger_path_id')
             execute_action_id = mapping_data.get('execute_action_id')
             
-            self.edit_name.setText(mapping_name)
-            
-            # 设置触发路径下拉框
-            for i in range(self.combo_trigger_path.count()):
-                if self.combo_trigger_path.itemData(i) == trigger_path_id:
-                    self.combo_trigger_path.setCurrentIndex(i)
-                    break
-                    
-            # 设置执行操作下拉框
-            for i in range(self.combo_execute_action.count()):
-                if self.combo_execute_action.itemData(i) == execute_action_id:
-                    self.combo_execute_action.setCurrentIndex(i)
-                    break
-                    
-        finally:
-            # 重新连接信号
-            self.edit_name.textChanged.connect(self._on_form_changed)
-            self.combo_trigger_path.currentIndexChanged.connect(self._on_form_changed)
-            self.combo_execute_action.currentIndexChanged.connect(self._on_form_changed)
-            
-        # 更新按钮状态
-        self._update_button_states()
-        
-        self.logger.debug(f"已加载映射到编辑器: {mapping_key}")
-        
-    def _on_form_changed(self):
-        """表单内容变化事件"""
-        self._auto_save_changes()
-        
-    def _auto_save_changes(self):
-        """自动保存变更到手势库变量中"""
-        if not self.current_mapping_key:
-            return
-            
-        name = self.edit_name.text().strip()
-        trigger_path_id = self.combo_trigger_path.currentData()
-        execute_action_id = self.combo_execute_action.currentData()
-        
-        if not name or trigger_path_id is None or execute_action_id is None:
-            return
-            
-        try:
-            # 自动更新到手势库变量中
-            mapping_data = self.gesture_library.gesture_mappings[self.current_mapping_key]
-            mapping_data['name'] = name
-            mapping_data['trigger_path_id'] = trigger_path_id
-            mapping_data['execute_action_id'] = execute_action_id
-            
-            # 刷新列表显示
-            self._load_mapping_list()
-            self._select_mapping_in_list(self.current_mapping_key)
-            
-        except Exception as e:
-            self.logger.error(f"自动保存映射时出错: {e}")
-        
-    def _update_button_states(self):
-        """更新按钮状态"""
-        self.btn_delete_mapping.setEnabled(self.current_mapping_key is not None)
-        
-    def _add_new_mapping(self):
-        """添加新映射"""
-        try:
-            # 刷新下拉框选项（可能有新的路径或操作）
-            self._load_combo_options()
-            
-            # 获取表单中的当前内容
-            current_name = self.edit_name.text().strip()
-            current_trigger_path_id = self.combo_trigger_path.currentData()
-            current_execute_action_id = self.combo_execute_action.currentData()
-            
-            # 生成新映射ID和默认名称
-            mapping_id = self.gesture_library._get_next_mapping_id()
-            mapping_key = f"mapping_{mapping_id}"
-            
-            # 使用用户填写的内容，如果为空则使用默认值
-            if not current_name:
-                current_name = f"映射{mapping_id}"
-            # 如果下拉框没有选择，保持None（将显示"请选择"）
-            
-            # 创建新映射数据
-            new_mapping_data = {
-                'id': mapping_id,
-                'name': current_name,
-                'trigger_path_id': current_trigger_path_id,
-                'execute_action_id': current_execute_action_id
-            }
-            
-            # 添加到手势库
-            self.gesture_library.gesture_mappings[mapping_key] = new_mapping_data
-            
-            # 更新当前编辑状态
-            self.current_mapping_key = mapping_key
-            
-            # 断开信号避免递归
-            self.edit_name.textChanged.disconnect()
-            self.combo_trigger_path.currentIndexChanged.disconnect()
-            self.combo_execute_action.currentIndexChanged.disconnect()
-            
-            # 更新表单内容
-            self.edit_name.setText(current_name)
-            # 设置触发路径下拉框
-            for i in range(self.combo_trigger_path.count()):
-                if self.combo_trigger_path.itemData(i) == current_trigger_path_id:
-                    self.combo_trigger_path.setCurrentIndex(i)
-                    break
-            # 设置执行操作下拉框
-            for i in range(self.combo_execute_action.count()):
-                if self.combo_execute_action.itemData(i) == current_execute_action_id:
-                    self.combo_execute_action.setCurrentIndex(i)
-                    break
-            
-            # 重新连接信号
-            self.edit_name.textChanged.connect(self._on_form_changed)
-            self.combo_trigger_path.currentIndexChanged.connect(self._on_form_changed)
-            self.combo_execute_action.currentIndexChanged.connect(self._on_form_changed)
-            
-            # 刷新列表并选中新添加的项
-            self._load_mapping_list()
-            self._select_mapping_in_list(mapping_key)
-            
-            # 更新按钮状态
-            self._update_button_states()
-            
-            self.logger.info(f"添加新映射: {current_name}, ID: {mapping_id}")
-            
-        except Exception as e:
-            self.logger.error(f"添加新映射时出错: {e}")
-            QMessageBox.critical(self, "错误", f"添加新映射失败: {str(e)}")
-        
-    def _select_mapping_in_list(self, mapping_key):
-        """在列表中选择指定映射"""
-        for i in range(self.mapping_list.count()):
-            item = self.mapping_list.item(i)
-            if item.data(Qt.ItemDataRole.UserRole) == mapping_key:
-                self.mapping_list.setCurrentItem(item)
-                break
+            if trigger_path_id and execute_action_id:
+                action_card = self.action_cards_widget.get_action_card(execute_action_id)
+                path_card = self.path_cards_widget.get_path_card(trigger_path_id)
                 
-    def _delete_mapping(self):
-        """删除映射"""
-        if not self.current_mapping_key:
-            return
-            
-        mapping_data = self.gesture_library.gesture_mappings.get(self.current_mapping_key)
-        if not mapping_data:
-            return
-            
-        mapping_name = mapping_data.get('name', '未命名映射')
-        
+                if action_card and path_card:
+                    action_global = action_card.mapToGlobal(action_card.rect().center())
+                    action_local = self.connection_widget.mapFromGlobal(action_global)
+                    
+                    path_global = path_card.mapToGlobal(path_card.rect().center())
+                    path_local = self.connection_widget.mapFromGlobal(path_global)
+                    
+                    self.connection_widget.add_connection(
+                        execute_action_id, trigger_path_id, action_local, path_local
+                    )
+                    
+    def _clear_all_mappings(self):
+        """清空所有映射"""
         reply = QMessageBox.question(
-            self, "确认删除",
-            f"确定要删除手势映射 '{mapping_name}' 吗？",
+            self, "确认清空", 
+            "确定要清空所有手势映射吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            try:
-                del self.gesture_library.gesture_mappings[self.current_mapping_key]
-                self.logger.info(f"删除映射: {mapping_name}")
+            self.gesture_library.gesture_mappings.clear()
+            
+            for path_card in self.path_cards_widget.path_cards.values():
+                path_card.set_mapped(False)
                 
-                # 清空编辑器
-                self._clear_form()
+            for action_card in self.action_cards_widget.action_cards.values():
+                action_card.set_mapped_count(0)
                 
-                # 刷新列表
-                self._load_mapping_list()
+            self.connection_widget.clear_connections()
+            
+            self.logger.info("已清空所有手势映射")
+            
+    def _delete_mapping_by_path_id(self, path_id):
+        """根据路径ID删除映射"""
+        try:
+            mapping_keys_to_delete = []
+            for mapping_key, mapping_data in self.gesture_library.gesture_mappings.items():
+                if mapping_data.get('trigger_path_id') == path_id:
+                    mapping_keys_to_delete.append(mapping_key)
+                    
+            for mapping_key in mapping_keys_to_delete:
+                del self.gesture_library.gesture_mappings[mapping_key]
                 
-                QMessageBox.information(self, "成功", "映射已删除")
+            if mapping_keys_to_delete:
+                path_card = self.path_cards_widget.get_path_card(path_id)
+                if path_card:
+                    path_card.set_mapped(False)
+                    
+                self._update_action_mapped_counts()
+                    
+                self.connection_widget.selected_connection = None
+                self._update_connections()
                 
-            except Exception as e:
-                self.logger.error(f"删除映射时出错: {e}")
-                QMessageBox.critical(self, "错误", f"删除映射失败: {str(e)}")
-        
-    def _clear_form(self):
-        """清空表单"""
-        self.current_mapping_key = None
-        self.edit_name.setText("")
-        self.combo_trigger_path.setCurrentIndex(0)
-        self.combo_execute_action.setCurrentIndex(0)
-        
-        # 更新按钮状态
-        self.btn_delete_mapping.setEnabled(False)
-        
-        self.logger.info("已清空表单")
-                
-
-        
+                self.logger.info(f"已删除路径{path_id}的映射")
+            
+        except Exception as e:
+            self.logger.error(f"删除映射时出错: {e}")
+            
     def refresh_list(self):
         """刷新列表"""
-        self._load_mapping_list() 
+        self._load_data()
+        
+    def resizeEvent(self, event):
+        """窗口大小改变事件"""
+        super().resizeEvent(event)
+        QTimer.singleShot(50, self._update_connections)
