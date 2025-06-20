@@ -639,46 +639,80 @@ current_action_key = actions_tab.current_action_key
 ###### 2.1.2.5 手势映射选项卡 (ui/gestures/gesture_mappings_tab.py)
 
 **功能说明**：
-手势映射管理选项卡，用于将触发路径和执行操作关联起来，形成完整的手势定义。提供映射关系的创建、编辑和删除功能。
+手势映射管理选项卡，提供可视化的手势映射创建和管理界面。使用卡片式布局显示执行操作和触发路径，通过连线的方式直观地展示映射关系。支持点击连接、可视化删除和状态显示等功能。
 
 **主要类和方法**：
-- `GestureMappingsTab`：手势映射管理选项卡类
-  - `__init__(self, parent=None)`：初始化手势映射选项卡
-  - `initUI(self)`：初始化用户界面，创建左右分栏布局
-  - `_create_mapping_list_panel(self)`：创建左侧映射列表面板
-  - `_create_mapping_editor_panel(self)`：创建右侧映射编辑器面板
-  - `_load_mapping_list(self)`：加载并显示映射列表，按ID排序
-  - `_load_combo_options(self)`：加载下拉框选项
-  - `_get_path_name_by_id(self, path_id)`：根据ID获取路径名称
-  - `_get_action_name_by_id(self, action_id)`：根据ID获取操作名称
-  - `_on_mapping_selected(self, item)`：处理映射选择事件
-  - `_load_mapping_to_editor(self, mapping_key)`：将映射数据加载到编辑器
-  - `_on_form_changed(self)`：表单内容变化事件处理
-  - `_auto_save_changes(self)`：自动保存变更到手势库变量中
-  - `_update_button_states(self)`：更新按钮启用状态
-  - `_add_new_mapping(self)`：添加新映射
-  - `_select_mapping_in_list(self, mapping_key)`：在列表中选择指定映射
-  - `_delete_mapping(self)`：删除选中的映射
-  - `_clear_form(self)`：清空表单
-  - `has_unsaved_changes(self)`：检查是否有未保存的更改
-  - `refresh_list(self)`：刷新映射列表显示
+
+**核心组件类**：
+- `ConnectionWidget`：连线绘制组件，处理映射关系的可视化连线
+  - `add_connection(action_id, path_id, start_point, end_point)`：添加连线
+  - `remove_connection(path_id)`：移除指定路径的连线
+  - `clear_connections()`：清空所有连线
+  - `mousePressEvent(event)`：鼠标点击选择连线
+  - `keyPressEvent(event)`：键盘删除选中连线（Delete键）
+  - `paintEvent(event)`：绘制所有连线和箭头
+
+- `ActionCardWidget`：执行操作卡片组件
+  - `action_clicked = Signal(int, QPoint)`：操作卡片点击信号
+  - `set_selected(is_selected)`：设置选中状态
+  - `set_mapped_count(count)`：更新已映射的路径数量显示
+
+- `PathCardWidget`：触发路径卡片组件
+  - `path_clicked = Signal(int, QPoint)`：路径卡片点击信号
+  - `set_mapped(is_mapped, action_name)`：设置映射状态和关联操作名
+
+- `ActionCardsWidget` / `PathCardsWidget`：卡片容器组件
+  - 管理多个卡片的布局和操作
+  - 支持动态添加、删除和刷新卡片
+
+**主要管理类**：
+- `GestureMappingsTab`：手势映射管理选项卡主类
+  - `initUI()`：初始化三面板布局界面
+  - `_create_actions_panel()`：创建左侧执行操作面板
+  - `_create_paths_panel()`：创建右侧触发路径面板
+  - `_load_data()`：加载所有数据（操作、路径、映射）
+  - `_load_actions()`：加载执行操作卡片
+  - `_load_paths()`：加载触发路径卡片
+  - `_load_existing_mappings()`：加载现有映射关系
+  - `_on_action_clicked(action_id, global_pos)`：处理操作卡片点击
+  - `_on_path_clicked(path_id, global_pos)`：处理路径卡片点击
+  - `_create_mapping(action_id, path_id)`：创建新的映射关系
+  - `_delete_mapping_by_path_id(path_id)`：根据路径ID删除映射
+  - `_update_connections()`：更新连线可视化
+  - `_clear_all_mappings()`：清除所有映射关系
+  - `refresh_list()`：刷新整个界面数据
 
 **界面布局**：
-- **左侧映射列表面板**：
-  - 映射列表（显示ID、手势名称、路径→操作）
-  - 添加映射按钮
-  - 删除映射按钮（选中映射时启用）
-- **右侧映射编辑器面板**：
-  - 手势名称输入框
-  - 触发路径下拉框（显示可用路径）
-  - 执行操作下拉框（显示可用操作）
-  - 清空按钮
+- **左侧执行操作面板**：
+  - 执行操作卡片网格布局
+  - 每个卡片显示操作名称、内容和状态
+  - 支持悬停高亮和点击选择
+  - 显示已映射的路径数量
 
-**核心功能**：
-- **关联管理**：将触发路径和执行操作关联成完整手势
-- **下拉框同步**：自动加载并显示可用的路径和操作
-- **名称解析**：根据ID自动解析并显示路径和操作名称
-- **完整性检查**：确保映射引用的路径和操作存在
+- **中间连线可视化区域**：
+  - 动态绘制操作与路径之间的连线
+  - 支持连线选择（点击高亮）
+  - 支持键盘删除选中连线（Delete键）
+  - 箭头指示连接方向
+
+- **右侧触发路径面板**：
+  - 触发路径卡片网格布局
+  - 每个卡片显示路径名称和方向信息
+  - 映射状态可视化显示（已连接/未连接）
+  - 显示关联的操作名称
+
+**可视化特性**：
+- **卡片式设计**：直观的操作和路径展示
+- **连线动画**：实时可视化映射关系
+- **状态指示**：清晰的连接状态显示
+- **交互式操作**：点击创建、删除连接
+- **颜色编码**：不同状态使用不同颜色区分
+
+**操作流程**：
+1. **创建映射**：先点击左侧操作卡片，再点击右侧路径卡片
+2. **删除映射**：点击选中连线，按Delete键删除
+3. **查看状态**：卡片颜色和文字显示当前连接状态
+4. **批量操作**：支持清除所有映射功能
 
 **使用方法**：
 ```python
@@ -688,27 +722,25 @@ from ui.gestures.gesture_mappings_tab import GestureMappingsTab
 # 创建选项卡实例
 mappings_tab = GestureMappingsTab()
 
-# 访问组件
-mapping_list = mappings_tab.mapping_list              # 映射列表控件
-name_input = mappings_tab.edit_name                   # 手势名称输入框
-path_combo = mappings_tab.combo_trigger_path          # 触发路径下拉框
-action_combo = mappings_tab.combo_execute_action      # 执行操作下拉框
+# 访问主要组件
+actions_widget = mappings_tab.actions_widget      # 左侧操作卡片容器
+paths_widget = mappings_tab.paths_widget          # 右侧路径卡片容器
+connection_widget = mappings_tab.connection_widget # 中间连线组件
 
-# 手动操作
-mappings_tab._add_new_mapping()      # 添加新映射
-mappings_tab._delete_mapping()       # 删除当前选中映射
-mappings_tab._clear_form()           # 清空表单
-mappings_tab.refresh_list()          # 刷新列表
+# 操作方法
+mappings_tab._load_data()                          # 重新加载所有数据
+mappings_tab._create_mapping(action_id, path_id)   # 创建映射关系
+mappings_tab._delete_mapping_by_path_id(path_id)   # 删除指定映射
+mappings_tab._clear_all_mappings()                 # 清除所有映射
+mappings_tab.refresh_list()                        # 刷新界面显示
 
-# 检查变更状态
-has_changes = mappings_tab.has_unsaved_changes()
+# 获取信息
+action_name = mappings_tab._get_action_name_by_id(action_id)  # 获取操作名
+path_name = mappings_tab._get_path_name_by_id(path_id)        # 获取路径名
 
-# 访问当前映射数据
-current_mapping_key = mappings_tab.current_mapping_key
-
-# 获取名称解析方法
-path_name = mappings_tab._get_path_name_by_id(1)      # 根据ID获取路径名
-action_name = mappings_tab._get_action_name_by_id(1)  # 根据ID获取操作名
+# 组件操作
+action_card = actions_widget.get_action_card(action_id)       # 获取操作卡片
+path_card = paths_widget.get_path_card(path_id)               # 获取路径卡片
 ```
 
 ###### 2.1.2.6 手势绘制组件 (ui/gestures/drawing_widget.py)
