@@ -32,7 +32,7 @@ class PenPreviewWidget(QWidget):
         self.animation_timer.timeout.connect(self._update_animation)
         
         self.animation_progress = 0.0
-        self.animation_speed = 0.015
+        self.animation_speed = 0.04
         self.is_playing = False
         
         try:
@@ -43,17 +43,223 @@ class PenPreviewWidget(QWidget):
         self._generate_gesture_path()
         
         self.drawing_buffer = None
+        self.previous_buffer = None
+        self.fade_progress = 0.0
+        self.fade_duration = 0.5
         self.current_brush = None
 
     def _generate_gesture_path(self):
+        """根据画笔粗细生成合适的随机形状"""
+        import random
+        
+        if self.pen_width <= 3:
+            shape_types = ['wave', 'spiral', 'heart', 'star', 'circle', 'triangle', 'diamond', 'infinity', 
+                          'sine_wave', 'cosine_wave', 's_curve', 'flower', 'butterfly', 'figure_eight', 'zigzag']
+        elif self.pen_width <= 8:
+            shape_types = ['wave', 'circle', 'triangle', 'diamond', 'simple_star', 'oval', 
+                          'sine_wave', 's_curve', 'simple_flower', 'figure_eight']
+        else:
+            shape_types = ['line', 'simple_wave', 'large_circle', 'square', 'simple_sine']
+        
+        shape_type = random.choice(shape_types)
         self.gesture_points = []
         
         t_values = [i / 100.0 for i in range(101)]
         
-        for t in t_values:
-            x = t
-            y = 0.5 + 0.3 * math.sin(t * math.pi * 2) * math.sin(t * math.pi)
-            self.gesture_points.append((x, y))
+        if shape_type == 'wave':
+            for t in t_values:
+                x = t
+                y = 0.5 + 0.3 * math.sin(t * math.pi * 2) * math.sin(t * math.pi)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'simple_wave':
+            for t in t_values:
+                x = t
+                y = 0.5 + 0.2 * math.sin(t * math.pi * 1.5)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'line':
+            for t in t_values:
+                x = t
+                y = 0.5
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'circle':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                x = 0.5 + 0.3 * math.cos(angle)
+                y = 0.5 + 0.3 * math.sin(angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'large_circle':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                x = 0.5 + 0.25 * math.cos(angle)
+                y = 0.5 + 0.25 * math.sin(angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'triangle':
+            for t in t_values:
+                if t <= 0.33:
+                    x = 0.2 + t * 1.8
+                    y = 0.8
+                elif t <= 0.66:
+                    progress = (t - 0.33) / 0.33
+                    x = 0.8 - progress * 0.3
+                    y = 0.8 - progress * 0.6
+                else:
+                    progress = (t - 0.66) / 0.34
+                    x = 0.5 - progress * 0.3
+                    y = 0.2 + progress * 0.6
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'square':
+            for t in t_values:
+                if t <= 0.25:
+                    x = 0.2 + t * 2.4
+                    y = 0.2
+                elif t <= 0.5:
+                    x = 0.8
+                    y = 0.2 + (t - 0.25) * 2.4
+                elif t <= 0.75:
+                    x = 0.8 - (t - 0.5) * 2.4
+                    y = 0.8
+                else:
+                    x = 0.2
+                    y = 0.8 - (t - 0.75) * 2.4
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'heart':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                x = 0.5 + 0.2 * (16 * math.sin(angle)**3) / 16
+                y = 0.4 - 0.15 * (13 * math.cos(angle) - 5 * math.cos(2*angle) - 2 * math.cos(3*angle) - math.cos(4*angle)) / 16
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'star':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                if int(t * 10) % 2 == 0:
+                    radius = 0.3
+                else:
+                    radius = 0.15
+                x = 0.5 + radius * math.cos(angle - math.pi/2)
+                y = 0.5 + radius * math.sin(angle - math.pi/2)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'simple_star':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                if int(t * 5) % 2 == 0:
+                    radius = 0.25
+                else:
+                    radius = 0.15
+                x = 0.5 + radius * math.cos(angle - math.pi/2)
+                y = 0.5 + radius * math.sin(angle - math.pi/2)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'diamond':
+            for t in t_values:
+                if t <= 0.25:
+                    x = 0.5 + t * 1.2
+                    y = 0.5 + t * 1.2
+                elif t <= 0.5:
+                    progress = t - 0.25
+                    x = 0.8 - progress * 1.2
+                    y = 0.8 - progress * 1.2
+                elif t <= 0.75:
+                    progress = t - 0.5
+                    x = 0.5 - progress * 1.2
+                    y = 0.5 - progress * 1.2
+                else:
+                    progress = t - 0.75
+                    x = 0.2 + progress * 1.2
+                    y = 0.2 + progress * 1.2
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'spiral':
+            for t in t_values:
+                angle = t * 4 * math.pi
+                radius = 0.05 + t * 0.25
+                x = 0.5 + radius * math.cos(angle)
+                y = 0.5 + radius * math.sin(angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'infinity':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                x = 0.5 + 0.3 * math.cos(angle) / (1 + math.sin(angle)**2)
+                y = 0.5 + 0.2 * math.sin(angle) * math.cos(angle) / (1 + math.sin(angle)**2)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'oval':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                x = 0.5 + 0.35 * math.cos(angle)
+                y = 0.5 + 0.2 * math.sin(angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'sine_wave':
+            for t in t_values:
+                x = t
+                y = 0.5 + 0.25 * math.sin(t * 2 * math.pi)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'simple_sine':
+            for t in t_values:
+                x = t
+                y = 0.5 + 0.15 * math.sin(t * math.pi)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'cosine_wave':
+            for t in t_values:
+                x = t
+                y = 0.5 + 0.25 * math.cos(t * 2 * math.pi)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 's_curve':
+            for t in t_values:
+                x = t
+                y = 0.5 + 0.3 * math.sin(t * math.pi)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'flower':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                radius = 0.2 + 0.1 * math.cos(5 * angle)
+                x = 0.5 + radius * math.cos(angle)
+                y = 0.5 + radius * math.sin(angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'simple_flower':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                radius = 0.15 + 0.08 * math.cos(3 * angle)
+                x = 0.5 + radius * math.cos(angle)
+                y = 0.5 + radius * math.sin(angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'butterfly':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                radius = math.exp(math.cos(angle)) - 2 * math.cos(4 * angle) + math.sin(angle/12)**5
+                radius = radius * 0.05 + 0.1
+                x = 0.5 + radius * math.cos(angle)
+                y = 0.5 + radius * math.sin(angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'figure_eight':
+            for t in t_values:
+                angle = t * 2 * math.pi
+                x = 0.5 + 0.25 * math.sin(angle)
+                y = 0.5 + 0.2 * math.sin(2 * angle)
+                self.gesture_points.append((x, y))
+                
+        elif shape_type == 'zigzag':
+            for t in t_values:
+                x = t
+                y = 0.5 + 0.2 * (2 * (t * 4 - math.floor(t * 4)) - 1)
+                self.gesture_points.append((x, y))
 
     def update_pen(self, width, color, brush_type=None):
         self.pen_width = width
@@ -62,11 +268,16 @@ class PenPreviewWidget(QWidget):
         if self.drawing_module and brush_type:
             self.drawing_module.set_brush_type(brush_type)
         
+        self._generate_gesture_path()
         self._start_animation()
 
     def _start_animation(self):
         self.animation_progress = 0.0
         self.is_playing = True
+        
+        if self.drawing_buffer:
+            self.previous_buffer = QPixmap(self.drawing_buffer)
+        self.fade_progress = 0.0
         
         self.animation_start_time = time.time()
         
@@ -83,7 +294,7 @@ class PenPreviewWidget(QWidget):
         
         self.current_point_index = 0
         
-        self.animation_timer.start(50)
+        self.animation_timer.start(30)
 
     def _create_drawing_buffer(self):
         self.drawing_buffer = QPixmap(self.size())
@@ -94,6 +305,8 @@ class PenPreviewWidget(QWidget):
             return
             
         self.animation_progress += self.animation_speed
+        
+        self.fade_progress = min(1.0, self.fade_progress + self.animation_speed * 5)
         
         screen_points = self._convert_to_screen_coords(self.gesture_points)
         total_points = len(screen_points)
@@ -167,6 +380,9 @@ class PenPreviewWidget(QWidget):
             
             if self.current_brush:
                 self.current_brush.end_stroke()
+                
+            if self.fade_progress >= 1.0:
+                self.previous_buffer = None
         
         self.update()
 
@@ -185,6 +401,7 @@ class PenPreviewWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
+            self._generate_gesture_path()
             self._start_animation()
 
     def paintEvent(self, event):
@@ -196,9 +413,12 @@ class PenPreviewWidget(QWidget):
         painter.setPen(QPen(QColor(200, 200, 200), 1))
         painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
         
-        if not self.is_playing and self.animation_progress == 0:
-            painter.setPen(QPen(QColor(150, 150, 150)))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "点击开始预览")
+        # 绘制淡出的上一个笔画
+        if self.previous_buffer and self.fade_progress < 1.0:
+            fade_opacity = 1.0 - self.fade_progress
+            painter.setOpacity(fade_opacity)
+            painter.drawPixmap(0, 0, self.previous_buffer)
+            painter.setOpacity(1.0)
             
         if self.drawing_buffer:
             painter.drawPixmap(0, 0, self.drawing_buffer)
@@ -221,16 +441,6 @@ class PenPreviewWidget(QWidget):
                 cursor_pen.setWidth(max(1, self.pen_width // 2))
                 painter.setPen(cursor_pen)
                 painter.drawEllipse(int(partial_x) - 2, int(partial_y) - 2, 4, 4)
-        
-        painter.setPen(QPen(QColor(60, 60, 60)))
-        info_text = f"粗细: {self.pen_width}px  颜色: RGB({self.pen_color[0]}, {self.pen_color[1]}, {self.pen_color[2]})"
-        painter.drawText(10, self.height() - 5, info_text)
-        
-        if self.is_playing:
-            status_text = f"绘制中: {int(self.animation_progress * 100)}%"
-        else:
-            status_text = "点击重新预览"
-        painter.drawText(self.width() - 120, self.height() - 5, status_text)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
