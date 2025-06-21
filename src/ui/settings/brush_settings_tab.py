@@ -78,6 +78,7 @@ class BrushSettingsTab(QWidget):
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
         
+        # 参数编辑区
         form_layout = QFormLayout()
 
         # 笔尖粗细
@@ -149,13 +150,15 @@ class BrushSettingsTab(QWidget):
 
         layout.addLayout(form_layout)
 
-        # 预览区域
+        # 预览区
         preview_layout = QVBoxLayout()
         preview_label = QLabel("预览:")
+        preview_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-top: 10px;")
         preview_layout.addWidget(preview_label)
         
         self.pen_preview = PenPreviewWidget()
-        self.pen_preview.setMinimumHeight(80)
+        self.pen_preview.setMinimumHeight(150)
+        self.pen_preview.setMaximumHeight(300)
         preview_layout.addWidget(self.pen_preview)
         
         layout.addLayout(preview_layout)
@@ -192,6 +195,12 @@ class BrushSettingsTab(QWidget):
         finally:
             self.is_loading = False
     
+    def showEvent(self, event):
+        """选项卡显示时重头播放预览动画"""
+        super().showEvent(event)
+        if hasattr(self, 'pen_preview'):
+            self.pen_preview._start_animation()
+
     def _on_thickness_changed(self, value):
         if self.is_loading:
             return
