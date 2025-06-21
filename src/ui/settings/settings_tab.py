@@ -25,10 +25,12 @@ from qtpy.QtWidgets import (
 try:
     from core.logger import get_logger
     from ui.settings.settings import get_settings
+    from .pen_preview_widget import PenPreviewWidget
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
     from core.logger import get_logger
     from ui.settings.settings import get_settings
+    from .pen_preview_widget import PenPreviewWidget
 
 
 class SettingsPage(QWidget):
@@ -277,22 +279,21 @@ class SettingsPage(QWidget):
             self.thickness_spinbox.setValue(pen_width)
             
             self.color_preview.set_color(pen_color)
-            self.pen_preview.update_pen(pen_width, pen_color)
             
-            # 设置画笔类型（从英文配置值映射到UI显示）
             if brush_type == "water":
                 self.water_radio.setChecked(True)
             elif brush_type == "calligraphy":
                 self.calligraphy_radio.setChecked(True)
-            else:  # 默认为 "pencil"
+            else:
                 self.pencil_radio.setChecked(True)
+            
+            self.pen_preview.update_pen(pen_width, pen_color, brush_type)
             
             self.force_topmost_checkbox.setChecked(force_topmost)
             
             is_autostart = self.settings.is_autostart_enabled()
             self.autostart_checkbox.setChecked(is_autostart)
             
-            # 加载应用设置
             show_exit_dialog = self.settings.get("app.show_exit_dialog", True)
             self.show_exit_dialog_checkbox.setChecked(show_exit_dialog)
             
@@ -302,11 +303,8 @@ class SettingsPage(QWidget):
             else:
                 self.exit_radio.setChecked(True)
             
-            # 加载手势相似度阈值
             threshold = self.settings.get("gesture.similarity_threshold", 0.70)
             self.threshold_spinbox.setValue(threshold)
-            
-
             
             self.logger.debug("设置已加载到界面")
             
@@ -326,9 +324,9 @@ class SettingsPage(QWidget):
             self.thickness_spinbox.setValue(value)
         
         color = self.color_preview.get_color()
-        self.pen_preview.update_pen(value, color)
+        brush_type = "water" if self.water_radio.isChecked() else ("calligraphy" if self.calligraphy_radio.isChecked() else "pencil")
+        self.pen_preview.update_pen(value, color, brush_type)
         
-        # 只在视觉上预览，不立即应用到后端
         self._mark_changed()
 
     def _on_thickness_spinbox_changed(self, value):
@@ -339,7 +337,6 @@ class SettingsPage(QWidget):
         if self.thickness_slider.value() != value:
             self.thickness_slider.setValue(value)
         
-        # 只在视觉上预览，不立即应用到后端
         self._mark_changed()
 
     def _on_color_button_clicked(self):
@@ -352,9 +349,9 @@ class SettingsPage(QWidget):
             self.color_preview.set_color(rgb)
             
             thickness = self.thickness_slider.value()
-            self.pen_preview.update_pen(thickness, rgb)
+            brush_type = "water" if self.water_radio.isChecked() else ("calligraphy" if self.calligraphy_radio.isChecked() else "pencil")
+            self.pen_preview.update_pen(thickness, rgb, brush_type)
             
-            # 只在视觉上预览，不立即应用到后端
             self._mark_changed()
 
     def _on_autostart_changed(self, state):
@@ -387,6 +384,10 @@ class SettingsPage(QWidget):
     def _on_brush_type_changed(self):
         """画笔类型改变"""
         if not self.is_loading:
+            thickness = self.thickness_slider.value()
+            color = self.color_preview.get_color()
+            brush_type = "water" if self.water_radio.isChecked() else ("calligraphy" if self.calligraphy_radio.isChecked() else "pencil")
+            self.pen_preview.update_pen(thickness, color, brush_type)
             self._mark_changed()
 
     def _mark_changed(self):
@@ -615,8 +616,6 @@ class SettingsPage(QWidget):
         return total_changes
 
 
-
-
 class ColorPreviewWidget(QWidget):
     """颜色预览控件"""
     
@@ -642,55 +641,6 @@ class ColorPreviewWidget(QWidget):
         painter.setPen(QPen(QColor(128, 128, 128), 1))
         painter.setBrush(QColor(*self.color))
         painter.drawRect(1, 1, self.width() - 2, self.height() - 2)
-
-
-class PenPreviewWidget(QWidget):
-    """笔尖预览控件"""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.pen_width = 3
-        self.pen_color = [0, 120, 255]
-        self.setMinimumHeight(60)
-
-    def update_pen(self, width, color):
-        """更新笔尖参数"""
-        self.pen_width = width
-        self.pen_color = color[:]
-        self.update()
-
-    def paintEvent(self, event):
-        """绘制笔尖预览"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        painter.fillRect(self.rect(), QColor(245, 245, 245))
-        
-        painter.setPen(QPen(QColor(200, 200, 200), 1))
-        painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
-        
-        pen = QPen(QColor(*self.pen_color))
-        pen.setWidth(self.pen_width)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        
-        y = self.height() // 2
-        start_x = 20
-        end_x = self.width() - 20
-        
-        if end_x > start_x:
-            import math
-            points = []
-            for x in range(start_x, end_x, 2):
-                wave_y = y + int(10 * math.sin((x - start_x) * 0.1))
-                points.append((x, wave_y))
-            
-            for i in range(len(points) - 1):
-                painter.drawLine(points[i][0], points[i][1], points[i+1][0], points[i+1][1])
-        
-        painter.setPen(QPen(QColor(60, 60, 60)))
-        info_text = f"粗细: {self.pen_width}px  颜色: RGB({self.pen_color[0]}, {self.pen_color[1]}, {self.pen_color[2]})"
-        painter.drawText(10, self.height() - 5, info_text)
 
 
 if __name__ == "__main__":
