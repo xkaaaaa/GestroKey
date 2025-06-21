@@ -13,7 +13,6 @@ from qtpy.QtWidgets import (
     QWidget,
     QFormLayout,
     QDoubleSpinBox,
-    QScrollArea,
 )
 
 try:
@@ -42,26 +41,7 @@ class RecognizerSettingsTab(QWidget):
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # 创建滚动区域
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setSpacing(20)
-        
-        # 判断器设置组
-        recognizer_group = self._create_recognizer_settings_group()
-        content_layout.addWidget(recognizer_group)
-        
-        content_layout.addStretch()
-        scroll_area.setWidget(content_widget)
-        layout.addWidget(scroll_area)
-    
-    def _create_recognizer_settings_group(self):
-        """创建判断器设置组"""
-        widget = QWidget()
-        layout = QFormLayout(widget)
+        form_layout = QFormLayout()
 
         # 手势相似度阈值
         threshold_layout = QHBoxLayout()
@@ -81,9 +61,10 @@ class RecognizerSettingsTab(QWidget):
         threshold_widget = QWidget()
         threshold_widget.setLayout(threshold_layout)
         
-        layout.addRow("相似度阈值:", threshold_widget)
+        form_layout.addRow("相似度阈值:", threshold_widget)
 
-        return widget
+        layout.addLayout(form_layout)
+        layout.addStretch()
     
     def _load_settings(self):
         """加载设置"""

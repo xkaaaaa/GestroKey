@@ -14,7 +14,6 @@ from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QScrollArea,
     QSlider,
     QSpinBox,
     QVBoxLayout,
@@ -79,27 +78,6 @@ class BrushSettingsTab(QWidget):
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # 创建滚动区域
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setSpacing(20)
-        
-        # 画笔设置组
-        brush_group = self._create_brush_settings_group()
-        content_layout.addWidget(brush_group)
-        
-        content_layout.addStretch()
-        scroll_area.setWidget(content_widget)
-        layout.addWidget(scroll_area)
-    
-    def _create_brush_settings_group(self):
-        """创建画笔设置组"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-
         form_layout = QFormLayout()
 
         # 笔尖粗细
@@ -181,8 +159,8 @@ class BrushSettingsTab(QWidget):
         preview_layout.addWidget(self.pen_preview)
         
         layout.addLayout(preview_layout)
-
-        return widget
+        
+        layout.addStretch()
     
     def _load_settings(self):
         """加载设置"""

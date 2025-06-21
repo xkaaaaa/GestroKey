@@ -15,7 +15,6 @@ from qtpy.QtWidgets import (
     QFormLayout,
     QRadioButton,
     QButtonGroup,
-    QScrollArea,
 )
 
 try:
@@ -44,38 +43,19 @@ class ApplicationSettingsTab(QWidget):
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # 创建滚动区域
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setSpacing(20)
-        
-        # 应用设置组
-        app_group = self._create_app_settings_group()
-        content_layout.addWidget(app_group)
-        
-        content_layout.addStretch()
-        scroll_area.setWidget(content_widget)
-        layout.addWidget(scroll_area)
-    
-    def _create_app_settings_group(self):
-        """创建应用设置组"""
-        widget = QWidget()
-        layout = QFormLayout(widget)
+        form_layout = QFormLayout()
 
         # 开机自启动
         self.autostart_checkbox = QCheckBox("开机自启动")
         self.autostart_checkbox.setToolTip("设置应用程序是否在系统启动时自动运行（将以静默模式启动，自动开始监听并最小化到托盘）")
         self.autostart_checkbox.stateChanged.connect(self._on_autostart_changed)
-        layout.addRow("启动选项:", self.autostart_checkbox)
+        form_layout.addRow("启动选项:", self.autostart_checkbox)
 
         # 退出确认对话框
         self.show_exit_dialog_checkbox = QCheckBox("显示退出确认对话框")
         self.show_exit_dialog_checkbox.setToolTip("关闭程序时是否显示确认对话框")
         self.show_exit_dialog_checkbox.stateChanged.connect(self._on_exit_dialog_changed)
-        layout.addRow("退出行为:", self.show_exit_dialog_checkbox)
+        form_layout.addRow("退出行为:", self.show_exit_dialog_checkbox)
 
         # 默认关闭行为
         close_behavior_layout = QVBoxLayout()
@@ -97,9 +77,10 @@ class ApplicationSettingsTab(QWidget):
         close_behavior_widget.setLayout(close_behavior_layout)
         close_behavior_widget.setToolTip("当不显示退出对话框时的默认行为")
         
-        layout.addRow("默认关闭行为:", close_behavior_widget)
+        form_layout.addRow("默认关闭行为:", close_behavior_widget)
 
-        return widget
+        layout.addLayout(form_layout)
+        layout.addStretch()
     
     def _load_settings(self):
         """加载设置"""
