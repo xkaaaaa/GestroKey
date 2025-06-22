@@ -6,11 +6,7 @@ from datetime import datetime, timedelta
 import psutil
 from qtpy.QtCore import QObject, QTimer, Signal
 
-try:
-    from core.logger import get_logger
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
-    from core.logger import get_logger
+from core.logger import get_logger
 
 
 class SystemMonitor(QObject):

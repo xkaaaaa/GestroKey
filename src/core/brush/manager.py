@@ -14,13 +14,8 @@ from qtpy.QtWidgets import QApplication
 
 from .overlay import DrawingSignals, TransparentDrawingOverlay
 
-try:
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
+from core.logger import get_logger
+from ui.settings.settings import get_settings
 
 
 class DrawingManager:
@@ -288,4 +283,4 @@ class DrawingManager:
             return self.overlay.get_stroke_direction()
         except Exception as e:
             self.logger.error(f"获取绘制方向失败: {e}")
-            return "获取方向信息失败" 
+            return "获取方向信息失败"

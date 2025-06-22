@@ -305,6 +305,7 @@ class GestroKeyApp(QMainWindow):
             def try_activate():
                 self.raise_()
                 self.activateWindow()
+
                 QApplication.processEvents()
 
             try_activate()

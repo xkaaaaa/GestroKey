@@ -5,22 +5,11 @@ from qtpy.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabe
 from qtpy.QtCore import Qt, QPoint, Signal, QTimer, QSize
 from qtpy.QtGui import QPainter, QPen, QColor, QPolygon, QTransform, QIcon
 
-# 尝试导入 SVG 组件，如果不支持则使用替代方案
-try:
-    from qtpy.QtSvgWidgets import QSvgWidget
-    SVG_SUPPORT = True
-except ImportError:
-    # PyQt5 不支持 QtSvgWidgets，使用 QLabel 作为替代
-    SVG_SUPPORT = False
-    QSvgWidget = QLabel
+from qtpy.QtSvgWidgets import QSvgWidget
+SVG_SUPPORT = True
 
-try:
-    from core.logger import get_logger
-    from core.path_analyzer import PathAnalyzer
-except ImportError:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from core.logger import get_logger
-    from core.path_analyzer import PathAnalyzer
+from core.logger import get_logger
+from core.path_analyzer import PathAnalyzer
 
 
 class GestureDrawingWidget(QWidget):
@@ -1117,4 +1106,4 @@ class GestureDrawingWidget(QWidget):
             self._reset_view()
             self.update()
         else:
-            self.clear_drawing() 
+            self.clear_drawing()

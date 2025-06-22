@@ -7,13 +7,8 @@ import traceback
 
 from pynput.keyboard import Controller, Key, KeyCode
 
-try:
-    from core.logger import get_logger
-    from ui.gestures.gestures import get_gesture_library
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
-    from core.logger import get_logger
-    from ui.gestures.gestures import get_gesture_library
+from core.logger import get_logger
+from ui.gestures.gestures import get_gesture_library
 
 
 class GestureExecutor:
@@ -429,24 +424,3 @@ class GestureExecutor:
 def get_gesture_executor():
     """获取手势执行器的全局实例"""
     return GestureExecutor.get_instance()
-
-
-# 测试代码
-if __name__ == "__main__":
-    # 获取手势执行器实例
-    executor = get_gesture_executor()
-
-    # 模拟执行手势动作
-    print("测试执行'复制'手势...")
-    result = executor.execute_gesture_by_path({"points": [[0, 0], [1, 1]], "connections": [[0, 1]]})
-    print(f"执行结果: {'成功' if result else '失败'}")
-
-    # 等待一段时间以便测试手势效果
-    import time
-
-    time.sleep(1)
-
-    # 测试不存在的手势
-    print("测试执行不存在的手势...")
-    result = executor.execute_gesture_by_path({"points": [[0, 0], [1, 1], [2, 2]], "connections": [[0, 1], [1, 2]]})
-    print(f"执行结果: {'成功' if result else '失败'}")

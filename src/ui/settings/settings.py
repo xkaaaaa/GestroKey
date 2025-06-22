@@ -5,13 +5,8 @@ import os
 import sys
 import time
 
-try:
-    from core.logger import get_logger
-    from version import APP_NAME, AUTHOR
-except ImportError:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from core.logger import get_logger
-    from version import APP_NAME, AUTHOR
+from core.logger import get_logger
+from version import APP_NAME, AUTHOR
 
 if sys.platform.startswith("win"):
     import winreg

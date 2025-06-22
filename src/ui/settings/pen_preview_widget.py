@@ -12,11 +12,7 @@ from qtpy.QtCore import Qt, QTimer
 from qtpy.QtGui import QColor, QPainter, QPen, QPixmap
 from qtpy.QtWidgets import QWidget
 
-try:
-    from core.brush.drawing import DrawingModule
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-    from core.brush.drawing import DrawingModule
+from core.brush.drawing import DrawingModule
 
 
 class PenPreviewWidget(QWidget):
@@ -445,4 +441,4 @@ class PenPreviewWidget(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self.size().width() > 0 and self.size().height() > 0:
-            self._create_drawing_buffer() 
+            self._create_drawing_buffer()

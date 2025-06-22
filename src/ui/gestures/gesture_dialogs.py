@@ -284,4 +284,4 @@ class ExecuteActionEditDialog(QDialog):
             
         except Exception as e:
             self.logger.error(f"保存操作时出错: {e}")
-            QMessageBox.critical(self, "错误", f"保存操作失败: {str(e)}") 
+            QMessageBox.critical(self, "错误", f"保存操作失败: {str(e)}")

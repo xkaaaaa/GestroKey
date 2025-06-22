@@ -17,19 +17,11 @@ from qtpy.QtWidgets import (
     QTabWidget,
 )
 
-try:
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
-    from .application_settings_tab import ApplicationSettingsTab
-    from .brush_settings_tab import BrushSettingsTab
-    from .recognizer_settings_tab import RecognizerSettingsTab
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
-    from .application_settings_tab import ApplicationSettingsTab
-    from .brush_settings_tab import BrushSettingsTab
-    from .recognizer_settings_tab import RecognizerSettingsTab
+from core.logger import get_logger
+from ui.settings.settings import get_settings
+from .application_settings_tab import ApplicationSettingsTab
+from .brush_settings_tab import BrushSettingsTab
+from .recognizer_settings_tab import RecognizerSettingsTab
 
 
 class SettingsPage(QWidget):

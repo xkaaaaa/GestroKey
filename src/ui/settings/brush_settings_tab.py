@@ -23,15 +23,9 @@ from qtpy.QtWidgets import (
     QButtonGroup,
 )
 
-try:
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
-    from .pen_preview_widget import PenPreviewWidget
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
-    from .pen_preview_widget import PenPreviewWidget
+from core.logger import get_logger
+from ui.settings.settings import get_settings
+from .pen_preview_widget import PenPreviewWidget
 
 
 class ColorPreviewWidget(QWidget):

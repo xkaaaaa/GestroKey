@@ -26,13 +26,8 @@ from qtpy.QtWidgets import QApplication, QWidget
 from .drawing import DrawingModule
 from .fading import FadingModule
 
-try:
-    from core.logger import get_logger
-    from core.path_analyzer import PathAnalyzer
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-    from core.logger import get_logger
-    from core.path_analyzer import PathAnalyzer
+from core.logger import get_logger
+from core.path_analyzer import PathAnalyzer
 
 
 class DrawingSignals(QObject):
@@ -567,7 +562,3 @@ class TransparentDrawingOverlay(QWidget):
             
         # 只要在绘制水性笔，就持续更新以显示变粗效果
         self.update()
-
-
-
-

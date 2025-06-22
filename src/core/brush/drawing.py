@@ -432,4 +432,4 @@ class DrawingModule:
         
     def get_current_brush_type(self):
         """获取当前画笔类型"""
-        return self.current_brush_type 
+        return self.current_brush_type

@@ -15,13 +15,8 @@ from qtpy.QtWidgets import (
     QDoubleSpinBox,
 )
 
-try:
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
+from core.logger import get_logger
+from ui.settings.settings import get_settings
 
 
 class RecognizerSettingsTab(QWidget):

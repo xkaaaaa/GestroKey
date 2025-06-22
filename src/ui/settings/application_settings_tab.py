@@ -17,13 +17,8 @@ from qtpy.QtWidgets import (
     QButtonGroup,
 )
 
-try:
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-    from core.logger import get_logger
-    from ui.settings.settings import get_settings
+from core.logger import get_logger
+from ui.settings.settings import get_settings
 
 
 class ApplicationSettingsTab(QWidget):
@@ -165,4 +160,4 @@ class ApplicationSettingsTab(QWidget):
             return True
         except Exception as e:
             self.logger.error(f"应用设置失败: {e}")
-            return False 
+            return False

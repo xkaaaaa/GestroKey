@@ -8,17 +8,10 @@ from qtpy.QtWidgets import (
     QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 )
 
-try:
-    from core.brush.manager import DrawingManager
-    from core.logger import get_logger
-    from core.system_monitor import SystemMonitor, format_bytes
-    from version import APP_NAME
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
-    from core.brush.manager import DrawingManager
-    from core.logger import get_logger
-    from core.system_monitor import SystemMonitor, format_bytes
-    from version import APP_NAME
+from core.brush.manager import DrawingManager
+from core.logger import get_logger
+from core.system_monitor import SystemMonitor, format_bytes
+from version import APP_NAME
 
 
 def create_styled_progress_bar(color_theme="default"):
@@ -229,10 +222,3 @@ class ConsolePage(QWidget):
 
         if self.system_monitor:
             self.system_monitor.stop()
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    widget = ConsolePage()
-    widget.show()
-    sys.exit(app.exec())

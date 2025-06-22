@@ -84,9 +84,3 @@ def get_packaging_config():
             "use_upx": PACKAGE_UPXIFY,
         },
     }
-
-
-if __name__ == "__main__":
-    print(get_version_string())
-    print(get_full_version_info())
-    print(get_packaging_config())

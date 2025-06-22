@@ -5,11 +5,7 @@ import sys
 import time
 from datetime import datetime
 
-try:
-    from version import APP_NAME, AUTHOR
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
-    from version import APP_NAME, AUTHOR
+from version import APP_NAME, AUTHOR
 
 
 class Logger:
@@ -92,15 +88,3 @@ default_logger = Logger()
 
 def get_logger(module_name=None):
     return Logger(module_name)
-
-
-if __name__ == "__main__":
-    logger = Logger("测试模块")
-    logger.info("这是一条信息日志")
-    logger.warning("这是一条警告日志")
-    logger.error("这是一条错误日志")
-
-    try:
-        1 / 0
-    except Exception as e:
-        logger.exception(f"发生异常: {e}")
