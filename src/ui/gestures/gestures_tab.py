@@ -639,33 +639,35 @@ class GesturesPage(QWidget):
         
     def initUI(self):
         """初始化用户界面"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        title = QLabel("手势管理")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; padding: 10px;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        # 创建滚动区域用于核心内容
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
+        # 滚动区域内容
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(10, 10, 10, 10)
-        
-        title_layout = QVBoxLayout()
-        title = QLabel("手势映射")
-        title.setFont(QFont("", 14, QFont.Weight.Bold))
-        title_layout.addWidget(title)
-        
-        instruction = QLabel("点击左侧操作卡片，然后点击右侧路径卡片进行映射。一个路径只能映射一个操作。")
-        instruction.setStyleSheet("color: #666; margin-bottom: 10px;")
-        instruction.setWordWrap(True)
-        title_layout.addWidget(instruction)
-        
-        scroll_layout.addLayout(title_layout)
-        
+                
+        # 核心内容布局
         content_layout = QHBoxLayout()
         content_layout.setSpacing(20)
         
+        # 左侧操作面板
         left_panel = self._create_actions_panel()
         content_layout.addWidget(left_panel)
         
+        # 中间连线面板
         middle_panel = QWidget()
         middle_layout = QVBoxLayout(middle_panel)
         middle_layout.setContentsMargins(0, 0, 0, 0)
@@ -681,43 +683,42 @@ class GesturesPage(QWidget):
         
         content_layout.addWidget(middle_panel, 1)
         
+        # 右侧路径面板
         right_panel = self._create_paths_panel()
         content_layout.addWidget(right_panel)
         
         scroll_layout.addLayout(content_layout, 1)
         
         self.scroll_area.setWidget(scroll_content)
+        layout.addWidget(self.scroll_area)
         
-        # 底部按钮布局（固定在页面底部，不滚动）
-        button_layout = QHBoxLayout()
-        button_layout.setContentsMargins(10, 10, 10, 10)
+        # 底部统一操作按钮 - 与设置页面保持完全一致
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(10)
         
-        # 重置为默认手势库按钮
+        # 重置为默认按钮
         self.btn_reset = QPushButton("重置为默认")
         self.btn_reset.setMinimumSize(120, 35)
         self.btn_reset.clicked.connect(self._reset_to_default)
-        button_layout.addWidget(self.btn_reset)
+        bottom_layout.addWidget(self.btn_reset)
         
-        button_layout.addStretch()
+        bottom_layout.addStretch()
         
         # 放弃修改按钮
         self.btn_discard = QPushButton("放弃修改")
         self.btn_discard.setMinimumSize(100, 35)
         self.btn_discard.clicked.connect(self._discard_changes)
         self.btn_discard.setEnabled(False)
-        button_layout.addWidget(self.btn_discard)
+        bottom_layout.addWidget(self.btn_discard)
         
-        # 保存手势库按钮
+        # 保存设置按钮
         self.btn_save_library = QPushButton("保存设置")
         self.btn_save_library.setMinimumSize(100, 35)
         self.btn_save_library.clicked.connect(self._save_gesture_library)
         self.btn_save_library.setEnabled(False)
-        button_layout.addWidget(self.btn_save_library)
+        bottom_layout.addWidget(self.btn_save_library)
         
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(self.scroll_area, 1)  # 滚动区域占据剩余空间
-        main_layout.addLayout(button_layout)  # 按钮固定在底部
+        layout.addLayout(bottom_layout)
         
     def _create_actions_panel(self):
         """创建操作卡片面板"""
