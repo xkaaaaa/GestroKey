@@ -350,7 +350,7 @@ jobs:
         run: |
           $QT_API = python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)"
           Write-Host "检测到 Qt API: $QT_API"
-          python -m nuitka --standalone --disable-console --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --standalone --disable-console --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/app/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
           Copy-Item -Path dist/main.dist/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
           Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
@@ -361,7 +361,7 @@ jobs:
         shell: pwsh
         run: |
           pip install pyinstaller
-          pyinstaller --name=GestroKey --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icons/icon.ico src/main.py
+          pyinstaller --name=GestroKey --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/app/icons/icon.ico src/main.py
           mkdir -Force -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable"
           Copy-Item -Path dist/GestroKey/* -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/" -Recurse
           Compress-Archive -Path "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable/*" -DestinationPath "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Portable.zip" -Force
@@ -445,7 +445,7 @@ jobs:
               target_arch=None,
               codesign_identity=None,
               entitlements_file=None,
-              icon='src/assets/images/icons/icon.icns',
+              icon='src/assets/images/app/icons/icon.icns',
           )
           
           coll = COLLECT(
@@ -461,7 +461,7 @@ jobs:
           app = BUNDLE(
               coll,
               name='GestroKey.app',
-              icon='src/assets/images/icons/icon.icns',
+              icon='src/assets/images/app/icons/icon.icns',
               bundle_identifier=None,
               info_plist={
                   'NSHighResolutionCapable': 'True',
@@ -489,7 +489,7 @@ jobs:
         run: |
           $QT_API = python -c "import sys; sys.path.append('src'); from version import QT_API; print(QT_API)"
           Write-Host "检测到 Qt API: $QT_API"
-          python -m nuitka --onefile --disable-console --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
+          python -m nuitka --onefile --disable-console --enable-plugin=$QT_API --include-data-dir=src/assets=assets --include-data-files=src/ui/settings/default_settings.json=ui/settings/default_settings.json --include-data-files=src/ui/gestures/default_gestures.json=ui/gestures/default_gestures.json --windows-icon-from-ico=src/assets/images/app/icons/icon.ico --output-dir=dist --assume-yes-for-downloads src/main.py
           Move-Item -Path dist/main.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
 
       # 构建单文件版本 - Windows (PyInstaller)
@@ -498,7 +498,7 @@ jobs:
         shell: pwsh
         run: |
           pip install pyinstaller
-          pyinstaller --name=GestroKey --onefile --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/icons/icon.ico src/main.py
+          pyinstaller --name=GestroKey --onefile --windowed --noconfirm --add-data="src/assets;assets" --add-data="src/ui/settings/default_settings.json;ui/settings" --add-data="src/ui/gestures/default_gestures.json;ui/gestures" --icon=src/assets/images/app/icons/icon.ico src/main.py
           Move-Item -Path dist/GestroKey.exe -Destination "dist/GestroKey-${{ needs.get-version.outputs.version }}-Windows-Standalone.exe"
 
       # 构建单文件版本 - Linux
@@ -581,13 +581,13 @@ jobs:
               target_arch=None,
               codesign_identity=None,
               entitlements_file=None,
-              icon='src/assets/images/icons/icon.icns',
+              icon='src/assets/images/app/icons/icon.icns',
           )
           
           app = BUNDLE(
               exe,
               name='GestroKey.app',
-              icon='src/assets/images/icons/icon.icns',
+              icon='src/assets/images/app/icons/icon.icns',
               bundle_identifier=None,
               info_plist={
                   'NSHighResolutionCapable': 'True',

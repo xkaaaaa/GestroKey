@@ -86,7 +86,7 @@ def get_system_tray(parent):
         return None
     
     tray_icon = QSystemTrayIcon(parent)
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "icon.svg")
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "app", "icon.svg")
     if os.path.exists(icon_path):
         tray_icon.setIcon(QIcon(icon_path))
     else:
@@ -94,7 +94,12 @@ def get_system_tray(parent):
         tray_icon.setIcon(parent.style().standardIcon(parent.style().StandardPixmap.SP_ComputerIcon))
     
     menu = QMenu()
+    
+    # 显示窗口
     show_action = QAction("显示窗口", parent)
+    show_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "tray-show.svg")
+    if os.path.exists(show_icon_path):
+        show_action.setIcon(QIcon(show_icon_path))
     show_action.triggered.connect(parent.show_and_activate)
     menu.addAction(show_action)
     
@@ -103,11 +108,15 @@ def get_system_tray(parent):
     
     # 切换绘制状态
     toggle_action = QAction("启动/停止监听", parent)
+    # 根据状态设置不同图标（稍后在update_drawing_state中动态更新）
     toggle_action.triggered.connect(parent.toggle_drawing)
     menu.addAction(toggle_action)
     
     # 显示设置
     settings_action = QAction("设置", parent)
+    settings_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "settings.svg")
+    if os.path.exists(settings_icon_path):
+        settings_action.setIcon(QIcon(settings_icon_path))
     settings_action.triggered.connect(parent.show_settings_page)
     menu.addAction(settings_action)
     
@@ -116,6 +125,9 @@ def get_system_tray(parent):
     
     # 退出
     exit_action = QAction("退出", parent)
+    exit_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "exit.svg")
+    if os.path.exists(exit_icon_path):
+        exit_action.setIcon(QIcon(exit_icon_path))
     exit_action.triggered.connect(parent._exit_application)
     menu.addAction(exit_action)
     
@@ -133,6 +145,16 @@ def get_system_tray(parent):
         status = "监听中" if is_active else "已停止"
         tray_icon.setToolTip(f"GestroKey - {status}")
         toggle_action.setText(f"{'停止' if is_active else '启动'}监听")
+        
+        # 根据状态设置不同的图标
+        if is_active:
+            stop_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "tray-stop.svg")
+            if os.path.exists(stop_icon_path):
+                toggle_action.setIcon(QIcon(stop_icon_path))
+        else:
+            start_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "tray-start.svg")
+            if os.path.exists(start_icon_path):
+                toggle_action.setIcon(QIcon(start_icon_path))
     
     tray_icon.update_drawing_state = update_drawing_state
     tray_icon.update_drawing_state(False)  # 初始状态
@@ -331,7 +353,7 @@ class GestroKeyApp(QMainWindow):
         self.setMinimumSize(800, 500)
 
         icon_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "assets", "images", "icon.svg"
+            os.path.dirname(os.path.abspath(__file__)), "assets", "images", "app", "icon.svg"
         )
         if os.path.exists(icon_path):
             self.logger.info(f"加载窗口图标: {icon_path}")
@@ -366,19 +388,19 @@ class GestroKeyApp(QMainWindow):
         assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images")
         
         self.console_btn = QPushButton("控制台")
-        console_icon_path = os.path.join(assets_dir, "console.svg")
+        console_icon_path = os.path.join(assets_dir, "ui", "console.svg")
         if os.path.exists(console_icon_path):
             self.console_btn.setIcon(QIcon(console_icon_path))
         self.console_btn.clicked.connect(lambda: self.switch_page(0))
         
         self.gestures_btn = QPushButton("手势管理")
-        gestures_icon_path = os.path.join(assets_dir, "gestures.svg")
+        gestures_icon_path = os.path.join(assets_dir, "ui", "gestures.svg")
         if os.path.exists(gestures_icon_path):
             self.gestures_btn.setIcon(QIcon(gestures_icon_path))
         self.gestures_btn.clicked.connect(lambda: self.switch_page(1))
         
         self.settings_btn = QPushButton("设置")
-        settings_icon_path = os.path.join(assets_dir, "settings.svg")
+        settings_icon_path = os.path.join(assets_dir, "ui", "settings.svg")
         if os.path.exists(settings_icon_path):
             self.settings_btn.setIcon(QIcon(settings_icon_path))
         self.settings_btn.clicked.connect(lambda: self.switch_page(2))
@@ -422,6 +444,11 @@ class GestroKeyApp(QMainWindow):
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
         self.exit_button.clicked.connect(self._exit_application)
+        # 设置退出按钮图标
+        exit_icon_path = os.path.join(assets_dir, "ui", "exit.svg")
+        if os.path.exists(exit_icon_path):
+            self.exit_button.setIcon(QIcon(exit_icon_path))
+            self.exit_button.setIconSize(QSize(18, 18))
 
         self.version_label = QLabel(get_version_string())
         self.version_label.setAlignment(

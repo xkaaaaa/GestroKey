@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="app_settings_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2288" />
+      <stop offset="100%" stop-color="#007BFF" />
+    </linearGradient>
+  </defs>
+  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#app_settings_gradient)"/>
+  <circle cx="12" cy="12" r="3" fill="#ffffff" opacity="0.9"/>
+</svg> 

@@ -90,20 +90,38 @@ src/
 │       ├── drawing_widget.py # 手势绘制组件
 │       └── default_gestures.json # 默认手势库定义（JSON格式）
 ├── assets/                  # 资源文件目录
-│   └── images/              # 图像资源
-│       ├── console.svg      # 控制台图标
-│       ├── gestures.svg     # 手势管理图标
-│       ├── settings.svg     # 设置图标
-│       ├── icon.svg         # 应用程序图标
-│       ├── brush.svg        # 画笔工具图标
-│       ├── pointer.svg      # 指针工具图标
-│       ├── undo.svg         # 撤销操作图标
-│       ├── redo.svg         # 重做操作图标
-│       ├── test.svg         # 测试功能图标
-│       └── icons/           # 多尺寸应用图标
-│           ├── icon.ico     # Windows图标文件
-│           ├── icon.icns    # macOS图标文件
-│           └── icon-*.png   # 各种尺寸的PNG图标
+│   └── images/              # 图像资源，按功能分类组织
+│       ├── app/             # 应用程序图标
+│       │   ├── icon.svg     # 主应用程序图标（SVG格式）
+│       │   └── icons/       # 多尺寸应用图标
+│       │       ├── icon.ico     # Windows图标文件
+│       │       ├── icon.icns    # macOS图标文件
+│       │       └── icon-*.png   # 各种尺寸的PNG图标（16px到1024px）
+│       ├── ui/              # 用户界面图标
+│       │   ├── console.svg      # 控制台选项卡图标
+│       │   ├── gestures.svg     # 手势管理选项卡图标
+│       │   ├── settings.svg     # 设置选项卡图标
+│       │   ├── start-drawing.svg    # 开始绘制按钮图标
+│       │   ├── stop-drawing.svg     # 停止绘制按钮图标
+│       │   ├── edit.svg         # 编辑操作图标
+│       │   ├── delete.svg       # 删除操作图标
+│       │   ├── add.svg          # 添加操作图标
+│       │   ├── app-settings.svg     # 应用设置选项卡图标
+│       │   ├── brush-settings.svg   # 画笔设置选项卡图标
+│       │   ├── recognizer-settings.svg # 识别器设置选项卡图标
+│       │   ├── reset.svg        # 重置为默认图标
+│       │   ├── cancel.svg       # 放弃修改图标
+│       │   ├── save.svg         # 保存修改图标
+│       │   ├── exit.svg         # 退出程序图标
+│       │   ├── tray-start.svg   # 托盘开始监听图标
+│       │   ├── tray-stop.svg    # 托盘停止监听图标
+│       │   └── tray-show.svg    # 托盘显示主窗口图标
+│       └── tools/           # 工具图标
+│           ├── brush.svg        # 画笔工具图标
+│           ├── pointer.svg      # 指针工具图标
+│           ├── undo.svg         # 撤销操作图标
+│           ├── redo.svg         # 重做操作图标
+│           └── test.svg         # 测试功能图标
 ├── version.py               # 版本信息模块
 ├── main.py                  # 主程序入口
 └── README.md               # 本文档

@@ -196,7 +196,17 @@ class GestureDrawingWidget(QWidget):
             current_dir = os.path.dirname(os.path.abspath(__file__))  # src/ui/gestures/
             ui_dir = os.path.dirname(current_dir)  # src/ui/
             src_dir = os.path.dirname(ui_dir)  # src/
-            icon_path = os.path.join(src_dir, "assets", "images", filename)
+            
+            # 根据文件名确定子目录
+            if filename in ["brush.svg", "pointer.svg", "test.svg", "undo.svg", "redo.svg"]:
+                icon_path = os.path.join(src_dir, "assets", "images", "tools", filename)
+            elif filename in ["console.svg", "gestures.svg", "settings.svg"]:
+                icon_path = os.path.join(src_dir, "assets", "images", "ui", filename)
+            elif filename == "icon.svg":
+                icon_path = os.path.join(src_dir, "assets", "images", "app", filename)
+            else:
+                # 默认在tools目录查找
+                icon_path = os.path.join(src_dir, "assets", "images", "tools", filename)
             
             if os.path.exists(icon_path):
                 return QIcon(icon_path)

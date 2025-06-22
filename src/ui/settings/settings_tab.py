@@ -6,7 +6,8 @@
 
 import os
 import sys
-from qtpy.QtCore import Qt, QTimer
+from qtpy.QtCore import Qt, QTimer, QSize
+from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -60,9 +61,29 @@ class SettingsPage(QWidget):
         self.recognizer_tab = RecognizerSettingsTab(self)
         
         # 添加选项卡
-        self.tab_widget.addTab(self.application_tab, "应用设置")
-        self.tab_widget.addTab(self.brush_tab, "画笔设置")
-        self.tab_widget.addTab(self.recognizer_tab, "判断器设置")
+        # 设置选项卡图标
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+            "assets", "images", "ui"
+        )
+        
+        app_settings_icon_path = os.path.join(assets_dir, "app-settings.svg")
+        if os.path.exists(app_settings_icon_path):
+            self.tab_widget.addTab(self.application_tab, QIcon(app_settings_icon_path), "应用设置")
+        else:
+            self.tab_widget.addTab(self.application_tab, "应用设置")
+            
+        brush_settings_icon_path = os.path.join(assets_dir, "brush-settings.svg")
+        if os.path.exists(brush_settings_icon_path):
+            self.tab_widget.addTab(self.brush_tab, QIcon(brush_settings_icon_path), "画笔设置")
+        else:
+            self.tab_widget.addTab(self.brush_tab, "画笔设置")
+            
+        recognizer_settings_icon_path = os.path.join(assets_dir, "recognizer-settings.svg")
+        if os.path.exists(recognizer_settings_icon_path):
+            self.tab_widget.addTab(self.recognizer_tab, QIcon(recognizer_settings_icon_path), "判断器设置")
+        else:
+            self.tab_widget.addTab(self.recognizer_tab, "判断器设置")
         
         # 选项卡切换事件
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
@@ -77,6 +98,11 @@ class SettingsPage(QWidget):
         self.btn_reset = QPushButton("重置为默认")
         self.btn_reset.setMinimumSize(120, 35)
         self.btn_reset.clicked.connect(self._reset_settings)
+        # 设置重置图标
+        reset_icon_path = os.path.join(assets_dir, "reset.svg")
+        if os.path.exists(reset_icon_path):
+            self.btn_reset.setIcon(QIcon(reset_icon_path))
+            self.btn_reset.setIconSize(QSize(18, 18))
         bottom_layout.addWidget(self.btn_reset)
         
         bottom_layout.addStretch()
@@ -86,6 +112,11 @@ class SettingsPage(QWidget):
         self.btn_discard.setMinimumSize(100, 35)
         self.btn_discard.clicked.connect(self._discard_changes)
         self.btn_discard.setEnabled(False)
+        # 设置取消图标
+        cancel_icon_path = os.path.join(assets_dir, "cancel.svg")
+        if os.path.exists(cancel_icon_path):
+            self.btn_discard.setIcon(QIcon(cancel_icon_path))
+            self.btn_discard.setIconSize(QSize(18, 18))
         bottom_layout.addWidget(self.btn_discard)
         
         # 保存设置按钮
@@ -93,6 +124,11 @@ class SettingsPage(QWidget):
         self.btn_save.setMinimumSize(100, 35)
         self.btn_save.clicked.connect(self._save_settings)
         self.btn_save.setEnabled(False)
+        # 设置保存图标
+        save_icon_path = os.path.join(assets_dir, "save.svg")
+        if os.path.exists(save_icon_path):
+            self.btn_save.setIcon(QIcon(save_icon_path))
+            self.btn_save.setIconSize(QSize(18, 18))
         bottom_layout.addWidget(self.btn_save)
         
         layout.addLayout(bottom_layout)

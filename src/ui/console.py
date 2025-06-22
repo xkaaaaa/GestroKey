@@ -2,7 +2,7 @@ import os
 import sys
 
 from qtpy.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QTimer, Property, Signal
-from qtpy.QtGui import QColor, QCursor
+from qtpy.QtGui import QColor, QCursor, QIcon
 from qtpy.QtWidgets import (
     QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar,
     QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
@@ -88,6 +88,12 @@ class ConsolePage(QWidget):
         self.action_button.setMinimumSize(150, 40)
         self.action_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.action_button.clicked.connect(self.toggle_drawing)
+        # 设置开始绘制图标
+        assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images", "ui")
+        start_icon_path = os.path.join(assets_dir, "start-drawing.svg")
+        if os.path.exists(start_icon_path):
+            self.action_button.setIcon(QIcon(start_icon_path))
+            self.action_button.setIconSize(QSize(24, 24))
         layout.addWidget(self.action_button, 0, Qt.AlignmentFlag.AlignCenter)
 
         layout.addSpacerItem(QSpacerItem(20, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
@@ -195,6 +201,11 @@ class ConsolePage(QWidget):
             if success:
                 self.status_label.setText("绘制中 - 使用鼠标右键进行绘制")
                 self.action_button.setText("停止绘制")
+                # 切换到停止绘制图标
+                assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images", "ui")
+                stop_icon_path = os.path.join(assets_dir, "stop-drawing.svg")
+                if os.path.exists(stop_icon_path):
+                    self.action_button.setIcon(QIcon(stop_icon_path))
                 self.is_drawing_active = True
                 self.drawing_state_changed.emit(True)
 
@@ -210,6 +221,11 @@ class ConsolePage(QWidget):
                 if success:
                     self.status_label.setText("准备就绪")
                     self.action_button.setText("开始绘制")
+                    # 切换回开始绘制图标
+                    assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images", "ui")
+                    start_icon_path = os.path.join(assets_dir, "start-drawing.svg")
+                    if os.path.exists(start_icon_path):
+                        self.action_button.setIcon(QIcon(start_icon_path))
                     self.is_drawing_active = False
                     self.drawing_state_changed.emit(False)
 

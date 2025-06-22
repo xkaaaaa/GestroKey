@@ -1,5 +1,5 @@
-from qtpy.QtCore import Qt, QTimer, QPoint, Signal
-from qtpy.QtGui import QPainter, QPen, QColor, QFont, QBrush
+from qtpy.QtCore import Qt, QTimer, QPoint, Signal, QSize
+from qtpy.QtGui import QPainter, QPen, QColor, QFont, QBrush, QIcon
 from qtpy.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QGroupBox, QMessageBox, QScrollArea, QDialog
@@ -17,12 +17,26 @@ def _find_parent_with_refresh(widget):
     return parent
 
 
-def _create_card_button(text, tooltip, style_extra="", size=(20, 20)):
+def _create_card_button(text, tooltip, style_extra="", size=(20, 20), icon_name=None):
     """创建卡片上的小按钮"""
     btn = QPushButton(text)
     btn.setFixedSize(*size)
     btn.setToolTip(tooltip)
     btn.setStyleSheet(f"font-size: 10px; padding: 0px; {style_extra}")
+    
+    # 设置图标
+    if icon_name:
+        import os
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+            "assets", "images", "ui"
+        )
+        icon_path = os.path.join(assets_dir, f"{icon_name}.svg")
+        if os.path.exists(icon_path):
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QSize(16, 16))
+            btn.setText("")  # 隐藏文本，只显示图标
+    
     return btn
 
 
@@ -207,11 +221,11 @@ class ActionCardWidget(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(3)
         
-        self.btn_edit = _create_card_button("✏", "编辑操作")
+        self.btn_edit = _create_card_button("✏", "编辑操作", icon_name="edit")
         self.btn_edit.clicked.connect(lambda: self._edit_action())
         buttons_layout.addWidget(self.btn_edit)
         
-        self.btn_delete = _create_card_button("✕", "删除操作", "color: red;")
+        self.btn_delete = _create_card_button("✕", "删除操作", "color: red;", icon_name="delete")
         self.btn_delete.clicked.connect(lambda: self._delete_action())
         buttons_layout.addWidget(self.btn_delete)
         
@@ -369,11 +383,11 @@ class PathCardWidget(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(3)
         
-        self.btn_edit = _create_card_button("✏", "编辑路径")
+        self.btn_edit = _create_card_button("✏", "编辑路径", icon_name="edit")
         self.btn_edit.clicked.connect(lambda: self._edit_path())
         buttons_layout.addWidget(self.btn_edit)
         
-        self.btn_delete = _create_card_button("✕", "删除路径", "color: red;")
+        self.btn_delete = _create_card_button("✕", "删除路径", "color: red;", icon_name="delete")
         self.btn_delete.clicked.connect(lambda: self._delete_path())
         buttons_layout.addWidget(self.btn_delete)
         
@@ -483,7 +497,7 @@ class ActionCardsWidget(QWidget):
         self.cards_layout.addStretch()
         
         # 添加"添加操作"按钮
-        self.btn_add = QPushButton("+ 添加操作")
+        self.btn_add = QPushButton("添加操作")
         self.btn_add.setMinimumSize(180, 40)
         self.btn_add.setStyleSheet("""
             QPushButton {
@@ -499,6 +513,17 @@ class ActionCardsWidget(QWidget):
                 color: #0078d4;
             }
         """)
+        # 设置添加图标
+        import os
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+            "assets", "images", "ui"
+        )
+        add_icon_path = os.path.join(assets_dir, "add.svg")
+        if os.path.exists(add_icon_path):
+            self.btn_add.setIcon(QIcon(add_icon_path))
+            self.btn_add.setIconSize(QSize(20, 20))
+        
         self.btn_add.clicked.connect(self._add_new_action)
         self.cards_layout.addWidget(self.btn_add)
         
@@ -560,7 +585,7 @@ class PathCardsWidget(QWidget):
         self.cards_layout.addStretch()
         
         # 添加"添加路径"按钮
-        self.btn_add = QPushButton("+ 添加路径")
+        self.btn_add = QPushButton("添加路径")
         self.btn_add.setMinimumSize(180, 40)
         self.btn_add.setStyleSheet("""
             QPushButton {
@@ -576,6 +601,17 @@ class PathCardsWidget(QWidget):
                 color: #0078d4;
             }
         """)
+        # 设置添加图标
+        import os
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+            "assets", "images", "ui"
+        )
+        add_icon_path = os.path.join(assets_dir, "add.svg")
+        if os.path.exists(add_icon_path):
+            self.btn_add.setIcon(QIcon(add_icon_path))
+            self.btn_add.setIconSize(QSize(20, 20))
+        
         self.btn_add.clicked.connect(self._add_new_path)
         self.cards_layout.addWidget(self.btn_add)
         
@@ -700,6 +736,16 @@ class GesturesPage(QWidget):
         self.btn_reset = QPushButton("重置为默认")
         self.btn_reset.setMinimumSize(120, 35)
         self.btn_reset.clicked.connect(self._reset_to_default)
+        # 设置重置图标
+        import os
+        assets_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+            "assets", "images", "ui"
+        )
+        reset_icon_path = os.path.join(assets_dir, "reset.svg")
+        if os.path.exists(reset_icon_path):
+            self.btn_reset.setIcon(QIcon(reset_icon_path))
+            self.btn_reset.setIconSize(QSize(18, 18))
         bottom_layout.addWidget(self.btn_reset)
         
         bottom_layout.addStretch()
@@ -709,6 +755,11 @@ class GesturesPage(QWidget):
         self.btn_discard.setMinimumSize(100, 35)
         self.btn_discard.clicked.connect(self._discard_changes)
         self.btn_discard.setEnabled(False)
+        # 设置取消图标
+        cancel_icon_path = os.path.join(assets_dir, "cancel.svg")
+        if os.path.exists(cancel_icon_path):
+            self.btn_discard.setIcon(QIcon(cancel_icon_path))
+            self.btn_discard.setIconSize(QSize(18, 18))
         bottom_layout.addWidget(self.btn_discard)
         
         # 保存设置按钮
@@ -716,6 +767,11 @@ class GesturesPage(QWidget):
         self.btn_save_library.setMinimumSize(100, 35)
         self.btn_save_library.clicked.connect(self._save_gesture_library)
         self.btn_save_library.setEnabled(False)
+        # 设置保存图标
+        save_icon_path = os.path.join(assets_dir, "save.svg")
+        if os.path.exists(save_icon_path):
+            self.btn_save_library.setIcon(QIcon(save_icon_path))
+            self.btn_save_library.setIconSize(QSize(18, 18))
         bottom_layout.addWidget(self.btn_save_library)
         
         layout.addLayout(bottom_layout)

@@ -320,6 +320,7 @@ class Settings:
                         os.path.dirname(sys.modules["__main__"].__file__),
                         "assets",
                         "images",
+                        "app",
                         "icon.svg",
                     )
                 ),
@@ -328,6 +329,7 @@ class Settings:
                         os.path.dirname(sys.modules["__main__"].__file__),
                         "assets",
                         "images",
+                        "app",
                         "icon.png",
                     )
                 ),
