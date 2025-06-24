@@ -21,20 +21,19 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
   - [1.1 main.py](#11-mainpy)
   - [1.2 version.py](#12-versionpy)
 - [2. 用户界面模块](#2-用户界面模块-ui)
-  - [2.1 界面UI模块](#21-界面ui模块)
-    - [2.1.1 控制台选项卡](#211-控制台选项卡-uiconsolepy)
-    - [2.1.2 手势管理模块](#212-手势管理模块)
-      - [2.1.2.1 手势库](#2121-手势库-uigesturesgesturespy)
-      - [2.1.2.2 手势管理主页面](#2122-手势管理主页面-uigesturesgestures_tabpy)
-      - [2.1.2.3 手势编辑对话框](#2123-手势编辑对话框-uigesturesgesture_dialogspy)
-      - [2.1.2.4 手势绘制组件](#2124-手势绘制组件-uigesturesdrawing_widgetpy)
-    - [2.1.3 设置模块](#213-设置模块)
-      - [2.1.3.1 设置管理器](#2131-设置管理器-uisettingssettingspy)
-      - [2.1.3.2 设置主页面](#2132-设置主页面-uisettingssettings_tabpy)
-      - [2.1.3.3 应用设置选项卡](#2133-应用设置选项卡-uisettingsapplication_settings_tabpy)
-      - [2.1.3.4 画笔设置选项卡](#2134-画笔设置选项卡-uisettingsbrush_settings_tabpy)
-      - [2.1.3.5 判断器设置选项卡](#2135-判断器设置选项卡-uisettingsrecognizer_settings_tabpy)
-      - [2.1.3.6 动态预览组件](#2136-动态预览组件-uisettingspen_preview_widgetpy)
+  - [2.1 控制台选项卡](#21-控制台选项卡-uiconsolepy)
+  - [2.2 手势管理模块](#22-手势管理模块)
+    - [2.2.1 手势库](#221-手势库-uigesturesgesturespy)
+    - [2.2.2 手势管理主页面](#222-手势管理主页面-uigesturesgestures_tabpy)
+    - [2.2.3 手势编辑对话框](#223-手势编辑对话框-uigesturesgesture_dialogspy)
+    - [2.2.4 手势绘制组件](#224-手势绘制组件-uigesturesdrawing_widgetpy)
+  - [2.3 设置模块](#23-设置模块)
+    - [2.3.1 设置管理器](#231-设置管理器-uisettingssettingspy)
+    - [2.3.2 设置主页面](#232-设置主页面-uisettingssettings_tabpy)
+    - [2.3.3 应用设置选项卡](#233-应用设置选项卡-uisettingsapplication_settings_tabpy)
+    - [2.3.4 画笔设置选项卡](#234-画笔设置选项卡-uisettingsbrush_settings_tabpy)
+    - [2.3.5 判断器设置选项卡](#235-判断器设置选项卡-uisettingsrecognizer_settings_tabpy)
+    - [2.3.6 动态预览组件](#236-动态预览组件-uisettingspen_preview_widgetpy)
 - [3. 核心功能模块](#3-核心功能模块)
   - [3.1 core/brush/](#31-corebrush)
     - [3.1.1 core/brush/manager.py](#311-corebrushmanagerpy)
@@ -45,17 +44,6 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
   - [3.3 core/gesture_executor.py](#33-coregesture_executorpy)
   - [3.4 core/system_monitor.py](#34-coresystem_monitorpy)
   - [3.5 core/logger.py](#35-coreloggerpy)
-- [4. 应用程序集成](#4-应用程序集成)
-  - [4.1 应用程序架构](#41-应用程序架构)
-  - [4.2 程序流程](#42-程序流程)
-  - [4.3 使用场景与示例](#43-使用场景与示例)
-  - [4.4 扩展开发指南](#44-扩展开发指南)
-- [5. 跨平台兼容性](#5-跨平台兼容性)
-  - [5.1 多平台支持概述](#51-多平台支持概述)
-  - [5.2 Windows平台适配](#52-windows平台适配)
-  - [5.3 macOS平台适配](#53-macos平台适配)
-  - [5.4 Linux平台适配](#54-linux平台适配)
-- [6. 总结](#6-总结)
 
 ## 目录结构
 
@@ -63,7 +51,6 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
 src/
 ├── core/                    # 核心功能模块
 │   ├── brush/               # 画笔绘制模块
-│   │   ├── __init__.py      # 包初始化文件
 │   │   ├── manager.py       # 绘制管理器
 │   │   ├── overlay.py       # 绘制覆盖层
 │   │   ├── drawing.py       # 画笔绘制逻辑
@@ -73,22 +60,21 @@ src/
 │   ├── system_monitor.py    # 系统监测模块
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
-│   ├── __init__.py          # 包初始化文件
 │   ├── console.py           # 控制台选项卡
 │   ├── settings/            # 设置模块
-│   │   ├── settings_tab.py  # 设置主页面（包含三个子选项卡）
 │   │   ├── application_settings_tab.py # 应用设置选项卡
 │   │   ├── brush_settings_tab.py # 画笔设置选项卡
-│   │   ├── recognizer_settings_tab.py # 判断器设置选项卡
+│   │   ├── default_settings.json # 默认设置配置文件
 │   │   ├── pen_preview_widget.py # 动态笔尖预览组件
+│   │   ├── recognizer_settings_tab.py # 判断器设置选项卡
 │   │   ├── settings.py      # 设置管理器
-│   │   └── default_settings.json # 默认设置配置文件
+│   │   └── settings_tab.py  # 设置主页面（包含三个子选项卡）
 │   └── gestures/            # 手势管理模块
-│       ├── gestures_tab.py  # 手势管理主页面
+│       ├── default_gestures.json # 默认手势库定义（JSON格式）
+│       ├── drawing_widget.py # 手势绘制组件
 │       ├── gesture_dialogs.py # 手势编辑/添加对话框
 │       ├── gestures.py      # 手势库管理模块
-│       ├── drawing_widget.py # 手势绘制组件
-│       └── default_gestures.json # 默认手势库定义（JSON格式）
+│       └── gestures_tab.py  # 手势管理主页面
 ├── assets/                  # 资源文件目录
 │   └── images/              # 图像资源，按功能分类组织
 │       ├── app/             # 应用程序图标
@@ -138,12 +124,8 @@ src/
 **主要类和方法**：
 
 **全局辅助函数**：
-- `show_dialog(parent, message_type, title_text, message, ...)`：通用对话框显示函数，支持自定义按钮和回调
-- `show_info(parent, message)`：显示信息对话框
-- `show_warning(parent, message)`：显示警告对话框
-- `show_error(parent, message)`：显示错误对话框
-- `get_system_tray(parent)`：创建系统托盘图标和右键菜单
-- `get_toast_manager()`：获取虚拟Toast管理器实例（当前为占位实现）
+- `show_dialog(parent, message_type="warning", title_text=None, message="", content_widget=None, custom_icon=None, custom_buttons=None, custom_button_colors=None, callback=None)`：通用对话框显示函数，支持信息、警告、错误、问题类型对话框，支持自定义按钮和回调
+- `get_system_tray(parent)`：创建系统托盘图标和右键菜单，包含显示窗口、启动/停止监听、设置、退出等菜单项，返回的托盘对象具有update_drawing_state方法用于更新状态显示，包含内部辅助函数_get_icon_path和_set_action_icon
 
 **GestroKeyApp主窗口类**：继承自`QMainWindow`
 - `__init__(self, silent_start=False)`：初始化应用程序主窗口，设置日志记录器、全局资源、UI界面和系统托盘，支持静默启动模式
@@ -155,22 +137,23 @@ src/
 - `stop_drawing(self)`：停止绘制功能
 - `show_and_activate(self)`：多平台窗口显示和激活方法，针对Windows、macOS和Linux平台进行了优化
 - `show_settings_page(self)`：显示设置页面并切换到设置选项卡
-- `initUI(self)`：初始化用户界面，设置窗口属性、创建页面选项卡、堆栈布局和底部状态栏
+- `initUI(self)`：初始化用户界面，设置窗口属性、创建页面选项卡、堆栈布局和底部状态栏，包含内部函数_create_tab_button用于统一创建选项卡按钮
 - `switch_page(self, index)`：切换到指定索引的页面并更新按钮样式
 - `_select_initial_page(self)`：选择初始页面（默认为控制台页面）
 - `onPageChanged(self, index)`：处理页面切换事件，记录切换日志
-- `resizeEvent(self, event)`：处理窗口尺寸变化事件
+- `resizeEvent(self, event)`：处理窗口尺寸变化事件，当前为空实现，仅调用父类方法
 - `closeEvent(self, event)`：处理窗口X按钮关闭事件，始终忽略并调用内部退出逻辑
-- `_show_exit_dialog(self)`：显示退出确认对话框，包含最小化到托盘、退出程序和取消选项
+- `_show_exit_dialog(self)`：显示退出确认对话框，包含最小化到托盘、退出程序和取消选项，内部定义ExitDialog类处理用户选择并自动保存设置
 - `_handle_close_request(self, is_window_close)`：统一的关闭请求处理，根据设置决定显示对话框或执行默认行为
 - `_prepare_for_close(self)`：退出前的准备工作，停止绘制和释放按键状态
+- `_notify_settings_changed(self)`：通知设置已更改，重新加载设置到内存并刷新设置页面UI
 - `_minimize_to_tray(self)`：将窗口最小化到系统托盘
-- `_exit_application(self)`：退出应用程序的入口点
+- `_exit_application(self)`：退出应用程序的入口点（强制退出）
 - `_exit_with_save_check(self)`：退出程序并检查未保存项目
 - `_check_unsaved_and_exit(self)`：检查未保存的设置和手势库更改，显示保存确认对话框
 - `_force_exit(self)`：强制退出程序，调用sys.exit(0)
 - `_handle_save_changes_response(self, button_text)`：处理保存更改对话框的用户响应（是/否/取消）
-- `show_global_dialog(self, ...)`：显示全局对话框，支持多种类型和自定义参数
+- `show_global_dialog(self, parent=None, message_type="warning", title_text=None, message="", content_widget=None, custom_icon=None, custom_buttons=None, custom_button_colors=None, callback=None)`：显示全局对话框，支持多种类型和自定义参数
 - `handle_dialog_close(self, dialog)`：处理对话框关闭事件，清除引用
 - `on_drawing_state_changed(self, is_active)`：响应绘制状态变化，更新托盘图标状态
 
@@ -300,9 +283,7 @@ print(f"当前使用的 Qt API: {QT_API}")
 
 ### 2. 用户界面模块 (UI)
 
-#### 2.1 界面UI模块
-
-##### 2.1.1 控制台选项卡 (ui/console.py)
+#### 2.1 控制台选项卡 (ui/console.py)
 
 **功能说明**：
 控制台界面，应用程序的主要交互界面，提供启动/停止绘制功能，显示系统资源监控信息。
@@ -313,10 +294,11 @@ print(f"当前使用的 Qt API: {QT_API}")
 - `ConsolePage`：控制台页面类，继承自QWidget
   - `drawing_state_changed`：绘制状态变化信号，参数为是否处于绘制状态
   - `__init__(self, parent=None)`：初始化控制台页面，设置系统监测器和UI
+  - `_get_icon_path(self, icon_name)`：获取图标文件路径，检查文件是否存在
+  - `_set_button_icon(self, button, icon_name, size=(24, 24))`：为按钮设置图标和尺寸
   - `_setup_ui(self)`：初始化UI组件和布局
   - `_create_system_info_card(self, title, value, color)`：创建系统信息卡片，使用QFrame实现
   - `update_system_info(self, data)`：更新系统信息显示，包括CPU、内存、运行时间和进程资源
-  - `resizeEvent(self, event)`：处理窗口尺寸变化事件
   - `toggle_drawing(self)`：切换绘制状态
   - `start_drawing(self)`：开始绘制功能
   - `stop_drawing(self)`：停止绘制功能
@@ -362,9 +344,9 @@ system_data = {
 console_page.update_system_info(system_data)
 ```
 
-##### 2.1.2 手势管理模块
+#### 2.2 手势管理模块
 
-###### 2.1.2.1 手势库 (ui/gestures/gestures.py)
+##### 2.2.1 手势库 (ui/gestures/gestures.py)
 
 **功能说明**：
 手势库管理器，负责保存和加载用户手势库。采用新的三部分架构：触发路径、执行操作和手势映射，提供更灵活的手势管理方式。作为后端模块，专注于数据管理和持久化，与前端界面逻辑分离。
@@ -387,6 +369,9 @@ console_page.update_system_info(system_data)
   - `_update_saved_state(self)`：更新已保存状态，深拷贝当前数据作为保存状态基准
   - `save(self)`：保存手势库到文件，返回保存成功状态
   - `has_changes(self)`：检查是否有未保存的更改，对比当前数据与保存状态
+  - `mark_data_changed(self, change_type)`：标记数据已更改，记录更改类型和时间戳
+  - `get_last_change_info(self)`：获取最后一次更改的类型和时间戳信息
+  - `clear_change_marker(self)`：清除更改标记，重置更改类型和时间戳
   - `get_gesture_by_path(self, drawn_path, similarity_threshold=0.70)`：根据绘制路径获取匹配的手势，核心逻辑包括路径对比、相似度计算、映射查找和操作获取，返回手势名称、操作数据和相似度
   - `get_gesture_count(self, use_saved=False)`：获取手势数量，可选择获取当前数据或已保存数据的数量
   - `_get_next_mapping_id(self)`：获取下一个可用的映射ID，遍历现有映射获取最大ID后加1
@@ -458,7 +443,7 @@ if success:
 gesture_library.reset_to_default()
 ```
 
-###### 2.1.2.2 手势管理主页面 (ui/gestures/gestures_tab.py)
+##### 2.2.2 手势管理主页面 (ui/gestures/gestures_tab.py)
 
 **功能说明**：
 手势管理主页面，提供可视化的手势映射界面。采用左右卡片布局和中间连线设计，用户可以直观地看到执行操作和触发路径的映射关系，并通过卡片上的按钮进行编辑和管理。
@@ -555,31 +540,52 @@ gestures_page._reset_to_default()         # 重置为默认
 gestures_page._discard_changes()          # 放弃修改
 ```
 
-###### 2.1.2.3 手势编辑对话框 (ui/gestures/gesture_dialogs.py)
+##### 2.2.3 手势编辑对话框 (ui/gestures/gesture_dialogs.py)
 
 **功能说明**：
 手势编辑对话框模块，提供操作和路径的添加、编辑功能。这些对话框重用了原有选项卡中的表单组件，保持了界面一致性和功能完整性。对话框采用模态设计，确保用户专注于当前编辑任务。
 
 **主要类和方法**：
 
-**EditActionDialog**：操作编辑对话框
-- `__init__(self, action_key=None, parent=None)`：初始化操作编辑对话框，支持添加新操作或编辑现有操作
-- `_init_ui(self)`：初始化对话框界面，包含操作名称、类型和值输入
-- `_load_existing_action(self)`：加载现有操作数据到表单
-- `_get_action_data(self)`：获取表单数据，返回操作名称、类型和值
-- `_validate_input(self)`：验证输入数据有效性
-- `_save_action(self)`：保存操作到手势库
-- `_cancel_action(self)`：取消编辑，关闭对话框
-
-**EditPathDialog**：路径编辑对话框
+**TriggerPathEditDialog**：触发路径编辑对话框
 - `__init__(self, path_key=None, parent=None)`：初始化路径编辑对话框，支持添加新路径或编辑现有路径
-- `_init_ui(self)`：初始化对话框界面，包含路径名称输入和绘制组件
-- `_load_existing_path(self)`：加载现有路径数据到表单和绘制组件
+- `initUI(self)`：初始化对话框界面，包含基本信息组和路径绘制组
+- `_load_path_data(self)`：加载现有路径数据到表单和绘制组件
 - `_on_path_completed(self, path)`：处理路径绘制完成事件
-- `_get_path_data(self)`：获取表单数据，返回路径名称和路径数据
-- `_validate_input(self)`：验证输入数据有效性，确保名称不为空且路径已绘制
-- `_save_path(self)`：保存路径到手势库
-- `_cancel_path(self)`：取消编辑，关闭对话框
+- `_on_path_updated(self)`：处理路径更新事件
+- `_clear_drawing(self)`：清空绘制内容
+- `_save_and_accept(self)`：保存路径数据并接受对话框
+
+**ExecuteActionEditDialog**：执行操作编辑对话框
+- `__init__(self, action_key=None, parent=None)`：初始化操作编辑对话框，支持添加新操作或编辑现有操作
+- `initUI(self)`：初始化对话框界面，包含操作信息输入组
+- `_load_action_data(self)`：加载现有操作数据到表单
+- `_save_and_accept(self)`：保存操作数据并接受对话框
+
+**TestSimilarityDialog**：测试相似度对话框
+- `__init__(self, reference_path, parent=None)`：初始化相似度测试对话框，接收参考路径
+- `_init_ui(self)`：初始化对话框界面，包含参考路径显示、测试绘制区域和相似度结果面板
+- `_create_reference_panel(self)`：创建参考路径显示面板
+- `_create_test_panel(self)`：创建测试绘制面板
+- `_create_similarity_panel(self)`：创建相似度结果显示面板
+- `_on_test_path_completed(self, path)`：处理测试路径绘制完成事件
+- `_calculate_similarity(self)`：计算参考路径与测试路径的相似度
+- `_update_similarity_display(self)`：更新相似度显示，包含颜色编码的结果状态
+- `_clear_test(self)`：清除测试绘制内容
+
+**ReferencePathDisplay**：参考路径显示组件
+- `__init__(self, path, parent=None)`：初始化参考路径显示组件
+- `paintEvent(self, event)`：绘制参考路径，包含自动缩放和居中显示
+
+**TestDrawingWidget**：测试绘制组件
+- `pathCompleted = Signal(dict)`：路径完成信号
+- `__init__(self, parent=None)`：初始化测试绘制组件
+- `mousePressEvent(self, event)`：处理鼠标按下事件，开始绘制
+- `mouseMoveEvent(self, event)`：处理鼠标移动事件，添加绘制点
+- `mouseReleaseEvent(self, event)`：处理鼠标释放事件，完成绘制并发送信号
+- `paintEvent(self, event)`：绘制事件处理，显示当前绘制和完成的路径
+- `_draw_completed_path(self, painter)`：绘制已完成的路径
+- `clear_drawing(self)`：清空绘制内容
 
 **对话框特性**：
 - **模态设计**：确保用户专注于当前编辑任务
@@ -590,17 +596,26 @@ gestures_page._discard_changes()          # 放弃修改
 
 **界面布局**：
 
-**操作编辑对话框布局**：
-- **操作名称**：文本输入框，用于设置操作的显示名称
-- **操作类型**：下拉选择框，当前支持"快捷键"类型
-- **操作值**：文本输入框，用于输入具体的快捷键组合（如"Ctrl+C"）
+**操作编辑对话框布局(ExecuteActionEditDialog)**：
+- **操作信息组**：包含操作名称、类型和值的表单输入
+  - **操作名称**：文本输入框，用于设置操作的显示名称
+  - **操作类型**：下拉选择框，当前支持"快捷键"类型
+  - **操作值**：文本输入框，用于输入具体的快捷键组合（如"Ctrl+C"）
 - **按钮区域**：确定和取消按钮
 
-**路径编辑对话框布局**：
-- **路径名称**：文本输入框，用于设置路径的显示名称
-- **绘制区域**：集成的手势绘制组件，支持路径绘制和编辑
-- **工具栏**：绘制工具（画笔、指针、撤销、重做等）
-- **按钮区域**：确定和取消按钮
+**路径编辑对话框布局(TriggerPathEditDialog)**：
+- **基本信息组**：包含路径名称输入
+  - **路径名称**：文本输入框，用于设置路径的显示名称
+- **路径绘制组**：集成的手势绘制组件，支持路径绘制和编辑
+- **按钮区域**：确定、取消和清空绘制按钮
+
+**相似度测试对话框布局(TestSimilarityDialog)**：
+- **标题区域**：显示"手势相似度测试"标题
+- **内容区域**：左右分栏布局
+  - **左侧面板**：参考路径显示区域，显示原始手势路径
+  - **右侧面板**：测试绘制区域，用户可在此绘制测试手势
+- **相似度结果面板**：显示计算结果、进度条和识别阈值
+- **按钮区域**：清除测试和关闭按钮
 
 **数据流程**：
 1. **打开对话框**：从主页面卡片的编辑/添加按钮触发
@@ -613,36 +628,44 @@ gestures_page._discard_changes()          # 放弃修改
 **使用方法**：
 ```python
 # 添加新操作
-from ui.gestures.gesture_dialogs import EditActionDialog
+from ui.gestures.gesture_dialogs import ExecuteActionEditDialog
 
 # 创建添加对话框
-add_dialog = EditActionDialog(parent=main_window)
+add_dialog = ExecuteActionEditDialog(parent=main_window)
 if add_dialog.exec() == QDialog.Accepted:
     print("操作已添加")
 
 # 编辑现有操作
-edit_dialog = EditActionDialog(action_key="action_1", parent=main_window)
+edit_dialog = ExecuteActionEditDialog(action_key="action_1", parent=main_window)
 if edit_dialog.exec() == QDialog.Accepted:
     print("操作已更新")
 
 # 添加新路径
-from ui.gestures.gesture_dialogs import EditPathDialog
+from ui.gestures.gesture_dialogs import TriggerPathEditDialog
 
 # 创建添加对话框
-add_dialog = EditPathDialog(parent=main_window)
+add_dialog = TriggerPathEditDialog(parent=main_window)
 if add_dialog.exec() == QDialog.Accepted:
     print("路径已添加")
 
 # 编辑现有路径
-edit_dialog = EditPathDialog(path_key="path_1", parent=main_window)
+edit_dialog = TriggerPathEditDialog(path_key="path_1", parent=main_window)
 if edit_dialog.exec() == QDialog.Accepted:
     print("路径已更新")
+
+# 测试手势相似度
+from ui.gestures.gesture_dialogs import TestSimilarityDialog
+
+# 创建相似度测试对话框
+reference_path = {"points": [[0, 0], [100, 100]], "connections": [...]}
+test_dialog = TestSimilarityDialog(reference_path, parent=main_window)
+test_dialog.exec()
 
 # 对话框会自动处理数据验证和保存
 # 主页面会自动刷新显示最新数据
 ```
 
-###### 2.1.2.4 手势绘制组件 (ui/gestures/drawing_widget.py)
+##### 2.2.4 手势绘制组件 (ui/gestures/drawing_widget.py)
 
 **功能说明**：
 手势绘制组件，提供可视化的手势路径绘制和编辑功能。支持多种绘制工具、历史记录、视图变换和路径测试等功能。集成在路径编辑对话框中，为用户提供直观的手势路径创建和编辑体验。
@@ -813,9 +836,9 @@ scale = drawing_widget.view_scale               # 当前缩放比例
 has_content = len(drawing_widget.completed_paths) > 0  # 是否有绘制内容
 ```
 
-##### 2.1.3 设置模块
+#### 2.3 设置模块
 
-###### 2.1.3.1 设置管理器 (ui/settings/settings.py)
+##### 2.3.1 设置管理器 (ui/settings/settings.py)
 
 **功能说明**：
 设置管理模块，负责保存和加载用户设置，提供设置的持久化和访问机制。
@@ -827,17 +850,23 @@ has_content = len(drawing_widget.completed_paths) > 0  # 是否有绘制内容
   - `_get_settings_file_path(self)`：获取设置文件路径
   - `load(self)`：从文件加载设置
   - `save(self)`：保存设置到文件
-  - `get(self, key, default=None)`：获取设置项
-  - `set(self, key, value)`：设置设置项
+  - `get(self, key, default=None)`：获取设置项，支持点分隔的嵌套键访问
+  - `set(self, key, value)`：设置设置项，支持点分隔的嵌套键设置
   - `reset_to_default(self)`：重置为默认设置
   - `has_changes(self)`：检查是否有未保存的更改
   - `get_app_path(self)`：获取应用程序可执行文件路径
-  - `is_autostart_enabled(self)`：检查应用程序是否设置为开机自启动，支持Windows、macOS和Linux系统
-  - `set_autostart(self, enable)`：设置开机自启动状态，在不同系统上使用不同的实现方式：
-    - Windows：通过注册表实现，自动添加`--silent`参数
-    - macOS：通过LaunchAgents的plist文件实现，自动添加`--silent`参数
-    - Linux：通过~/.config/autostart目录下的.desktop文件实现，自动添加`--silent`参数
   - `get_app_path_with_silent(self)`：获取带有静默启动参数的应用程序路径，专用于开机自启设置
+  - `_get_autostart_dir(self)`：获取自启动目录路径，支持macOS和Linux
+  - `_get_autostart_file_path(self)`：获取自启动文件完整路径
+  - `_normalize_app_path(self, app_path)`：规范化应用路径格式，为包含空格的路径添加引号
+  - `_get_icon_path(self)`：获取应用图标路径，支持多种可能的图标位置
+  - `_create_macos_plist(self, app_path)`：创建macOS plist自启动文件内容
+  - `_create_linux_desktop(self, app_path)`：创建Linux desktop自启动文件内容
+  - `is_autostart_enabled(self)`：检查应用程序是否设置为开机自启动，支持Windows、macOS和Linux系统
+  - `set_autostart(self, enable)`：设置开机自启动状态，在不同系统上使用不同的实现方式
+  - `_set_windows_autostart(self, enable, app_path)`：Windows平台特定的自启动设置，通过注册表实现
+  - `_set_macos_autostart(self, enable, app_path)`：macOS平台特定的自启动设置，通过LaunchAgents的plist文件实现
+  - `_set_linux_autostart(self, enable, app_path)`：Linux平台特定的自启动设置，通过~/.config/autostart目录下的.desktop文件实现
 
 - `get_settings()`：获取设置管理器实例的单例函数
 
@@ -883,7 +912,7 @@ settings.set_autostart(True)  # 启用
 settings.set_autostart(False)  # 禁用
 ```
 
-###### 2.1.3.2 设置主页面 (ui/settings/settings_tab.py)
+##### 2.3.2 设置主页面 (ui/settings/settings_tab.py)
 
 **功能说明**：
 设置主页面，提供选项卡式布局，包含应用设置、画笔设置、判断器设置三个子选项卡。采用模块化设计，每个选项卡独立管理自己的设置项。
@@ -895,11 +924,13 @@ settings.set_autostart(False)  # 禁用
   - `_on_tab_changed(self, index)`：选项卡切换事件处理
   - `_check_settings_changes(self)`：定时检查设置是否有变更，自动更新保存和放弃按钮状态
   - `has_unsaved_changes(self)`：检查是否有未保存的更改，综合检查所有子选项卡的状态
+  - `_mark_changed(self)`：标记设置已更改（由子选项卡调用）
   - `_save_settings(self)`：保存设置到文件，调用所有子选项卡的apply_settings方法
   - `_reset_settings(self)`：重置设置为默认值
   - `_discard_changes(self)`：放弃所有未保存的修改
   - `_reload_all(self)`：重新加载所有子选项卡
-  - `_mark_changed(self)`：标记设置已更改（由子选项卡调用）
+  - `_load_settings(self)`：加载设置（调用_reload_all）
+  - `_apply_settings(self)`：应用所有子选项卡的设置
 
 **界面结构**：
 - **选项卡容器**：包含三个子选项卡
@@ -940,7 +971,7 @@ tab_widget = settings_page.tab_widget               # QTabWidget控件
 current_index = tab_widget.currentIndex()          # 当前选项卡索引
 ```
 
-###### 2.1.3.3 应用设置选项卡 (ui/settings/application_settings_tab.py)
+##### 2.3.3 应用设置选项卡 (ui/settings/application_settings_tab.py)
 
 **功能说明**：
 应用设置选项卡，处理开机自启动、退出行为等应用程序全局设置。
@@ -949,8 +980,11 @@ current_index = tab_widget.currentIndex()          # 当前选项卡索引
 - `ApplicationSettingsTab`：应用设置选项卡类，继承自QWidget
   - `__init__(self, parent=None)`：初始化应用设置选项卡
   - `_init_ui(self)`：初始化用户界面
-  - `_create_app_settings_group(self)`：创建应用设置组
   - `_load_settings(self)`：加载设置
+  - `_on_autostart_changed(self, state)`：处理开机自启动状态变化
+  - `_on_exit_dialog_changed(self, state)`：处理退出对话框设置变化
+  - `_on_close_behavior_changed(self)`：处理默认关闭行为变化
+  - `_mark_changed(self)`：标记设置已更改，通知父级容器
   - `has_unsaved_changes(self)`：检查是否有未保存的更改
   - `apply_settings(self)`：应用设置
 
@@ -973,7 +1007,7 @@ has_changes = app_tab.has_unsaved_changes()
 success = app_tab.apply_settings()
 ```
 
-###### 2.1.3.4 画笔设置选项卡 (ui/settings/brush_settings_tab.py)
+##### 2.3.4 画笔设置选项卡 (ui/settings/brush_settings_tab.py)
 
 **功能说明**：
 画笔设置选项卡，处理笔尖粗细、颜色、画笔类型等绘制相关设置，包含动态预览功能。
@@ -982,11 +1016,18 @@ success = app_tab.apply_settings()
 - `BrushSettingsTab`：画笔设置选项卡类，继承自QWidget
   - `__init__(self, parent=None)`：初始化画笔设置选项卡
   - `_init_ui(self)`：初始化用户界面
-  - `_create_brush_settings_group(self)`：创建画笔设置组
   - `_load_settings(self)`：加载设置
+  - `showEvent(self, event)`：显示事件处理，启动预览动画
+  - `_on_thickness_changed(self, value)`：处理笔尖粗细滑块变化事件
+  - `_on_thickness_spinbox_changed(self, value)`：处理笔尖粗细数字框变化事件
+  - `_on_color_button_clicked(self)`：处理颜色选择按钮点击事件
+  - `_on_brush_type_changed(self)`：处理画笔类型变化事件
+  - `_on_force_topmost_changed(self, state)`：处理强制置顶选项变化事件
+  - `_mark_changed(self)`：标记设置已更改，通知父级容器
   - `has_unsaved_changes(self)`：检查是否有未保存的更改
   - `apply_settings(self)`：应用设置
   - `_apply_pen_settings_to_drawing_module(self, width, color)`：实时应用画笔设置到绘制模块
+  - `_find_main_window(self)`：查找主窗口实例
 
 - `ColorPreviewWidget`：颜色预览控件类，继承自QWidget
   - `set_color(self, color)`：设置颜色
@@ -1013,7 +1054,7 @@ color_preview = brush_tab.color_preview              # 颜色预览
 pen_preview = brush_tab.pen_preview                  # 动态预览
 ```
 
-###### 2.1.3.5 判断器设置选项卡 (ui/settings/recognizer_settings_tab.py)
+##### 2.3.5 判断器设置选项卡 (ui/settings/recognizer_settings_tab.py)
 
 **功能说明**：
 判断器设置选项卡，处理手势识别相似度阈值等识别相关设置。
@@ -1022,8 +1063,9 @@ pen_preview = brush_tab.pen_preview                  # 动态预览
 - `RecognizerSettingsTab`：判断器设置选项卡类，继承自QWidget
   - `__init__(self, parent=None)`：初始化判断器设置选项卡
   - `_init_ui(self)`：初始化用户界面
-  - `_create_recognizer_settings_group(self)`：创建判断器设置组
   - `_load_settings(self)`：加载设置
+  - `_on_threshold_changed(self, value)`：处理相似度阈值变化事件
+  - `_mark_changed(self)`：标记设置已更改，通知父级容器
   - `has_unsaved_changes(self)`：检查是否有未保存的更改
   - `apply_settings(self)`：应用设置
 
@@ -1041,7 +1083,7 @@ recognizer_tab = RecognizerSettingsTab()
 threshold = recognizer_tab.threshold_spinbox.value()
 ```
 
-###### 2.1.3.6 动态预览组件 (ui/settings/pen_preview_widget.py)
+##### 2.3.6 动态预览组件 (ui/settings/pen_preview_widget.py)
 
 **功能说明**：
 动态预览组件，用于在设置页面实时预览不同画笔效果。支持随机生成多种类型的手势路径，具备智能的路径优化和合理性检测功能。
@@ -1154,6 +1196,11 @@ manager.stop()
 ##### 3.1.2 core/brush/overlay.py
 
 **主要类和方法**：
+- `DrawingSignals`：信号类，用于在线程间安全地传递信号，继承自QObject
+  - `start_drawing_signal`：开始绘制信号 (x, y, pressure)
+  - `continue_drawing_signal`：继续绘制信号 (x, y, pressure)
+  - `stop_drawing_signal`：停止绘制信号
+
 - `TransparentDrawingOverlay`：透明绘制覆盖层类
   - `__init__(self)`：初始化覆盖层，设置透明窗口、绘制参数和定时器
   - `initUI(self)`：初始化UI，创建全屏透明窗口
@@ -1199,6 +1246,7 @@ manager.stop()
 
 **DrawingModule (绘制模块管理器)**：
 - `set_brush_type(self, brush_type)`：设置当前画笔类型
+- `get_brush_types(self)`：获取所有可用的画笔类型列表
 - `create_brush(self, width, color)`：创建当前类型的画笔实例
 - `get_current_brush_type(self)`：获取当前画笔类型
 - 支持的画笔类型：
@@ -1209,11 +1257,14 @@ manager.stop()
 ##### 3.1.4 core/brush/fading.py
 
 **主要类和方法**：
-- `FadingModule`：淡出效果管理器
-  - `__init__(self, parent_widget)`：初始化淡出模块
+- `FadingModule`：淡出效果管理器，继承自QObject
+  - `fade_update`：淡出更新信号，用于通知重绘
+  - `fade_complete`：淡出完成信号，用于通知淡出结束
+  - `__init__(self, parent=None)`：初始化淡出模块
   - `start_fade(self)`：开始淡出动画
   - `stop_fade(self)`：停止淡出动画
   - `get_fade_alpha(self)`：获取当前透明度值 (0-255)
+  - `_update_fade(self)`：内部方法，更新淡出状态
 
 **淡出机制**：
 - 绘制完成后，线条在指定时间内逐渐变透明
@@ -1230,21 +1281,21 @@ manager.stop()
 
 **PathAnalyzer 路径分析器类**：
 - `__init__(self)`：初始化路径分析器，设置日志记录器
-- `format_raw_path(self, raw_points: List[Tuple]) -> Dict`：将原始绘制点转换为格式化路径，流程包括缩放、简化、提取关键点、生成连接
-- `calculate_similarity(self, path1: Dict, path2: Dict) -> float`：计算两个路径的相似度，结果范围[0,1]，综合考虑形状轮廓和笔画顺序
-- `normalize_path_scale(self, path: Dict, target_size: int = 100) -> Dict`：将路径归一化到指定尺寸，保持宽高比
-- `_scale_small_path(self, coords: List[Tuple]) -> List[Tuple]`：对尺寸过小的路径进行等比放大，提高处理精度
-- `_extract_key_points(self, coords: List[Tuple]) -> List[Tuple]`：从坐标点中提取关键点，保留路径核心特征
-- `_douglas_peucker(self, points: List[Tuple], tolerance: float) -> List[Tuple]`：使用道格拉斯-普克算法简化路径
-- `_analyze_direction_changes(self, points: List[Tuple]) -> List[Tuple]`：通过分析角度和距离变化识别重要转折点
-- `_preprocess_for_comparison(self, path: Dict, target_size: int, resample_n: int) -> np.ndarray`：为相似度计算准备路径，归一化和重采样
+- `format_raw_path(self, raw_points: List[Tuple]) -> Dict`：将原始绘制点转换为格式化路径，流程包括坐标转换、尺寸缩放、关键点提取、连接生成
+- `calculate_similarity(self, path1: Dict, path2: Dict) -> float`：计算两个路径的相似度，结果范围[0,1]，综合考虑形状轮廓和笔画顺序，支持正向和反向匹配
+- `normalize_path_scale(self, path: Dict, target_size: int = 100) -> Dict`：将路径归一化到指定的边界框尺寸，保持宽高比
+- `_scale_small_path(self, coords: List[Tuple[int, int]]) -> List[Tuple[int, int]]`：对尺寸过小的路径进行等比放大，提高后续处理的精度
+- `_extract_key_points(self, coords: List[Tuple[int, int]]) -> List[Tuple[int, int]]`：从坐标点中智能提取关键点，保留路径的核心特征
+- `_douglas_peucker(self, points: List[Tuple[int, int]], tolerance: float) -> List[Tuple[int, int]]`：使用道格拉斯-普克算法简化路径
+- `_analyze_direction_changes(self, points: List[Tuple[int, int]]) -> List[Tuple[int, int]]`：通过分析角度和距离变化，识别重要的转折点
+- `_preprocess_for_comparison(self, path: Dict, target_size: int = 200, resample_n: int = 64) -> np.ndarray | None`：为相似度计算准备路径，归一化和重采样
 - `_resample_points(self, pts: np.ndarray, target_n: int) -> np.ndarray`：沿曲线总长度等距采样指定数量的点
-- `_compute_scores(self, pts1: np.ndarray, pts2: np.ndarray) -> Tuple[float, float]`：计算形状和方向得分
-- `_procrustes_align(self, A: np.ndarray, B: np.ndarray) -> np.ndarray`：使用Procrustes分析对齐两个点集
-- `_get_path_bbox(self, points: List[Tuple]) -> Dict`：计算路径边界框
-- `_calculate_path_length(self, points: List[Tuple]) -> float`：计算路径总长度
-- `_calculate_angle_change(self, p1: Tuple, p2: Tuple, p3: Tuple) -> float`：计算三点夹角变化
-- `_distance_to_line(self, p1: Tuple, p2: Tuple, point: Tuple) -> float`：计算点到线段的距离
+- `_compute_scores(self, pts1: np.ndarray, pts2: np.ndarray) -> Tuple[float, float]`：计算两条点集的形状得分和方向得分
+- `_procrustes_align(self, A: np.ndarray, B: np.ndarray) -> np.ndarray`：通过旋转和平移将点集A对齐到点集B
+- `_get_path_bbox(self, points: List[Tuple]) -> Dict`：计算路径的边界框
+- `_calculate_path_length(self, points: List[Tuple[int, int]]) -> float`：计算路径的总长度
+- `_calculate_angle_change(self, p1: Tuple, p2: Tuple, p3: Tuple) -> float`：计算三点构成的夹角变化
+- `_distance_to_line(self, p1: Tuple, p2: Tuple, point: Tuple) -> float`：计算一个点到由另外两点确定的线段的距离
 
 **核心算法特性**：
 - **路径预处理**：自动识别并放大小于50像素的微小路径至200像素，提高识别精度
@@ -1296,13 +1347,11 @@ normalized_path = analyzer.normalize_path_scale(path, target_size=200)
 **主要类和方法**：
 - `GestureExecutor`：手势执行器类（单例模式）
   - `get_instance()`：类方法，获取手势执行器的全局唯一实例
-  - `__init__(self)`：初始化手势执行器，设置键盘控制器和特殊键映射
+  - `__init__(self)`：初始化手势执行器，设置键盘控制器和特殊键映射，初始化手势库
   - `execute_gesture_by_path(self, drawn_path)`：根据绘制路径执行对应的手势动作，核心执行入口
   - `_execute_shortcut(self, shortcut_str)`：执行快捷键操作，支持多种快捷键格式
-  - `_press_keys(self, modifier_keys, regular_keys)`：按下并释放快捷键组合
-  - `release_all_keys(self)`：释放所有可能按下的键，用于程序退出前的清理
-  - `refresh_gestures(self)`：刷新手势库，确保使用最新的已保存手势库
-  - `find_similar_paths(self, test_path)`：查找与测试路径相似的所有触发路径，返回相似度排序结果
+  - `_press_keys(self, modifier_keys, regular_keys)`：按下并释放快捷键组合，采用线程化执行
+  - `release_all_keys(self)`：释放所有可能按下的键，用于程序退出前的清理操作
 
 **全局函数**：
 - `get_gesture_executor()`：获取手势执行器的全局实例
@@ -1336,11 +1385,10 @@ drawn_path = {
     'connections': [{'from': 0, 'to': 1, 'type': 'line'}]
 }
 success = executor.execute_gesture_by_path(drawn_path)
-
-# 查找相似路径
-similar_paths = executor.find_similar_paths(test_path)
-for path_key, similarity, path_data in similar_paths:
-    print(f"路径: {path_data['name']}, 相似度: {similarity:.3f}")
+if success:
+    print("手势执行成功")
+else:
+    print("手势执行失败")
 
 # 程序退出前清理
 executor.release_all_keys()
