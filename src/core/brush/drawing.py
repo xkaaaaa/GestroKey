@@ -18,7 +18,7 @@ class BaseBrush(ABC):
     def __init__(self, width=2, color=None):
         self.width = width
         self.color = color or QColor(0, 120, 255, 255)
-        self.points = []  # 当前笔画的点
+        self.points = []
         self.start_time = 0
         
     @abstractmethod
@@ -43,7 +43,7 @@ class BaseBrush(ABC):
 
 
 class PencilBrush(BaseBrush):
-    """铅笔画笔 - 原有的绘制效果"""
+    """铅笔画笔"""
     
     def __init__(self, width=2, color=None):
         super().__init__(width, color)
@@ -100,7 +100,7 @@ class PencilBrush(BaseBrush):
 
 
 class WaterBrush(BaseBrush):
-    """水性笔画笔 - 新出现的点由小变大，直到预设粗细"""
+    """水性笔画笔 - 新出现的点由小变大"""
     
     def __init__(self, width=2, color=None):
         super().__init__(width, color)

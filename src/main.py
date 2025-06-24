@@ -28,7 +28,6 @@ from version import APP_NAME, get_version_string
 def show_dialog(parent, message_type="warning", title_text=None, message="", 
                 content_widget=None, custom_icon=None, custom_buttons=None, 
                 custom_button_colors=None, callback=None):
-    """显示对话框"""
     title = title_text or "提示"
     
     if message_type == "question" and custom_buttons:
@@ -68,107 +67,77 @@ def show_dialog(parent, message_type="warning", title_text=None, message="",
     return None
 
 
-def show_info(parent, message):
-    QMessageBox.information(parent, "信息", message)
-
-
-def show_warning(parent, message):
-    QMessageBox.warning(parent, "警告", message)
-
-
-def show_error(parent, message):
-    QMessageBox.critical(parent, "错误", message)
-
-
 def get_system_tray(parent):
-    """创建系统托盘图标"""
     if not QSystemTrayIcon.isSystemTrayAvailable():
         return None
     
+    def _get_icon_path(icon_name):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        if icon_name.startswith("app/"):
+            return os.path.join(base_dir, "assets", "images", icon_name)
+        else:
+            return os.path.join(base_dir, "assets", "images", "ui", icon_name)
+    
+    def _set_action_icon(action, icon_name):
+        icon_path = _get_icon_path(icon_name)
+        if os.path.exists(icon_path):
+            action.setIcon(QIcon(icon_path))
+    
     tray_icon = QSystemTrayIcon(parent)
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "app", "icon.svg")
+    icon_path = _get_icon_path("app/icon.svg")
     if os.path.exists(icon_path):
         tray_icon.setIcon(QIcon(icon_path))
     else:
-        # 使用默认图标
         tray_icon.setIcon(parent.style().standardIcon(parent.style().StandardPixmap.SP_ComputerIcon))
     
     menu = QMenu()
     
-    # 显示窗口
     show_action = QAction("显示窗口", parent)
-    show_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "tray-show.svg")
-    if os.path.exists(show_icon_path):
-        show_action.setIcon(QIcon(show_icon_path))
+    _set_action_icon(show_action, "tray-show.svg")
     show_action.triggered.connect(parent.show_and_activate)
     menu.addAction(show_action)
     
-    # 分隔符
     menu.addSeparator()
     
-    # 切换绘制状态
     toggle_action = QAction("启动/停止监听", parent)
-    # 根据状态设置不同图标（稍后在update_drawing_state中动态更新）
     toggle_action.triggered.connect(parent.toggle_drawing)
     menu.addAction(toggle_action)
     
-    # 显示设置
     settings_action = QAction("设置", parent)
-    settings_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "settings.svg")
-    if os.path.exists(settings_icon_path):
-        settings_action.setIcon(QIcon(settings_icon_path))
+    _set_action_icon(settings_action, "settings.svg")
     settings_action.triggered.connect(parent.show_settings_page)
     menu.addAction(settings_action)
     
-    # 分隔符
     menu.addSeparator()
     
-    # 退出
     exit_action = QAction("退出", parent)
-    exit_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "exit.svg")
-    if os.path.exists(exit_icon_path):
-        exit_action.setIcon(QIcon(exit_icon_path))
+    _set_action_icon(exit_action, "exit.svg")
     exit_action.triggered.connect(parent._exit_application)
     menu.addAction(exit_action)
     
     tray_icon.setContextMenu(menu)
     
-    # 双击事件
     def on_activated(reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             parent.show_and_activate()
     
     tray_icon.activated.connect(on_activated)
     
-    # 添加更新状态的方法
     def update_drawing_state(is_active):
         status = "监听中" if is_active else "已停止"
         tray_icon.setToolTip(f"GestroKey - {status}")
         toggle_action.setText(f"{'停止' if is_active else '启动'}监听")
         
-        # 根据状态设置不同的图标
-        if is_active:
-            stop_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "tray-stop.svg")
-            if os.path.exists(stop_icon_path):
-                toggle_action.setIcon(QIcon(stop_icon_path))
-        else:
-            start_icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images", "ui", "tray-start.svg")
-            if os.path.exists(start_icon_path):
-                toggle_action.setIcon(QIcon(start_icon_path))
+        icon_name = "tray-stop.svg" if is_active else "tray-start.svg"
+        _set_action_icon(toggle_action, icon_name)
     
     tray_icon.update_drawing_state = update_drawing_state
-    tray_icon.update_drawing_state(False)  # 初始状态
+    tray_icon.update_drawing_state(False)
     
     return tray_icon
 
 
-def get_toast_manager():
-    class DummyToastManager:
-        def set_main_window(self, window):
-            pass
-        def update_positions_on_resize(self):
-            pass
-    return DummyToastManager()
+
 
 
 class GestroKeyApp(QMainWindow):
@@ -182,14 +151,10 @@ class GestroKeyApp(QMainWindow):
         self.initUI()
         self.init_system_tray()
 
-        toast_manager = get_toast_manager()
-        toast_manager.set_main_window(self)
-        self.logger.debug("初始化Toast管理器并设置主窗口引用")
 
-        # 如果是静默启动，自动开始监听（不显示窗口）
+
         if self.silent_start:
             self.logger.info("GestroKey应用程序已静默启动")
-            # 延迟启动监听，确保所有初始化完成
             QTimer.singleShot(100, self._silent_start_drawing)
         else:
             self.logger.info("GestroKey应用程序已启动")
@@ -254,7 +219,6 @@ class GestroKeyApp(QMainWindow):
 
     def show_and_activate(self):
         self.show()
-        import sys
 
         if sys.platform == "win32":
             if self.isMinimized():
@@ -369,47 +333,30 @@ class GestroKeyApp(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        self.logger.debug("创建控制台页面")
         self.console_page = ConsolePage()
         self.console_page.drawing_state_changed.connect(self.on_drawing_state_changed)
 
-        self.logger.debug("创建设置页面")
         self.settings_page = SettingsPage()
-
-        self.logger.debug("创建手势管理页面")
         self.gestures_page = GesturesPage()
-
-        self.logger.debug("创建页面切换控件")
         
         tab_widget = QWidget()
         tab_layout = QHBoxLayout(tab_widget)
         
-        # 创建带图标的选项卡按钮
         assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "images")
         
-        self.console_btn = QPushButton("控制台")
-        console_icon_path = os.path.join(assets_dir, "ui", "console.svg")
-        if os.path.exists(console_icon_path):
-            self.console_btn.setIcon(QIcon(console_icon_path))
-        self.console_btn.clicked.connect(lambda: self.switch_page(0))
+        def _create_tab_button(text, icon_name, page_index):
+            button = QPushButton(text)
+            icon_path = os.path.join(assets_dir, "ui", icon_name)
+            if os.path.exists(icon_path):
+                button.setIcon(QIcon(icon_path))
+            button.clicked.connect(lambda: self.switch_page(page_index))
+            button.setMinimumHeight(40)
+            button.setIconSize(QSize(20, 20))
+            return button
         
-        self.gestures_btn = QPushButton("手势管理")
-        gestures_icon_path = os.path.join(assets_dir, "ui", "gestures.svg")
-        if os.path.exists(gestures_icon_path):
-            self.gestures_btn.setIcon(QIcon(gestures_icon_path))
-        self.gestures_btn.clicked.connect(lambda: self.switch_page(1))
-        
-        self.settings_btn = QPushButton("设置")
-        settings_icon_path = os.path.join(assets_dir, "ui", "settings.svg")
-        if os.path.exists(settings_icon_path):
-            self.settings_btn.setIcon(QIcon(settings_icon_path))
-        self.settings_btn.clicked.connect(lambda: self.switch_page(2))
-        
-        from qtpy.QtCore import QSize
-        tab_buttons = [self.console_btn, self.gestures_btn, self.settings_btn]
-        for btn in tab_buttons:
-            btn.setMinimumHeight(40)
-            btn.setIconSize(QSize(20, 20))
+        self.console_btn = _create_tab_button("控制台", "console.svg", 0)
+        self.gestures_btn = _create_tab_button("手势管理", "gestures.svg", 1)
+        self.settings_btn = _create_tab_button("设置", "settings.svg", 2)
         
         tab_layout.addWidget(self.console_btn)
         tab_layout.addWidget(self.gestures_btn)
@@ -423,12 +370,10 @@ class GestroKeyApp(QMainWindow):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         
-        self.logger.debug("添加页面到堆栈")
         self.stacked_widget.addWidget(self.console_page)
         self.stacked_widget.addWidget(self.gestures_page)
         self.stacked_widget.addWidget(self.settings_page)
         
-        self.logger.debug("将页面堆栈添加到主布局")
         main_layout.addWidget(self.stacked_widget, 1)
 
         status_widget = QWidget()
@@ -444,7 +389,6 @@ class GestroKeyApp(QMainWindow):
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
         )
         self.exit_button.clicked.connect(self._exit_application)
-        # 设置退出按钮图标
         exit_icon_path = os.path.join(assets_dir, "ui", "exit.svg")
         if os.path.exists(exit_icon_path):
             self.exit_button.setIcon(QIcon(exit_icon_path))
@@ -465,13 +409,10 @@ class GestroKeyApp(QMainWindow):
         status_widget.setLayout(status_layout)
         main_layout.addWidget(status_widget)
 
-        # 静默启动时不显示窗口
         if not self.silent_start:
             self.show()
 
-        self.logger.debug("设置初始页面为控制台")
         QApplication.processEvents()
-
         QTimer.singleShot(100, lambda: self._select_initial_page())
 
     def switch_page(self, index):
@@ -488,7 +429,6 @@ class GestroKeyApp(QMainWindow):
     def _select_initial_page(self):
         try:
             if hasattr(self, "stacked_widget") and self.stacked_widget:
-                self.logger.debug("设置初始页面索引为0（控制台）")
                 self.switch_page(0)
                 QApplication.processEvents()
         except Exception as e:
@@ -508,21 +448,13 @@ class GestroKeyApp(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.logger.debug(f"主窗口大小已调整: {self.width()}x{self.height()}")
-
-        toast_manager = get_toast_manager()
-        toast_manager.update_positions_on_resize()
 
     def closeEvent(self, event):
-        """窗口关闭事件 - 仅处理窗口X按钮的关闭"""
         self.logger.info("检测到窗口关闭事件")
-        
-        # 直接调用关闭流程处理，传入True表示这是窗口关闭事件
         self._handle_close_request(is_window_close=True)
-        event.ignore()  # 始终忽略窗口关闭事件，由内部逻辑决定是否真正退出
+        event.ignore()
 
     def _show_exit_dialog(self):
-        """显示退出确认对话框"""
         class ExitDialog(QDialog):
             def __init__(self, parent=None):
                 super().__init__(parent)
@@ -558,34 +490,25 @@ class GestroKeyApp(QMainWindow):
                 layout.addLayout(button_layout)
             
             def _on_minimize_clicked(self):
-                """点击最小化到托盘按钮"""
                 if self.dont_show_checkbox.isChecked():
-                    # 保存设置：不再显示对话框，默认行为是最小化到托盘
                     self.settings.set("app.show_exit_dialog", False)
                     self.settings.set("app.default_close_action", "minimize")
                     self.settings.save()
-                    
-                    # 通知主窗口更新设置
                     self.parent()._notify_settings_changed()
                 
                 self.accept()
                 self.parent()._minimize_to_tray()
             
             def _on_exit_clicked(self):
-                """点击退出程序按钮"""
                 if self.dont_show_checkbox.isChecked():
-                    # 保存设置：不再显示对话框，默认行为是退出程序
                     self.settings.set("app.show_exit_dialog", False)
                     self.settings.set("app.default_close_action", "exit")
                     self.settings.save()
-                    
-                    # 通知主窗口更新设置
                     self.parent()._notify_settings_changed()
                 
                 self.accept()
                 self.parent()._exit_with_save_check()
         
-        # 创建并显示对话框
         dialog = ExitDialog(self)
         dialog.exec()
 
@@ -666,46 +589,30 @@ class GestroKeyApp(QMainWindow):
             self._force_exit()
 
     def _check_unsaved_and_exit(self):
-        """检查未保存的更改并退出"""
         try:
             unsaved_settings = False
             unsaved_gestures = False
-
-            # 添加详细的调试输出
-            self.logger.debug("开始检查未保存的更改...")
             
-            # 检查设置：既检查前端UI状态，也检查后端数据
             try:
-                # 检查前端设置页面是否有未应用的更改
                 if hasattr(self, "settings_page"):
                     frontend_changes = self.settings_page.has_unsaved_changes()
-                    self.logger.debug(f"设置页面前端是否有未保存更改: {frontend_changes}")
                     if frontend_changes:
                         unsaved_settings = True
                 else:
-                    # 如果没有设置页面，只检查后端
                     settings = get_settings()
                     settings_has_changes = settings.has_changes()
-                    self.logger.debug(f"设置后端是否有未保存更改: {settings_has_changes}")
                     if settings_has_changes:
                         unsaved_settings = True
             except Exception as e:
                 self.logger.error(f"检查设置变更时出错: {e}")
-                import traceback
-                self.logger.error(traceback.format_exc())
 
             try:
                 gesture_library = get_gesture_library()
                 gestures_has_changes = gesture_library.has_changes()
-                self.logger.debug(f"手势库是否有未保存更改: {gestures_has_changes}")
                 if gestures_has_changes:
                     unsaved_gestures = True
             except Exception as e:
                 self.logger.error(f"检查手势库变更时出错: {e}")
-                import traceback
-                self.logger.error(traceback.format_exc())
-
-            self.logger.debug(f"最终检查结果 - 设置未保存: {unsaved_settings}, 手势未保存: {unsaved_gestures}")
 
             if unsaved_settings or unsaved_gestures:
                 self.logger.info("检测到未保存的更改")
@@ -717,16 +624,11 @@ class GestroKeyApp(QMainWindow):
                     callback=self._handle_save_changes_response,
                 )
                 return
-            else:
-                self.logger.debug("没有检测到未保存的更改，直接退出")
 
             self._force_exit()
             
         except Exception as e:
             self.logger.error(f"检查未保存更改时发生严重错误: {e}")
-            import traceback
-            self.logger.error(traceback.format_exc())
-            # 发生错误时直接退出
             self._force_exit()
     
     def _force_exit(self):
@@ -752,11 +654,11 @@ class GestroKeyApp(QMainWindow):
                     else:
                         self.logger.error("保存设置失败")
                         save_success = False
-                        show_error(self, "保存设置失败，取消退出")
+                        QMessageBox.critical(self, "错误", "保存设置失败，取消退出")
             except Exception as e:
                 self.logger.error(f"保存设置时出现异常: {e}")
                 save_success = False
-                show_error(self, f"保存设置时出错: {str(e)}，取消退出")
+                QMessageBox.critical(self, "错误", f"保存设置时出错: {str(e)}，取消退出")
 
             try:
                 gesture_library = get_gesture_library()
@@ -767,11 +669,11 @@ class GestroKeyApp(QMainWindow):
                     else:
                         self.logger.error("保存手势库失败")
                         save_success = False
-                        show_error(self, "保存手势库失败，取消退出")
+                        QMessageBox.critical(self, "错误", "保存手势库失败，取消退出")
             except Exception as e:
                 self.logger.error(f"保存手势库时出现异常: {e}")
                 save_success = False
-                show_error(self, f"保存手势库时出错: {str(e)}，取消退出")
+                QMessageBox.critical(self, "错误", f"保存手势库时出错: {str(e)}，取消退出")
 
             if not save_success:
                 self._closing = False
@@ -839,17 +741,12 @@ class GestroKeyApp(QMainWindow):
 
 
 if __name__ == "__main__":
-    # 解析命令行参数
     parser = argparse.ArgumentParser(description='GestroKey - 手势控制应用程序')
     parser.add_argument('--silent', '-s', action='store_true', 
                        help='静默启动：自动开始监听并最小化到托盘')
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
-
-    app.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
 
     logger = get_logger("Main")
     if args.silent:
@@ -859,7 +756,6 @@ if __name__ == "__main__":
 
     window = GestroKeyApp(silent_start=args.silent)
     
-    # 静默启动时不显示窗口
     if not args.silent:
         window.show()
 

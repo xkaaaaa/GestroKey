@@ -4,12 +4,9 @@
 处理开机自启动、退出行为等应用相关设置
 """
 
-import os
-import sys
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QCheckBox,
-    QHBoxLayout,
     QVBoxLayout,
     QWidget,
     QFormLayout,
@@ -33,26 +30,22 @@ class ApplicationSettingsTab(QWidget):
         self._load_settings()
     
     def _init_ui(self):
-        """初始化用户界面"""
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
         
         form_layout = QFormLayout()
 
-        # 开机自启动
         self.autostart_checkbox = QCheckBox("开机自启动")
         self.autostart_checkbox.setToolTip("设置应用程序是否在系统启动时自动运行（将以静默模式启动，自动开始监听并最小化到托盘）")
         self.autostart_checkbox.stateChanged.connect(self._on_autostart_changed)
         form_layout.addRow("启动选项:", self.autostart_checkbox)
 
-        # 退出确认对话框
         self.show_exit_dialog_checkbox = QCheckBox("显示退出确认对话框")
         self.show_exit_dialog_checkbox.setToolTip("关闭程序时是否显示确认对话框")
         self.show_exit_dialog_checkbox.stateChanged.connect(self._on_exit_dialog_changed)
         form_layout.addRow("退出行为:", self.show_exit_dialog_checkbox)
 
-        # 默认关闭行为
         close_behavior_layout = QVBoxLayout()
         
         self.close_behavior_group = QButtonGroup()
@@ -78,7 +71,6 @@ class ApplicationSettingsTab(QWidget):
         layout.addStretch()
     
     def _load_settings(self):
-        """加载设置"""
         self.is_loading = True
         try:
             is_autostart = self.settings.is_autostart_enabled()
@@ -111,13 +103,11 @@ class ApplicationSettingsTab(QWidget):
             self._mark_changed()
     
     def _mark_changed(self):
-        """标记设置已更改"""
         parent = self.parent()
         if parent and hasattr(parent, 'parent') and hasattr(parent.parent(), '_mark_changed'):
             parent.parent()._mark_changed()
     
     def has_unsaved_changes(self):
-        """检查是否有未保存的更改"""
         try:
             current_autostart = self.autostart_checkbox.isChecked()
             saved_autostart = self.settings.is_autostart_enabled()
@@ -139,9 +129,7 @@ class ApplicationSettingsTab(QWidget):
             return False
     
     def apply_settings(self):
-        """应用设置"""
         try:
-            # 应用开机自启设置
             is_autostart = self.autostart_checkbox.isChecked()
             current_autostart = self.settings.is_autostart_enabled()
             
@@ -150,7 +138,6 @@ class ApplicationSettingsTab(QWidget):
                 if not success:
                     return False
             
-            # 应用应用设置
             show_exit_dialog = self.show_exit_dialog_checkbox.isChecked()
             self.settings.set("app.show_exit_dialog", show_exit_dialog)
             

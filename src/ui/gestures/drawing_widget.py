@@ -1,97 +1,76 @@
 import sys
 import os
 import math
+import copy
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QToolButton
 from qtpy.QtCore import Qt, QPoint, Signal, QTimer, QSize
 from qtpy.QtGui import QPainter, QPen, QColor, QPolygon, QTransform, QIcon
-
 from qtpy.QtSvgWidgets import QSvgWidget
-SVG_SUPPORT = True
 
 from core.logger import get_logger
 from core.path_analyzer import PathAnalyzer
 
 
 class GestureDrawingWidget(QWidget):
-    """手势绘制组件，用于在手势管理界面绘制手势路径"""
-    
-    pathCompleted = Signal(dict)  # 路径完成信号，发送格式化的路径
-    pathUpdated = Signal()  # 路径更新信号，用于通知路径已修改
-    testSimilarity = Signal()  # 测试相似度信号
+    pathCompleted = Signal(dict)
+    pathUpdated = Signal()
+    testSimilarity = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = get_logger("GestureDrawingWidget")
         self.path_analyzer = PathAnalyzer()
         
-        # 绘制状态
         self.drawing = False
         self.current_path = []
         self.completed_paths = []
         
-        # 历史记录（用于撤回/还原）
-        self.path_history = []  # 历史记录
-        self.history_index = -1  # 当前历史索引
+        self.path_history = []
+        self.history_index = -1
         
-        # 工具状态
-        self.current_tool = "brush"  # 当前工具：brush 或 pointer
-        self.selected_point_index = -1  # 选中的点索引
-        self.dragging_point = False  # 是否正在拖拽点
-
+        self.current_tool = "brush"
+        self.selected_point_index = -1
+        self.dragging_point = False
         
-        # 视图变换属性
-        self.view_scale = 1.0  # 缩放因子
-        self.view_offset = QPoint(0, 0)  # 视图偏移
-        self.min_scale = 0.1  # 最小缩放
-        self.max_scale = 5.0  # 最大缩放
+        self.view_scale = 1.0
+        self.view_offset = QPoint(0, 0)
+        self.min_scale = 0.1
+        self.max_scale = 5.0
         
-
-        
-        # 拖拽状态
         self.panning = False
         self.last_pan_point = QPoint()
         self.space_pressed = False
-        self.left_shift_pressed = False   # 左Shift键状态
-        self.right_shift_pressed = False  # 右Shift键状态
+        self.left_shift_pressed = False
+        self.right_shift_pressed = False
         
-        # 双击检测
         self.click_timer = QTimer()
         self.click_timer.setSingleShot(True)
         self.click_timer.timeout.connect(self._single_click_timeout)
         self.click_count = 0
         
-        # 设置最小尺寸
-        self.setMinimumSize(350, 200)  # 增加宽度以容纳工具栏
+        self.setMinimumSize(350, 200)
         self.setStyleSheet("background-color: white;")
-        
-        # 启用键盘焦点和滚轮事件
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         self.initUI()
         
     def initUI(self):
-        """初始化UI"""
-        # 创建主布局
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(5)
         
-        # 创建左侧工具栏（在画布外）
         self.create_toolbar()
         main_layout.addWidget(self.toolbar)
         
-        # 创建右侧绘制区域占位（用于布局计算）
         self.drawing_area = QWidget()
         self.drawing_area.setStyleSheet("background-color: transparent;")
         self.drawing_area.setMinimumSize(300, 200)
-        main_layout.addWidget(self.drawing_area, 1)  # 让绘制区域占据剩余空间
+        main_layout.addWidget(self.drawing_area, 1)
         
         self.setLayout(main_layout)
         
     def create_toolbar(self):
-        """创建左侧工具栏"""
         self.toolbar = QFrame()
-        self.toolbar.setFrameStyle(QFrame.Shape.Box)
         self.toolbar.setStyleSheet("""
             QFrame {
                 background-color: #f0f0f0;
@@ -124,17 +103,15 @@ class GestureDrawingWidget(QWidget):
         toolbar_layout.setContentsMargins(5, 5, 5, 5)
         toolbar_layout.setSpacing(5)
         
-        # 画笔工具按钮
         self.brush_btn = QToolButton()
         self.brush_btn.setIcon(self.load_svg_icon("brush.svg"))
         self.brush_btn.setIconSize(QSize(24, 24))
         self.brush_btn.setToolTip("画笔工具")
         self.brush_btn.setCheckable(True)
-        self.brush_btn.setChecked(True)  # 默认选中
+        self.brush_btn.setChecked(True)
         self.brush_btn.clicked.connect(self.select_brush_tool)
         toolbar_layout.addWidget(self.brush_btn)
         
-        # 点击工具按钮
         self.pointer_btn = QToolButton()
         self.pointer_btn.setIcon(self.load_svg_icon("pointer.svg"))
         self.pointer_btn.setIconSize(QSize(24, 24))
@@ -143,14 +120,12 @@ class GestureDrawingWidget(QWidget):
         self.pointer_btn.clicked.connect(self.select_pointer_tool)
         toolbar_layout.addWidget(self.pointer_btn)
         
-        # 分割线
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         separator.setStyleSheet("color: #aaa;")
         toolbar_layout.addWidget(separator)
         
-        # 撤回按钮
         self.undo_btn = QToolButton()
         self.undo_btn.setIcon(self.load_svg_icon("undo.svg"))
         self.undo_btn.setIconSize(QSize(24, 24))
@@ -158,7 +133,6 @@ class GestureDrawingWidget(QWidget):
         self.undo_btn.clicked.connect(self.undo_action)
         toolbar_layout.addWidget(self.undo_btn)
         
-        # 还原按钮
         self.redo_btn = QToolButton()
         self.redo_btn.setIcon(self.load_svg_icon("redo.svg"))
         self.redo_btn.setIconSize(QSize(24, 24))
@@ -166,14 +140,12 @@ class GestureDrawingWidget(QWidget):
         self.redo_btn.clicked.connect(self.redo_action)
         toolbar_layout.addWidget(self.redo_btn)
         
-        # 第二个分割线
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
         separator2.setFrameShadow(QFrame.Shadow.Sunken)
         separator2.setStyleSheet("color: #aaa;")
         toolbar_layout.addWidget(separator2)
         
-        # 测试相似度按钮
         self.test_btn = QToolButton()
         self.test_btn.setIcon(self.load_svg_icon("test.svg"))
         self.test_btn.setIconSize(QSize(24, 24))
@@ -181,23 +153,17 @@ class GestureDrawingWidget(QWidget):
         self.test_btn.clicked.connect(self.test_similarity)
         toolbar_layout.addWidget(self.test_btn)
         
-        # 弹性空间
         toolbar_layout.addStretch()
         
         self.toolbar.setLayout(toolbar_layout)
-        
-        # 更新按钮状态
         self.update_toolbar_buttons()
         
     def load_svg_icon(self, filename):
-        """加载SVG图标"""
         try:
-            # 构建图标文件路径
-            current_dir = os.path.dirname(os.path.abspath(__file__))  # src/ui/gestures/
-            ui_dir = os.path.dirname(current_dir)  # src/ui/
-            src_dir = os.path.dirname(ui_dir)  # src/
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            ui_dir = os.path.dirname(current_dir)
+            src_dir = os.path.dirname(ui_dir)
             
-            # 根据文件名确定子目录
             if filename in ["brush.svg", "pointer.svg", "test.svg", "undo.svg", "redo.svg"]:
                 icon_path = os.path.join(src_dir, "assets", "images", "tools", filename)
             elif filename in ["console.svg", "gestures.svg", "settings.svg"]:
@@ -205,101 +171,82 @@ class GestureDrawingWidget(QWidget):
             elif filename == "icon.svg":
                 icon_path = os.path.join(src_dir, "assets", "images", "app", filename)
             else:
-                # 默认在tools目录查找
                 icon_path = os.path.join(src_dir, "assets", "images", "tools", filename)
             
             if os.path.exists(icon_path):
                 return QIcon(icon_path)
             else:
                 self.logger.warning(f"图标文件不存在: {icon_path}")
-                return QIcon()  # 返回空图标
+                return QIcon()
         except Exception as e:
             self.logger.error(f"加载图标失败 {filename}: {e}")
             return QIcon()
     
     def select_brush_tool(self):
-        """选择画笔工具"""
         self.current_tool = "brush"
         self.brush_btn.setChecked(True)
         self.pointer_btn.setChecked(False)
         self.selected_point_index = -1
         self.dragging_point = False
         self.setCursor(Qt.CursorShape.ArrowCursor)
-        self.logger.info("切换到画笔工具")
         
     def select_pointer_tool(self):
-        """选择点击工具"""
         self.current_tool = "pointer"
         self.brush_btn.setChecked(False)
         self.pointer_btn.setChecked(True)
-        self.drawing = False  # 停止绘制模式
+        self.drawing = False
         self.selected_point_index = -1
         self.dragging_point = False
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.logger.info("切换到点击工具")
         
     def undo_action(self):
-        """撤回操作"""
         if self.history_index > 0:
             self.history_index -= 1
-            import copy
             self.completed_paths = copy.deepcopy(self.path_history[self.history_index])
             self.update()
             self.update_toolbar_buttons()
-            self.logger.info(f"撤回到历史记录 {self.history_index}，路径数量: {len(self.completed_paths)}")
-            # 发送路径更新信号
             self.pathUpdated.emit()
             
     def redo_action(self):
-        """还原操作"""
         if self.history_index < len(self.path_history) - 1:
             self.history_index += 1
-            import copy
             self.completed_paths = copy.deepcopy(self.path_history[self.history_index])
             self.update()
             self.update_toolbar_buttons()
-            self.logger.info(f"还原到历史记录 {self.history_index}，路径数量: {len(self.completed_paths)}")
-            # 发送路径更新信号
             self.pathUpdated.emit()
             
     def update_toolbar_buttons(self):
-        """更新工具栏按钮状态"""
-        # 更新撤回按钮状态
         self.undo_btn.setEnabled(self.history_index > 0)
-        
-        # 更新还原按钮状态
         self.redo_btn.setEnabled(self.history_index < len(self.path_history) - 1)
-        
-        # 更新测试按钮状态：有路径时启用
         self.test_btn.setEnabled(bool(self.completed_paths))
     
     def test_similarity(self):
-        """测试相似度"""
-        self.testSimilarity.emit()
+        if not self.completed_paths:
+            from qtpy.QtWidgets import QMessageBox
+            QMessageBox.information(self, "提示", "请先绘制一个手势路径")
+            return
+            
+        reference_path = self.completed_paths[-1]
+        
+        from ui.gestures.gesture_dialogs import TestSimilarityDialog
+        dialog = TestSimilarityDialog(reference_path, self)
+        dialog.exec()
         
     def save_to_history(self):
-        """保存当前状态到历史记录"""
-        import copy
-        
-        # 删除当前索引之后的历史记录（如果用户在撤回后进行了新操作）
         if self.history_index < len(self.path_history) - 1:
             self.path_history = self.path_history[:self.history_index + 1]
         
-        # 添加新的历史状态（深拷贝）
         self.path_history.append(copy.deepcopy(self.completed_paths))
         self.history_index = len(self.path_history) - 1
         
-        # 限制历史记录数量（避免内存占用过多）
         max_history = 50
         if len(self.path_history) > max_history:
             self.path_history = self.path_history[-max_history:]
             self.history_index = len(self.path_history) - 1
             
         self.update_toolbar_buttons()
-        self.logger.debug(f"保存历史记录，当前索引: {self.history_index}, 总数: {len(self.path_history)}")
         
     def keyPressEvent(self, event):
-        """键盘按下事件"""
         if event.key() == Qt.Key.Key_Space:
             self.space_pressed = True
             self.setCursor(Qt.CursorShape.OpenHandCursor)
@@ -313,18 +260,14 @@ class GestureDrawingWidget(QWidget):
             elif sc == 54 or vk == 161:
                 self.right_shift_pressed = True
         elif event.key() == Qt.Key.Key_Z and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # Ctrl+Z 撤回
             self.undo_action()
         elif event.key() == Qt.Key.Key_Y and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # Ctrl+Y 还原
             self.redo_action()
         elif event.key() == Qt.Key.Key_Delete and self.current_tool == "pointer" and self.selected_point_index >= 0:
-            # Delete键删除选中的点
             self._delete_selected_point()
         super().keyPressEvent(event)
         
     def keyReleaseEvent(self, event):
-        """键盘释放事件"""
         if event.key() == Qt.Key.Key_Space:
             self.space_pressed = False
             if not self.panning:

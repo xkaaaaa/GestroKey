@@ -4,8 +4,6 @@
 处理笔尖粗细、颜色、画笔类型等画笔相关设置
 """
 
-import os
-import sys
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QColor, QPainter, QPen
 from qtpy.QtWidgets import (
@@ -37,16 +35,13 @@ class ColorPreviewWidget(QWidget):
         self.setMinimumSize(50, 30)
 
     def set_color(self, color):
-        """设置颜色"""
         self.color = color[:]
         self.update()
 
     def get_color(self):
-        """获取颜色"""
         return self.color[:]
 
     def paintEvent(self, event):
-        """绘制颜色预览"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
@@ -67,15 +62,12 @@ class BrushSettingsTab(QWidget):
         self._load_settings()
     
     def _init_ui(self):
-        """初始化用户界面"""
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # 参数编辑区
         form_layout = QFormLayout()
 
-        # 笔尖粗细
         thickness_layout = QHBoxLayout()
         
         self.thickness_slider = QSlider(Qt.Orientation.Horizontal)
@@ -93,7 +85,6 @@ class BrushSettingsTab(QWidget):
         
         form_layout.addRow("笔尖粗细:", thickness_layout)
 
-        # 笔尖颜色
         color_layout = QHBoxLayout()
         
         self.color_button = QPushButton("选择颜色")
@@ -109,7 +100,6 @@ class BrushSettingsTab(QWidget):
         
         form_layout.addRow("笔尖颜色:", color_layout)
 
-        # 画笔类型
         brush_type_layout = QHBoxLayout()
         
         self.brush_type_group = QButtonGroup()
@@ -136,7 +126,6 @@ class BrushSettingsTab(QWidget):
         
         form_layout.addRow("画笔类型:", brush_type_widget)
 
-        # 强制置顶
         self.force_topmost_checkbox = QCheckBox("绘制时强制置顶")
         self.force_topmost_checkbox.setToolTip("开启后在绘制路径过程中会重复执行置顶命令，确保绘画窗口始终保持在最前面")
         self.force_topmost_checkbox.stateChanged.connect(self._on_force_topmost_changed)
@@ -144,7 +133,6 @@ class BrushSettingsTab(QWidget):
 
         layout.addLayout(form_layout)
 
-        # 预览区
         preview_layout = QVBoxLayout()
         preview_label = QLabel("预览:")
         preview_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-top: 10px;")
@@ -160,7 +148,6 @@ class BrushSettingsTab(QWidget):
         layout.addStretch()
     
     def _load_settings(self):
-        """加载设置"""
         self.is_loading = True
         try:
             pen_width = self.settings.get("brush.pen_width", 3)
@@ -190,7 +177,6 @@ class BrushSettingsTab(QWidget):
             self.is_loading = False
     
     def showEvent(self, event):
-        """选项卡显示时重头播放预览动画"""
         super().showEvent(event)
         if hasattr(self, 'pen_preview'):
             self.pen_preview._start_animation()
@@ -244,13 +230,11 @@ class BrushSettingsTab(QWidget):
             self._mark_changed()
     
     def _mark_changed(self):
-        """标记设置已更改"""
         parent = self.parent()
         if parent and hasattr(parent, 'parent') and hasattr(parent.parent(), '_mark_changed'):
             parent.parent()._mark_changed()
     
     def has_unsaved_changes(self):
-        """检查是否有未保存的更改"""
         try:
             if self.thickness_slider.value() != self.settings.get("brush.pen_width", 3):
                 return True
@@ -266,7 +250,6 @@ class BrushSettingsTab(QWidget):
             return False
     
     def apply_settings(self):
-        """应用设置"""
         try:
             thickness = self.thickness_slider.value()
             color = self.color_preview.get_color()

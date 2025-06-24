@@ -1,3 +1,4 @@
+import os
 from qtpy.QtCore import Qt, QTimer, QPoint, Signal, QSize
 from qtpy.QtGui import QPainter, QPen, QColor, QFont, QBrush, QIcon
 from qtpy.QtWidgets import (
@@ -26,7 +27,6 @@ def _create_card_button(text, tooltip, style_extra="", size=(20, 20), icon_name=
     
     # 设置图标
     if icon_name:
-        import os
         assets_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
             "assets", "images", "ui"
@@ -514,7 +514,6 @@ class ActionCardsWidget(QWidget):
             }
         """)
         # 设置添加图标
-        import os
         assets_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
             "assets", "images", "ui"
@@ -602,7 +601,6 @@ class PathCardsWidget(QWidget):
             }
         """)
         # 设置添加图标
-        import os
         assets_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
             "assets", "images", "ui"
@@ -737,7 +735,6 @@ class GesturesPage(QWidget):
         self.btn_reset.setMinimumSize(120, 35)
         self.btn_reset.clicked.connect(self._reset_to_default)
         # 设置重置图标
-        import os
         assets_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
             "assets", "images", "ui"

@@ -1,10 +1,7 @@
-import getpass
 import logging
 import os
 import sys
-import time
 from datetime import datetime
-
 from version import APP_NAME, AUTHOR
 
 
@@ -81,9 +78,6 @@ class Logger:
 
     def exception(self, message):
         self.logger.exception(message)
-
-
-default_logger = Logger()
 
 
 def get_logger(module_name=None):

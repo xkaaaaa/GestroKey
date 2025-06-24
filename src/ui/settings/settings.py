@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import sys
-import time
 
 from core.logger import get_logger
 from version import APP_NAME, AUTHOR
@@ -168,59 +167,29 @@ class Settings:
         return False
 
     def get_app_path(self):
+        def _quote_if_needed(path):
+            return f'"{path}"' if " " in path else path
+        
         try:
-            import os
-            import sys
-
             if getattr(sys, "frozen", False):
-                if sys.platform == "win32":
-                    app_path = sys.executable
-                    if " " in app_path:
-                        app_path = f'"{app_path}"'
-                    return app_path
-                elif sys.platform == "darwin":
+                if sys.platform == "darwin":
                     bundle_dir = os.path.dirname(sys.executable)
                     if ".app/Contents/MacOS" in bundle_dir:
                         app_path = os.path.dirname(
                             bundle_dir.split(".app/Contents/MacOS")[0] + ".app"
                         )
-                        if " " in app_path:
-                            app_path = f'"{app_path}"'
-                        return app_path
-                    else:
-                        app_path = sys.executable
-                        if " " in app_path:
-                            app_path = f'"{app_path}"'
-                        return app_path
-                else:
-                    app_path = sys.executable
-                    if " " in app_path:
-                        app_path = f'"{app_path}"'
-                    return app_path
+                        return _quote_if_needed(app_path)
+                
+                return _quote_if_needed(sys.executable)
             else:
-                if sys.platform == "win32":
-                    main_script = os.path.abspath(sys.argv[0])
-                    if " " in main_script:
-                        main_script = f'"{main_script}"'
-                    return main_script
-                elif sys.platform == "darwin":
-                    main_script = os.path.abspath(sys.argv[0])
-                    if " " in main_script:
-                        main_script = f'"{main_script}"'
-                    return main_script
-                else:
-                    main_script = os.path.abspath(sys.argv[0])
-                    if " " in main_script:
-                        main_script = f'"{main_script}"'
-                    return main_script
+                main_script = os.path.abspath(sys.argv[0])
+                return _quote_if_needed(main_script)
         except Exception as e:
             logging.error(f"获取应用路径时出错: {e}")
 
             try:
                 default_path = os.path.abspath(os.getcwd())
-                if " " in default_path and sys.platform == "win32":
-                    default_path = f'"{default_path}"'
-                return default_path
+                return _quote_if_needed(default_path) if sys.platform == "win32" else default_path
             except:
                 return None
 
@@ -229,18 +198,10 @@ class Settings:
         if not app_path:
             return None
         
-        if sys.platform == "win32":
-            if app_path.endswith('"'):
-                app_path = app_path[:-1] + ' --silent"'
-            else:
-                app_path = app_path + ' --silent'
+        if app_path.endswith('"'):
+            return app_path[:-1] + ' --silent"'
         else:
-            if app_path.endswith('"'):
-                app_path = app_path[:-1] + ' --silent"'
-            else:
-                app_path = app_path + ' --silent'
-        
-        return app_path
+            return app_path + ' --silent'
 
     def _get_autostart_dir(self):
         if sys.platform.startswith("darwin"):
@@ -267,20 +228,53 @@ class Settings:
         else:
             return os.path.join(autostart_dir, f"{APP_NAME.lower()}.desktop")
 
+    def _normalize_app_path(self, app_path):
+        if " " in app_path and not (app_path.startswith('"') and app_path.endswith('"')):
+            return f'"{app_path}"'
+        return app_path
+
+    def _get_icon_path(self):
+        try:
+            possible_icon_paths = [
+                f"/usr/share/icons/hicolor/scalable/apps/{APP_NAME.lower()}.svg",
+                f"/usr/share/icons/hicolor/128x128/apps/{APP_NAME.lower()}.png",
+                os.path.abspath(
+                    os.path.join(
+                        os.path.dirname(sys.modules["__main__"].__file__),
+                        "assets",
+                        "images",
+                        "app",
+                        "icon.svg",
+                    )
+                ),
+                os.path.abspath(
+                    os.path.join(
+                        os.path.dirname(sys.modules["__main__"].__file__),
+                        "assets",
+                        "images",
+                        "app",
+                        "icon.png",
+                    )
+                ),
+            ]
+
+            for path in possible_icon_paths:
+                if os.path.exists(path):
+                    return path
+
+            self.logger.warning(f"未找到应用图标，将使用默认图标名称: {APP_NAME.lower()}")
+            return APP_NAME.lower()
+
+        except Exception as e:
+            self.logger.warning(f"查找图标路径时出错: {e}")
+            return APP_NAME.lower()
+
     def _create_macos_plist(self, app_path):
-        if " " in app_path and not (
-            app_path.startswith('"') and app_path.endswith('"')
-        ):
-            app_path = f'"{app_path}"'
-
-        if app_path.startswith("/usr/bin/python") or app_path.startswith(
-            "/usr/bin/python3"
-        ):
-            pass
-        elif "python" in app_path.lower() and not app_path.startswith("/"):
-            app_path = app_path.replace("python", "/usr/bin/python")
-
-        command = f"/bin/bash -c {app_path}"
+        app_path = self._normalize_app_path(app_path)
+        
+        if "python" in app_path.lower() and not app_path.startswith("/usr/bin/python"):
+            if not app_path.startswith("/"):
+                app_path = app_path.replace("python", "/usr/bin/python")
 
         plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -310,49 +304,8 @@ class Settings:
         return plist_content
 
     def _create_linux_desktop(self, app_path):
-        icon_path = ""
-        try:
-            possible_icon_paths = [
-                f"/usr/share/icons/hicolor/scalable/apps/{APP_NAME.lower()}.svg",
-                f"/usr/share/icons/hicolor/128x128/apps/{APP_NAME.lower()}.png",
-                os.path.abspath(
-                    os.path.join(
-                        os.path.dirname(sys.modules["__main__"].__file__),
-                        "assets",
-                        "images",
-                        "app",
-                        "icon.svg",
-                    )
-                ),
-                os.path.abspath(
-                    os.path.join(
-                        os.path.dirname(sys.modules["__main__"].__file__),
-                        "assets",
-                        "images",
-                        "app",
-                        "icon.png",
-                    )
-                ),
-            ]
-
-            for path in possible_icon_paths:
-                if os.path.exists(path):
-                    icon_path = path
-                    break
-
-            if not icon_path:
-                self.logger.warning(f"未找到应用图标，将使用默认图标名称: {APP_NAME.lower()}")
-                icon_path = APP_NAME.lower()
-
-        except Exception as e:
-            self.logger.warning(f"查找图标路径时出错: {e}")
-            icon_path = APP_NAME.lower()
-
-        if " " in app_path and not (
-            app_path.startswith('"') and app_path.endswith('"')
-        ):
-            app_path = f'"{app_path}"'
-
+        icon_path = self._get_icon_path()
+        app_path = self._normalize_app_path(app_path)
         command = f"bash -c {app_path}"
 
         desktop_content = f"""[Desktop Entry]
@@ -376,11 +329,6 @@ Hidden=false
                     self.logger.warning("Windows注册表模块未导入，开机自启动检查失败")
                     return False
 
-                app_path_with_silent = self.get_app_path_with_silent()
-                if not app_path_with_silent:
-                    self.logger.warning("无法获取应用程序路径")
-                    return False
-
                 key = winreg.OpenKey(
                     winreg.HKEY_CURRENT_USER,
                     r"Software\Microsoft\Windows\CurrentVersion\Run",
@@ -395,19 +343,10 @@ Hidden=false
                     exists = False
 
                 winreg.CloseKey(key)
-                self.logger.debug(f"Windows自启动状态检查: {exists}")
-                return exists
-
-            if sys.platform.startswith("darwin"):
-                autostart_file = self._get_autostart_file_path()
-                exists = autostart_file and os.path.exists(autostart_file)
-                self.logger.debug(f"macOS自启动状态检查: {exists}")
                 return exists
 
             autostart_file = self._get_autostart_file_path()
-            exists = autostart_file and os.path.exists(autostart_file)
-            self.logger.debug(f"Linux自启动状态检查: {exists}")
-            return exists
+            return autostart_file and os.path.exists(autostart_file)
 
         except Exception as e:
             self.logger.error(f"检查开机自启动状态时出错: {e}")
@@ -422,69 +361,75 @@ Hidden=false
 
             current_state = self.is_autostart_enabled()
             if current_state == enable:
-                self.logger.debug(f"自启动状态已经是{'启用' if enable else '禁用'}状态，无需更改")
                 return True
 
             if sys.platform.startswith("win"):
-                if "winreg" not in sys.modules:
-                    self.logger.warning("Windows注册表模块未导入，开机自启动设置失败")
-                    return False
-
-                key = winreg.OpenKey(
-                    winreg.HKEY_CURRENT_USER,
-                    r"Software\Microsoft\Windows\CurrentVersion\Run",
-                    0,
-                    winreg.KEY_SET_VALUE,
-                )
-
-                if enable:
-                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, app_path)
-                    self.logger.info(f"Windows: 已添加开机自启动: {app_path}")
-                else:
-                    try:
-                        winreg.DeleteValue(key, APP_NAME)
-                        self.logger.info("Windows: 已移除开机自启动")
-                    except FileNotFoundError:
-                        self.logger.debug("Windows: 移除自启动项时未找到注册表项，可能已经不存在")
-
-                winreg.CloseKey(key)
-                return True
-
+                return self._set_windows_autostart(enable, app_path)
             elif sys.platform.startswith("darwin"):
-                autostart_file = self._get_autostart_file_path()
-
-                if enable:
-                    plist_content = self._create_macos_plist(app_path)
-                    with open(autostart_file, "w") as f:
-                        f.write(plist_content)
-                    self.logger.info(f"macOS: 已添加开机自启动: {app_path}")
-                    os.chmod(autostart_file, 0o644)
-                else:
-                    if os.path.exists(autostart_file):
-                        os.remove(autostart_file)
-                        self.logger.info("macOS: 已移除开机自启动")
-
-                return True
-
+                return self._set_macos_autostart(enable, app_path)
             else:
-                autostart_file = self._get_autostart_file_path()
-
-                if enable:
-                    desktop_content = self._create_linux_desktop(app_path)
-                    with open(autostart_file, "w") as f:
-                        f.write(desktop_content)
-                    self.logger.info(f"Linux: 已添加开机自启动: {app_path}")
-                    os.chmod(autostart_file, 0o755)
-                else:
-                    if os.path.exists(autostart_file):
-                        os.remove(autostart_file)
-                        self.logger.info("Linux: 已移除开机自启动")
-
-                return True
+                return self._set_linux_autostart(enable, app_path)
 
         except Exception as e:
             self.logger.error(f"设置开机自启动时出错: {e}")
             return False
+
+    def _set_windows_autostart(self, enable, app_path):
+        if "winreg" not in sys.modules:
+            self.logger.warning("Windows注册表模块未导入，开机自启动设置失败")
+            return False
+
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_SET_VALUE,
+        )
+
+        if enable:
+            winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, app_path)
+            self.logger.info(f"Windows: 已添加开机自启动: {app_path}")
+        else:
+            try:
+                winreg.DeleteValue(key, APP_NAME)
+                self.logger.info("Windows: 已移除开机自启动")
+            except FileNotFoundError:
+                pass
+
+        winreg.CloseKey(key)
+        return True
+
+    def _set_macos_autostart(self, enable, app_path):
+        autostart_file = self._get_autostart_file_path()
+
+        if enable:
+            plist_content = self._create_macos_plist(app_path)
+            with open(autostart_file, "w") as f:
+                f.write(plist_content)
+            self.logger.info(f"macOS: 已添加开机自启动: {app_path}")
+            os.chmod(autostart_file, 0o644)
+        else:
+            if os.path.exists(autostart_file):
+                os.remove(autostart_file)
+                self.logger.info("macOS: 已移除开机自启动")
+
+        return True
+
+    def _set_linux_autostart(self, enable, app_path):
+        autostart_file = self._get_autostart_file_path()
+
+        if enable:
+            desktop_content = self._create_linux_desktop(app_path)
+            with open(autostart_file, "w") as f:
+                f.write(desktop_content)
+            self.logger.info(f"Linux: 已添加开机自启动: {app_path}")
+            os.chmod(autostart_file, 0o755)
+        else:
+            if os.path.exists(autostart_file):
+                os.remove(autostart_file)
+                self.logger.info("Linux: 已移除开机自启动")
+
+        return True
 
 
 settings_manager = Settings()

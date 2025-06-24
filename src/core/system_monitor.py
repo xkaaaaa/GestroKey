@@ -1,7 +1,6 @@
 import os
-import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import psutil
 from qtpy.QtCore import QObject, QTimer, Signal
@@ -15,13 +14,11 @@ class SystemMonitor(QObject):
     def __init__(self, update_interval=1000):
         super().__init__()
         self.logger = get_logger("SystemMonitor")
-
         self._update_interval = update_interval
         self._start_time = datetime.now()
         self._timer = QTimer()
         self._timer.timeout.connect(self._update_data)
         self._running = False
-
         self._data = {
             "cpu_percent": 0.0,
             "memory_percent": 0.0,
@@ -31,7 +28,6 @@ class SystemMonitor(QObject):
             "process_memory": 0.0,
             "process_cpu": 0.0,
         }
-
         self._process = psutil.Process(os.getpid())
 
     def start(self):
@@ -58,10 +54,8 @@ class SystemMonitor(QObject):
         try:
             cpu_percent = psutil.cpu_percent(interval=None)
             memory = psutil.virtual_memory()
-
             process_memory = self._process.memory_percent()
             process_cpu = self._process.cpu_percent(interval=None) / psutil.cpu_count()
-
             runtime = datetime.now() - self._start_time
             runtime_str = str(runtime).split(".")[0]
 
@@ -74,9 +68,7 @@ class SystemMonitor(QObject):
                 "process_memory": process_memory,
                 "process_cpu": process_cpu,
             })
-
             self.dataUpdated.emit(self._data)
-
         except Exception as e:
             self.logger.error(f"更新系统信息时发生错误: {e}")
 

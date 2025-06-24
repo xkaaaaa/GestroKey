@@ -1,32 +1,20 @@
 import math
 import sys
 import os
-from typing import List, Tuple, Dict  # 确保所有需要的类型都被导入
-
+from typing import List, Tuple, Dict
 import numpy as np
 from numpy.linalg import svd, norm
-
 from core.logger import get_logger
 
 
 class PathAnalyzer:
-    """
-    路径分析器，用于格式化原始鼠标/触摸板绘制路径，并计算路径间的相似度。
-    相似度计算主要关注两大核心要素：
-      1. 形状轮廓 (Shape): 路径在视觉上的几何形态。
-      2. 笔画顺序 (Stroke Order): 路径的绘制方向和顺序。
-    """
+    """路径分析器，用于格式化原始鼠标/触摸板绘制路径，并计算路径间的相似度"""
     
     def __init__(self):
         self.logger = get_logger("PathAnalyzer")
-    
-    # ===================== 路径格式化与关键点提取 ===================== #
 
     def format_raw_path(self, raw_points: List[Tuple]) -> Dict:
-        """
-        将原始绘制点列表转换为格式化的路径字典。
-        流程: 缩放 -> 简化 -> 提取关键点 -> 生成连接。
-        """
+        """将原始绘制点列表转换为格式化的路径字典"""
         if len(raw_points) < 2:
             return {'points': [], 'connections': []}
         
@@ -42,7 +30,7 @@ class PathAnalyzer:
         return {'points': key_points, 'connections': connections}
 
     def _scale_small_path(self, coords: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
-        """对尺寸过小的路径进行等比放大，以提高后续处理的精度。"""
+        """对尺寸过小的路径进行等比放大，以提高后续处理的精度"""
         if len(coords) < 2:
             return coords
             
@@ -75,7 +63,7 @@ class PathAnalyzer:
         return coords
     
     def _extract_key_points(self, coords: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
-        """从坐标点中智能提取关键点，保留路径的核心特征。"""
+        """从坐标点中智能提取关键点，保留路径的核心特征"""
         if len(coords) <= 2:
             return coords
         
@@ -94,7 +82,7 @@ class PathAnalyzer:
         return unique_points
     
     def _douglas_peucker(self, points: List[Tuple[int, int]], tolerance: float) -> List[Tuple[int, int]]:
-        """使用道格拉斯-普克算法简化路径。"""
+        """使用道格拉斯-普克算法简化路径"""
         if len(points) <= 2:
             return points
             
@@ -113,7 +101,7 @@ class PathAnalyzer:
             return [points[0], points[end]]
 
     def _analyze_direction_changes(self, points: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
-        """通过分析角度和距离变化，识别重要的转折点。"""
+        """通过分析角度和距离变化，识别重要的转折点"""
         if len(points) <= 2:
             return points
         
@@ -125,19 +113,14 @@ class PathAnalyzer:
             angle_change = self._calculate_angle_change(points[i - 1], points[i], points[i + 1])
             distance_from_last_key = math.dist(points[i], key_points[-1])
             
-            # 保留点位的条件：显著的角度变化 或 与上一个关键点距离足够远
             if abs(angle_change) > 30 or distance_from_last_key > min_distance_threshold:
                 key_points.append(points[i])
         
         key_points.append(points[-1])
         return key_points
-    
-    # ====================== 相似度核心实现 ====================== #
 
     def calculate_similarity(self, path1: Dict, path2: Dict) -> float:
-        """
-        计算两条格式化路径的相似度，结果范围 [0, 1]，值越大越相似。
-        """
+        """计算两条格式化路径的相似度，结果范围 [0, 1]，值越大越相似"""
         if not all([path1, path2, path1.get("points", []), path2.get("points", [])]) or \
            len(path1["points"]) < 2 or len(path2["points"]) < 2:
             return 0.0
@@ -172,27 +155,22 @@ class PathAnalyzer:
             
         return float(final_sim)
 
-    # ====================== 相似度计算的内部辅助函数 ====================== #
-
     def _preprocess_for_comparison(self, path: Dict, target_size: int = 200, resample_n: int = 64) -> np.ndarray | None:
-        """为相似度计算准备路径：归一化 + 重采样。"""
-        # 归一化
+        """为相似度计算准备路径：归一化 + 重采样"""
         norm_path = self.normalize_path_scale(path, target_size)
         points = np.array(norm_path["points"], dtype=float)
         if points.shape[0] < 2:
             return None
-        # 重采样
         return self._resample_points(points, resample_n)
 
     def _resample_points(self, pts: np.ndarray, target_n: int) -> np.ndarray:
-        """沿曲线总长度等距采样 target_n 个点。"""
+        """沿曲线总长度等距采样 target_n 个点"""
         distances = np.cumsum(np.sqrt(np.sum(np.diff(pts, axis=0)**2, axis=1)))
         distances = np.insert(distances, 0, 0)
         
-        if distances[-1] == 0:  # 路径所有点重合
+        if distances[-1] == 0:
             return np.repeat(pts[:1], target_n, axis=0)
 
-        # 使用np.interp进行高效插值
         regular_distances = np.linspace(0, distances[-1], target_n)
         resampled_x = np.interp(regular_distances, distances, pts[:, 0])
         resampled_y = np.interp(regular_distances, distances, pts[:, 1])
@@ -200,15 +178,12 @@ class PathAnalyzer:
         return np.vstack((resampled_x, resampled_y)).T
 
     def _compute_scores(self, pts1: np.ndarray, pts2: np.ndarray) -> Tuple[float, float]:
-        """计算两条点集的形状得分和方向得分。"""
-        # 形状得分 (Shape Score)
+        """计算两条点集的形状得分和方向得分"""
         aligned_pts1 = self._procrustes_align(pts1, pts2)
         shape_dist = np.mean(norm(aligned_pts1 - pts2, axis=1))
-        # 放宽标准：增大边界值，使得对微小形状偏差更宽容，尤其对复杂路径有益
         shape_scale_boundary = 175.0
         shape_score = max(0.0, 1.0 - shape_dist / shape_scale_boundary)
 
-        # 方向得分 (Direction Score)
         vec1 = np.diff(aligned_pts1, axis=0)
         vec2 = np.diff(pts2, axis=0)
         
@@ -221,29 +196,22 @@ class PathAnalyzer:
         return shape_score, direction_score
 
     def _procrustes_align(self, A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        """通过旋转和平移将点集A对齐到点集B (Orthogonal Procrustes problem)。"""
+        """通过旋转和平移将点集A对齐到点集B"""
         A_centered = A - A.mean(axis=0)
         B_centered = B - B.mean(axis=0)
 
-        # 计算协方差矩阵
         C = A_centered.T @ B_centered
-        # SVD分解
         U, _, Vt = svd(C)
-        # 计算最佳旋转矩阵R
         R = Vt.T @ U.T
 
-        # 保证R是旋转矩阵而非反射矩阵 (det(R) = 1)
         if np.linalg.det(R) < 0:
             Vt[-1, :] *= -1
             R = Vt.T @ U.T
 
-        # 应用旋转并移回B的中心
         return A_centered @ R + B.mean(axis=0)
 
-    # ====================== 通用工具函数 ====================== #
-
     def normalize_path_scale(self, path: Dict, target_size: int = 100) -> Dict:
-        """将路径归一化到指定的边界框尺寸。"""
+        """将路径归一化到指定的边界框尺寸"""
         points = path.get('points', [])
         if len(points) < 2:
             return path
@@ -265,7 +233,7 @@ class PathAnalyzer:
         return {'points': normalized_points, 'connections': path.get('connections', [])}
 
     def _get_path_bbox(self, points: List[Tuple]) -> Dict:
-        """计算路径的边界框。"""
+        """计算路径的边界框"""
         xs = [p[0] for p in points]
         ys = [p[1] for p in points]
         min_x, max_x = min(xs), max(xs)
@@ -278,11 +246,11 @@ class PathAnalyzer:
         }
     
     def _calculate_path_length(self, points: List[Tuple[int, int]]) -> float:
-        """计算路径的总长度。"""
+        """计算路径的总长度"""
         return sum(math.dist(points[i], points[i+1]) for i in range(len(points) - 1))
 
     def _calculate_angle_change(self, p1: Tuple, p2: Tuple, p3: Tuple) -> float:
-        """计算三点构成的夹角变化。"""
+        """计算三点构成的夹角变化"""
         v1 = (p2[0] - p1[0], p2[1] - p1[1])
         v2 = (p3[0] - p2[0], p3[1] - p2[1])
         
@@ -292,7 +260,7 @@ class PathAnalyzer:
         return math.degrees(math.atan2(cross_product, dot_product))
     
     def _distance_to_line(self, p1: Tuple, p2: Tuple, point: Tuple) -> float:
-        """计算一个点到由另外两点确定的线段的距离。"""
+        """计算一个点到由另外两点确定的线段的距离"""
         x1, y1 = p1
         x2, y2 = p2
         x0, y0 = point

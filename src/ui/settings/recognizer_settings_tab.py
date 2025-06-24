@@ -4,8 +4,6 @@
 处理手势识别相似度阈值等设置
 """
 
-import os
-import sys
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QHBoxLayout,
@@ -31,14 +29,12 @@ class RecognizerSettingsTab(QWidget):
         self._load_settings()
     
     def _init_ui(self):
-        """初始化用户界面"""
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
         layout.setContentsMargins(20, 20, 20, 20)
         
         form_layout = QFormLayout()
 
-        # 手势相似度阈值
         threshold_layout = QHBoxLayout()
         
         self.threshold_spinbox = QDoubleSpinBox()
@@ -62,7 +58,6 @@ class RecognizerSettingsTab(QWidget):
         layout.addStretch()
     
     def _load_settings(self):
-        """加载设置"""
         self.is_loading = True
         try:
             threshold = self.settings.get("gesture.similarity_threshold", 0.70)
@@ -73,18 +68,15 @@ class RecognizerSettingsTab(QWidget):
             self.is_loading = False
     
     def _on_threshold_changed(self, value):
-        """相似度阈值改变时的处理"""
         if not self.is_loading:
             self._mark_changed()
     
     def _mark_changed(self):
-        """标记设置已更改"""
         parent = self.parent()
         if parent and hasattr(parent, 'parent') and hasattr(parent.parent(), '_mark_changed'):
             parent.parent()._mark_changed()
     
     def has_unsaved_changes(self):
-        """检查是否有未保存的更改"""
         try:
             current_threshold = self.threshold_spinbox.value()
             saved_threshold = self.settings.get("gesture.similarity_threshold", 0.70)
@@ -93,7 +85,6 @@ class RecognizerSettingsTab(QWidget):
             return False
     
     def apply_settings(self):
-        """应用设置"""
         try:
             threshold = self.threshold_spinbox.value()
             self.settings.set("gesture.similarity_threshold", threshold)

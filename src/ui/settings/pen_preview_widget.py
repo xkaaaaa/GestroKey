@@ -4,10 +4,9 @@
 用于在设置页面预览不同画笔效果的动态组件
 """
 
-import os
-import sys
 import math
 import time
+import random
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtGui import QColor, QPainter, QPen, QPixmap
 from qtpy.QtWidgets import QWidget
@@ -45,9 +44,6 @@ class PenPreviewWidget(QWidget):
         self.current_brush = None
 
     def _generate_gesture_path(self):
-        """根据画笔粗细生成合适的随机形状"""
-        import random
-        
         if self.pen_width <= 3:
             shape_types = ['wave', 'spiral', 'heart', 'star', 'circle', 'triangle', 'diamond', 'infinity', 
                           'sine_wave', 'cosine_wave', 's_curve', 'flower', 'butterfly', 'figure_eight', 'zigzag']
@@ -80,18 +76,12 @@ class PenPreviewWidget(QWidget):
                 y = 0.5
                 self.gesture_points.append((x, y))
                 
-        elif shape_type == 'circle':
+        elif shape_type in ['circle', 'large_circle']:
+            radius = 0.3 if shape_type == 'circle' else 0.25
             for t in t_values:
                 angle = t * 2 * math.pi
-                x = 0.5 + 0.3 * math.cos(angle)
-                y = 0.5 + 0.3 * math.sin(angle)
-                self.gesture_points.append((x, y))
-                
-        elif shape_type == 'large_circle':
-            for t in t_values:
-                angle = t * 2 * math.pi
-                x = 0.5 + 0.25 * math.cos(angle)
-                y = 0.5 + 0.25 * math.sin(angle)
+                x = 0.5 + radius * math.cos(angle)
+                y = 0.5 + radius * math.sin(angle)
                 self.gesture_points.append((x, y))
                 
         elif shape_type == 'triangle':
@@ -132,24 +122,16 @@ class PenPreviewWidget(QWidget):
                 y = 0.4 - 0.15 * (13 * math.cos(angle) - 5 * math.cos(2*angle) - 2 * math.cos(3*angle) - math.cos(4*angle)) / 16
                 self.gesture_points.append((x, y))
                 
-        elif shape_type == 'star':
+        elif shape_type in ['star', 'simple_star']:
+            points = 10 if shape_type == 'star' else 5
+            outer_radius = 0.3 if shape_type == 'star' else 0.25
+            inner_radius = 0.15
             for t in t_values:
                 angle = t * 2 * math.pi
-                if int(t * 10) % 2 == 0:
-                    radius = 0.3
+                if int(t * points) % 2 == 0:
+                    radius = outer_radius
                 else:
-                    radius = 0.15
-                x = 0.5 + radius * math.cos(angle - math.pi/2)
-                y = 0.5 + radius * math.sin(angle - math.pi/2)
-                self.gesture_points.append((x, y))
-                
-        elif shape_type == 'simple_star':
-            for t in t_values:
-                angle = t * 2 * math.pi
-                if int(t * 5) % 2 == 0:
-                    radius = 0.25
-                else:
-                    radius = 0.15
+                    radius = inner_radius
                 x = 0.5 + radius * math.cos(angle - math.pi/2)
                 y = 0.5 + radius * math.sin(angle - math.pi/2)
                 self.gesture_points.append((x, y))
@@ -195,42 +177,25 @@ class PenPreviewWidget(QWidget):
                 y = 0.5 + 0.2 * math.sin(angle)
                 self.gesture_points.append((x, y))
                 
-        elif shape_type == 'sine_wave':
+        elif shape_type in ['sine_wave', 'simple_sine', 'cosine_wave', 's_curve']:
             for t in t_values:
                 x = t
-                y = 0.5 + 0.25 * math.sin(t * 2 * math.pi)
+                if shape_type == 'sine_wave':
+                    y = 0.5 + 0.25 * math.sin(t * 2 * math.pi)
+                elif shape_type == 'simple_sine' or shape_type == 's_curve':
+                    amplitude = 0.15 if shape_type == 'simple_sine' else 0.3
+                    y = 0.5 + amplitude * math.sin(t * math.pi)
+                else:  # cosine_wave
+                    y = 0.5 + 0.25 * math.cos(t * 2 * math.pi)
                 self.gesture_points.append((x, y))
                 
-        elif shape_type == 'simple_sine':
-            for t in t_values:
-                x = t
-                y = 0.5 + 0.15 * math.sin(t * math.pi)
-                self.gesture_points.append((x, y))
-                
-        elif shape_type == 'cosine_wave':
-            for t in t_values:
-                x = t
-                y = 0.5 + 0.25 * math.cos(t * 2 * math.pi)
-                self.gesture_points.append((x, y))
-                
-        elif shape_type == 's_curve':
-            for t in t_values:
-                x = t
-                y = 0.5 + 0.3 * math.sin(t * math.pi)
-                self.gesture_points.append((x, y))
-                
-        elif shape_type == 'flower':
+        elif shape_type in ['flower', 'simple_flower']:
             for t in t_values:
                 angle = t * 2 * math.pi
-                radius = 0.2 + 0.1 * math.cos(5 * angle)
-                x = 0.5 + radius * math.cos(angle)
-                y = 0.5 + radius * math.sin(angle)
-                self.gesture_points.append((x, y))
-                
-        elif shape_type == 'simple_flower':
-            for t in t_values:
-                angle = t * 2 * math.pi
-                radius = 0.15 + 0.08 * math.cos(3 * angle)
+                if shape_type == 'flower':
+                    radius = 0.2 + 0.1 * math.cos(5 * angle)
+                else:  # simple_flower
+                    radius = 0.15 + 0.08 * math.cos(3 * angle)
                 x = 0.5 + radius * math.cos(angle)
                 y = 0.5 + radius * math.sin(angle)
                 self.gesture_points.append((x, y))
@@ -409,7 +374,6 @@ class PenPreviewWidget(QWidget):
         painter.setPen(QPen(QColor(200, 200, 200), 1))
         painter.drawRect(self.rect().adjusted(0, 0, -1, -1))
         
-        # 绘制淡出的上一个笔画
         if self.previous_buffer and self.fade_progress < 1.0:
             fade_opacity = 1.0 - self.fade_progress
             painter.setOpacity(fade_opacity)

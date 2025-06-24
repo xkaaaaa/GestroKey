@@ -1,17 +1,15 @@
 import os
-import sys
 
-from qtpy.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QTimer, Property, Signal
-from qtpy.QtGui import QColor, QCursor, QIcon
+from qtpy.QtCore import QSize, Qt, Signal
+from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (
-    QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar,
+    QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar,
     QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 )
 
 from core.brush.manager import DrawingManager
 from core.logger import get_logger
 from core.system_monitor import SystemMonitor, format_bytes
-from version import APP_NAME
 
 
 def create_styled_progress_bar(color_theme="default"):
@@ -19,32 +17,19 @@ def create_styled_progress_bar(color_theme="default"):
     progress_bar.setTextVisible(False)
     progress_bar.setRange(0, 100)
     
-    if color_theme == "memory":
-        progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: none;
-                border-radius: 5px;
-                background-color: rgba(255, 255, 255, 50);
-                height: 8px;
-            }
-            QProgressBar::chunk {
-                border-radius: 5px;
-                background-color: #3498db;
-            }
-        """)
-    else:
-        progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: none;
-                border-radius: 5px;
-                background-color: rgba(255, 255, 255, 50);
-                height: 8px;
-            }
-            QProgressBar::chunk {
-                border-radius: 5px;
-                background-color: #2ecc71;
-            }
-        """)
+    chunk_color = "#3498db" if color_theme == "memory" else "#2ecc71"
+    progress_bar.setStyleSheet(f"""
+        QProgressBar {{
+            border: none;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 50);
+            height: 8px;
+        }}
+        QProgressBar::chunk {{
+            border-radius: 5px;
+            background-color: {chunk_color};
+        }}
+    """)
     
     return progress_bar
 
@@ -60,11 +45,22 @@ class ConsolePage(QWidget):
         self.is_drawing_active = False
 
         self.system_monitor = SystemMonitor(update_interval=1500)
+        self._assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images", "ui")
 
         self._setup_ui()
 
         self.system_monitor.dataUpdated.connect(self.update_system_info)
         self.system_monitor.start()
+
+    def _get_icon_path(self, icon_name):
+        icon_path = os.path.join(self._assets_dir, icon_name)
+        return icon_path if os.path.exists(icon_path) else None
+
+    def _set_button_icon(self, button, icon_name, size=(24, 24)):
+        icon_path = self._get_icon_path(icon_name)
+        if icon_path:
+            button.setIcon(QIcon(icon_path))
+            button.setIconSize(QSize(*size))
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -88,12 +84,7 @@ class ConsolePage(QWidget):
         self.action_button.setMinimumSize(150, 40)
         self.action_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.action_button.clicked.connect(self.toggle_drawing)
-        # 设置开始绘制图标
-        assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images", "ui")
-        start_icon_path = os.path.join(assets_dir, "start-drawing.svg")
-        if os.path.exists(start_icon_path):
-            self.action_button.setIcon(QIcon(start_icon_path))
-            self.action_button.setIconSize(QSize(24, 24))
+        self._set_button_icon(self.action_button, "start-drawing.svg")
         layout.addWidget(self.action_button, 0, Qt.AlignmentFlag.AlignCenter)
 
         layout.addSpacerItem(QSpacerItem(20, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
@@ -123,13 +114,11 @@ class ConsolePage(QWidget):
     def _create_system_info_card(self, title, value, color):
         card = QFrame()
         card.setMinimumSize(180, 120)
-        card.setFrameStyle(QFrame.Shape.Box)
         
         r, g, b = color[0], color[1], color[2]
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: rgb({r}, {g}, {b});
-                border: 1px solid rgba(255, 255, 255, 0.3);
                 border-radius: 8px;
                 margin: 2px;
             }}
@@ -182,9 +171,6 @@ class ConsolePage(QWidget):
         process_memory = data["process_memory"]
         self.process_card._value_label.setText(f"CPU: {process_cpu:.1f}% | 内存: {process_memory:.1f}%")
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-
     def toggle_drawing(self):
         if self.is_drawing_active:
             self.stop_drawing()
@@ -201,11 +187,7 @@ class ConsolePage(QWidget):
             if success:
                 self.status_label.setText("绘制中 - 使用鼠标右键进行绘制")
                 self.action_button.setText("停止绘制")
-                # 切换到停止绘制图标
-                assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images", "ui")
-                stop_icon_path = os.path.join(assets_dir, "stop-drawing.svg")
-                if os.path.exists(stop_icon_path):
-                    self.action_button.setIcon(QIcon(stop_icon_path))
+                self._set_button_icon(self.action_button, "stop-drawing.svg")
                 self.is_drawing_active = True
                 self.drawing_state_changed.emit(True)
 
@@ -221,11 +203,7 @@ class ConsolePage(QWidget):
                 if success:
                     self.status_label.setText("准备就绪")
                     self.action_button.setText("开始绘制")
-                    # 切换回开始绘制图标
-                    assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "images", "ui")
-                    start_icon_path = os.path.join(assets_dir, "start-drawing.svg")
-                    if os.path.exists(start_icon_path):
-                        self.action_button.setIcon(QIcon(start_icon_path))
+                    self._set_button_icon(self.action_button, "start-drawing.svg")
                     self.is_drawing_active = False
                     self.drawing_state_changed.emit(False)
 

@@ -1,9 +1,3 @@
-"""
-透明绘制覆盖层
-
-处理绘制界面的显示和交互
-"""
-
 import sys
 import os
 import math
@@ -22,10 +16,8 @@ from qtpy.QtGui import (
 )
 from qtpy.QtWidgets import QApplication, QWidget
 
-# 导入画笔模块
 from .drawing import DrawingModule
 from .fading import FadingModule
-
 from core.logger import get_logger
 from core.path_analyzer import PathAnalyzer
 
@@ -39,71 +31,58 @@ class DrawingSignals(QObject):
 
 
 class TransparentDrawingOverlay(QWidget):
-    """透明绘制覆盖层，用于捕获鼠标移动并绘制轨迹"""
+    """透明绘制覆盖层"""
 
     def __init__(self):
         super().__init__()
         self.logger = get_logger("DrawingOverlay")
 
-        # 绘制状态
         self.drawing = False
         self.last_point = None
 
-        # 点和压力数据
-        self.points = []  # 存储所有轨迹点，每个元素为 [x, y, pressure, timestamp]
-        self.lines = []  # 存储完整线条，每条线由多个点组成
-        self.current_line = []  # 当前正在绘制的线条
-        self.current_stroke_id = 0  # 当前绘制的笔画ID
+        self.points = []
+        self.lines = []
+        self.current_line = []
+        self.current_stroke_id = 0
 
-        # 路径分析器
         self.path_analyzer = PathAnalyzer()
-
-        # 画笔模块
         self.drawing_module = DrawingModule()
         self.current_brush = None
 
-        # 绘制效果控制
-        self.pen_color = QColor(0, 120, 255, 255)  # 线条颜色，设置完全不透明
-        self.pen_width = 2  # 线条宽度
+        self.pen_color = QColor(0, 120, 255, 255)
+        self.pen_width = 2
 
-        # 缓冲区和更新控制
-        self.image = None  # 绘图缓冲
+        self.image = None
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update)
         self.update_timer.setInterval(10)
         
-        # 水性笔持续更新定时器
         self.water_update_timer = QTimer(self)
         self.water_update_timer.timeout.connect(self._update_water_brush)
-        self.water_update_timer.setInterval(16)  # 约60FPS
+        self.water_update_timer.setInterval(16)
 
-        # 消失模块
         self.fading_module = FadingModule(self)
         self.fading_module.fade_update.connect(self.update)
         self.fading_module.fade_complete.connect(self._on_fade_complete)
         self.fading = False
 
-        # 绘制优化参数
-        self.min_drawing_distance = 2.0  # 最小绘制距离阈值，防止过于频繁绘制
-        self.last_drawing_points = []  # 存储最近的几个绘制点，用于平滑处理
-        self.max_drawing_points = 3  # 最大存储点数
+        self.min_drawing_distance = 2.0
+        self.last_drawing_points = []
+        self.max_drawing_points = 3
 
-        # 性能优化 - 预创建画笔和批量绘制
         self.painter_pen = QPen()
         self.painter_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         self.painter_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        self._batch_painter = None  # 批量绘制的QPainter实例
+        self._batch_painter = None
 
-        # 强制置顶定时器
         self.force_topmost_timer = QTimer(self)
         self.force_topmost_timer.timeout.connect(self._force_window_topmost)
-        self.force_topmost_enabled = True  # 默认启用强制置顶
+        self.force_topmost_enabled = True
 
         self.initUI()
         self.logger.debug("绘制覆盖层初始化完成")
 
     def set_brush_type(self, brush_type):
-        """设置画笔类型"""
         if self.drawing_module.set_brush_type(brush_type):
             self.logger.debug(f"画笔类型已设置为: {brush_type}")
             return True
@@ -112,24 +91,19 @@ class TransparentDrawingOverlay(QWidget):
             return False
 
     def get_brush_types(self):
-        """获取所有画笔类型"""
         return self.drawing_module.get_brush_types()
 
     def get_current_brush_type(self):
-        """获取当前画笔类型"""
         return self.drawing_module.get_current_brush_type()
 
     def set_force_topmost(self, enabled):
-        """设置是否启用强制置顶"""
         self.force_topmost_enabled = enabled
         self.logger.debug(f"强制置顶已设置为: {enabled}")
 
     def _force_window_topmost(self):
-        """强制窗口置顶"""
         if self.force_topmost_enabled and self.isVisible():
             self.raise_()
             self.activateWindow()
-            # 确保窗口始终在最顶层
             self.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
@@ -138,16 +112,13 @@ class TransparentDrawingOverlay(QWidget):
             self.show()
 
     def set_pen_width(self, width):
-        """设置笔尖粗细"""
         if width > 0:
             self.pen_width = width
             self.logger.debug(f"笔尖粗细已设置为: {width}")
 
     def set_pen_color(self, color):
-        """设置笔尖颜色"""
         if isinstance(color, list) and len(color) >= 3:
             r, g, b = color[0], color[1], color[2]
-            # 设置完全不透明
             alpha = 255
             self.pen_color = QColor(r, g, b, alpha)
             self.logger.debug(f"笔尖颜色已设置为: RGB({r},{g},{b})")
@@ -157,50 +128,35 @@ class TransparentDrawingOverlay(QWidget):
             return False
 
     def initUI(self):
-        # 创建一个全屏、透明、无边框的窗口，用于绘制
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True
-        )  # 完全透明，不影响鼠标事件
-
-        # 启用图形硬件加速
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
 
-        # 有选择性地启用硬件加速，避免与QPainter冲突
         try:
-            # 设置高质量渲染格式
             format = QSurfaceFormat()
-            format.setSamples(4)  # 启用多重采样抗锯齿
-            format.setSwapInterval(1)  # 垂直同步
-
-            # 在支持的环境中使用OpenGL
+            format.setSamples(4)
+            format.setSwapInterval(1)
             QSurfaceFormat.setDefaultFormat(format)
-
-            # 启用Qt的合成器提示以获得更好的硬件加速
             self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
-            self.setAutoFillBackground(False)  # 禁用自动填充背景以提高性能
-
+            self.setAutoFillBackground(False)
             self.logger.debug("成功配置图形硬件加速")
         except ImportError:
             self.logger.warning("无法导入QSurfaceFormat，图形硬件加速可能不可用")
         except Exception as e:
             self.logger.warning(f"配置图形硬件加速时出错: {e}")
 
-        # 获取屏幕尺寸
         screen = QApplication.primaryScreen()
         screen_geometry = screen.geometry()
         self.setGeometry(screen_geometry)
 
-        # 创建绘图缓冲区
         self.image = QPixmap(screen_geometry.width(), screen_geometry.height())
         self.image.fill(Qt.GlobalColor.transparent)
 
-        # 隐藏窗口，仅在绘制时显示
         self.hide()
         self.logger.debug(
             f"UI初始化完成，屏幕尺寸: {screen_geometry.width()}x{screen_geometry.height()}"

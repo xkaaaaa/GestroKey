@@ -1,16 +1,19 @@
+import copy
 from qtpy.QtCore import Qt, QTimer, Signal
 from qtpy.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit, 
-    QGroupBox, QMessageBox, QComboBox, QDialogButtonBox
+    QGroupBox, QMessageBox, QComboBox, QDialogButtonBox, QWidget, QProgressBar
 )
+from qtpy.QtGui import QPainter, QPen, QColor
 
 from core.logger import get_logger
 from ui.gestures.gestures import get_gesture_library
 from ui.gestures.drawing_widget import GestureDrawingWidget
+from core.path_analyzer import PathAnalyzer
+from ui.settings.settings import get_settings
 
 
 class TriggerPathEditDialog(QDialog):
-    """触发路径编辑/添加对话框"""
     
     def __init__(self, path_key=None, parent=None):
         super().__init__(parent)
@@ -30,14 +33,11 @@ class TriggerPathEditDialog(QDialog):
             self._load_path_data()
         
     def initUI(self):
-        """初始化用户界面"""
         layout = QVBoxLayout(self)
         
-        # 基本信息编辑
         info_group = QGroupBox("基本信息")
         info_layout = QVBoxLayout(info_group)
         
-        # 路径名称
         name_layout = QHBoxLayout()
         name_layout.addWidget(QLabel("路径名称:"))
         self.edit_name = QLineEdit()
@@ -46,7 +46,6 @@ class TriggerPathEditDialog(QDialog):
         
         layout.addWidget(info_group)
         
-        # 路径绘制区域
         drawing_group = QGroupBox("路径绘制")
         drawing_layout = QVBoxLayout(drawing_group)
         
@@ -58,14 +57,12 @@ class TriggerPathEditDialog(QDialog):
         
         layout.addWidget(drawing_group)
         
-        # 按钮区域
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         button_box.accepted.connect(self._save_and_accept)
         button_box.rejected.connect(self.reject)
         
-        # 添加清空绘制按钮
         self.btn_clear = QPushButton("清空绘制")
         self.btn_clear.clicked.connect(self._clear_drawing)
         button_box.addButton(self.btn_clear, QDialogButtonBox.ButtonRole.ActionRole)
@@ -73,7 +70,6 @@ class TriggerPathEditDialog(QDialog):
         layout.addWidget(button_box)
         
     def _load_path_data(self):
-        """加载路径数据"""
         if not self.path_key:
             return
             
@@ -82,37 +78,26 @@ class TriggerPathEditDialog(QDialog):
             self.logger.error(f"找不到路径: {self.path_key}")
             return
             
-        # 填充表单
         path_name = path_data.get('name', '')
         self.edit_name.setText(path_name)
         
-        # 加载路径到绘制区域
         path = path_data.get('path')
         if path:
-            import copy
             self.current_path = copy.deepcopy(path)
             self.drawing_widget.load_path(self.current_path)
             
     def _on_path_completed(self, path):
-        """处理路径绘制完成事件"""
-        import copy
         self.current_path = copy.deepcopy(path)
-        self.logger.info(f"路径绘制完成，关键点数: {len(path.get('points', []))}")
         
     def _on_path_updated(self):
-        """处理路径更新事件"""
         if self.drawing_widget.completed_paths:
-            import copy
             self.current_path = copy.deepcopy(self.drawing_widget.completed_paths[-1])
-            self.logger.info("路径已更新")
             
     def _clear_drawing(self):
-        """清空绘制"""
         self.drawing_widget.clear_drawing()
         self.current_path = None
         
     def _save_and_accept(self):
-        """保存并关闭对话框"""
         name = self.edit_name.text().strip()
         if not name:
             QMessageBox.warning(self, "警告", "请输入路径名称")
@@ -120,14 +105,11 @@ class TriggerPathEditDialog(QDialog):
             
         try:
             if self.is_editing:
-                # 编辑现有路径
                 path_data = self.gesture_library.trigger_paths[self.path_key]
                 path_data['name'] = name
                 if self.current_path:
                     path_data['path'] = self.current_path
-                self.logger.info(f"更新路径: {name}")
             else:
-                # 添加新路径
                 path_id = self.gesture_library._get_next_path_id()
                 path_key = f"path_{path_id}"
                 
@@ -139,9 +121,7 @@ class TriggerPathEditDialog(QDialog):
                 
                 self.gesture_library.trigger_paths[path_key] = new_path_data
                 self.path_key = path_key
-                self.logger.info(f"添加新路径: {name}, ID: {path_id}")
                 
-            # 标记数据已变更
             self.gesture_library.mark_data_changed("trigger_paths")
             
             self.accept()
@@ -152,8 +132,6 @@ class TriggerPathEditDialog(QDialog):
 
 
 class ExecuteActionEditDialog(QDialog):
-    """执行操作编辑/添加对话框"""
-    
     def __init__(self, action_key=None, parent=None):
         super().__init__(parent)
         self.logger = get_logger("ExecuteActionEditDialog")
@@ -171,21 +149,17 @@ class ExecuteActionEditDialog(QDialog):
             self._load_action_data()
         
     def initUI(self):
-        """初始化用户界面"""
         layout = QVBoxLayout(self)
         
-        # 基本信息编辑
         info_group = QGroupBox("操作信息")
         info_layout = QVBoxLayout(info_group)
         
-        # 操作名称
         name_layout = QHBoxLayout()
         name_layout.addWidget(QLabel("操作名称:"))
         self.edit_name = QLineEdit()
         name_layout.addWidget(self.edit_name)
         info_layout.addLayout(name_layout)
         
-        # 操作类型
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("操作类型:"))
         self.combo_type = QComboBox()
@@ -193,7 +167,6 @@ class ExecuteActionEditDialog(QDialog):
         type_layout.addWidget(self.combo_type)
         info_layout.addLayout(type_layout)
         
-        # 操作值
         value_layout = QHBoxLayout()
         value_layout.addWidget(QLabel("操作值:"))
         self.edit_value = QLineEdit()
@@ -203,10 +176,8 @@ class ExecuteActionEditDialog(QDialog):
         
         layout.addWidget(info_group)
         
-        # 添加一些空间
         layout.addStretch()
         
-        # 按钮区域
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -216,7 +187,6 @@ class ExecuteActionEditDialog(QDialog):
         layout.addWidget(button_box)
         
     def _load_action_data(self):
-        """加载操作数据"""
         if not self.action_key:
             return
             
@@ -225,7 +195,6 @@ class ExecuteActionEditDialog(QDialog):
             self.logger.error(f"找不到操作: {self.action_key}")
             return
             
-        # 填充表单
         action_name = action_data.get('name', '')
         action_type = action_data.get('type', 'shortcut')
         action_value = action_data.get('value', '')
@@ -233,14 +202,12 @@ class ExecuteActionEditDialog(QDialog):
         self.edit_name.setText(action_name)
         self.edit_value.setText(action_value)
         
-        # 设置类型下拉框
         for i in range(self.combo_type.count()):
             if self.combo_type.itemData(i) == action_type:
                 self.combo_type.setCurrentIndex(i)
                 break
                 
     def _save_and_accept(self):
-        """保存并关闭对话框"""
         name = self.edit_name.text().strip()
         action_type = self.combo_type.currentData()
         value = self.edit_value.text().strip()
@@ -255,14 +222,11 @@ class ExecuteActionEditDialog(QDialog):
             
         try:
             if self.is_editing:
-                # 编辑现有操作
                 action_data = self.gesture_library.execute_actions[self.action_key]
                 action_data['name'] = name
                 action_data['type'] = action_type
                 action_data['value'] = value
-                self.logger.info(f"更新操作: {name}")
             else:
-                # 添加新操作
                 action_id = self.gesture_library._get_next_action_id()
                 action_key = f"action_{action_id}"
                 
@@ -275,9 +239,7 @@ class ExecuteActionEditDialog(QDialog):
                 
                 self.gesture_library.execute_actions[action_key] = new_action_data
                 self.action_key = action_key
-                self.logger.info(f"添加新操作: {name}, ID: {action_id}")
                 
-            # 标记数据已变更
             self.gesture_library.mark_data_changed("execute_actions")
             
             self.accept()
@@ -285,3 +247,375 @@ class ExecuteActionEditDialog(QDialog):
         except Exception as e:
             self.logger.error(f"保存操作时出错: {e}")
             QMessageBox.critical(self, "错误", f"保存操作失败: {str(e)}")
+
+class TestSimilarityDialog(QDialog):
+    def __init__(self, reference_path, parent=None):
+        super().__init__(parent)
+        self.reference_path = reference_path
+        self.test_path = None
+        self.similarity_score = 0.0
+        self.threshold = 0.70
+        
+        self.path_analyzer = PathAnalyzer()
+        
+        try:
+            settings = get_settings()
+            self.threshold = settings.get("gesture.similarity_threshold", 0.70)
+        except:
+            self.threshold = 0.70
+            
+        self.setWindowTitle("测试手势相似度")
+        self.setModal(True)
+        self.resize(800, 600)
+        self.setMinimumSize(700, 500)
+        
+        self._init_ui()
+        
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        title_label = QLabel("手势相似度测试")
+        title_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #333;")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_label)
+        
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setSpacing(20)
+        
+        left_panel = self._create_reference_panel()
+        content_layout.addWidget(left_panel, 1)
+        
+        right_panel = self._create_test_panel()
+        content_layout.addWidget(right_panel, 1)
+        
+        layout.addWidget(content_widget, 1)
+        
+        similarity_panel = self._create_similarity_panel()
+        layout.addWidget(similarity_panel)
+        
+        button_layout = QHBoxLayout()
+        
+        clear_btn = QPushButton("清除测试")
+        clear_btn.clicked.connect(self._clear_test)
+        button_layout.addWidget(clear_btn)
+        
+        button_layout.addStretch()
+        
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(self.accept)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+    def _create_reference_panel(self):
+        panel = QWidget()
+        panel.setStyleSheet("background-color: #f8f9fa; border-radius: 8px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        title = QLabel("参考路径")
+        title.setStyleSheet("font-weight: bold; font-size: 14px; color: #495057; border: none;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        self.reference_display = ReferencePathDisplay(self.reference_path)
+        layout.addWidget(self.reference_display, 1)
+        
+        return panel
+        
+    def _create_test_panel(self):
+        panel = QWidget()
+        panel.setStyleSheet("background-color: #f8f9fa; border-radius: 8px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        title = QLabel("绘制测试路径")
+        title.setStyleSheet("font-weight: bold; font-size: 14px; color: #495057; border: none;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        self.test_drawing = TestDrawingWidget()
+        self.test_drawing.pathCompleted.connect(self._on_test_path_completed)
+        layout.addWidget(self.test_drawing, 1)
+        
+        return panel
+        
+    def _create_similarity_panel(self):
+        panel = QWidget()
+        panel.setFixedHeight(120)
+        panel.setStyleSheet("background-color: #ffffff; border-radius: 8px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(20, 15, 20, 15)
+        
+        self.similarity_title = QLabel("等待绘制测试路径...")
+        self.similarity_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #6c757d;")
+        self.similarity_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.similarity_title)
+        
+        self.similarity_bar = QProgressBar()
+        self.similarity_bar.setRange(0, 100)
+        self.similarity_bar.setValue(0)
+        self.similarity_bar.setTextVisible(True)
+        self.similarity_bar.setStyleSheet("""
+            QProgressBar {
+                border: none;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 14px;
+                background-color: #f8f9fa;
+            }
+            QProgressBar::chunk {
+                border-radius: 6px;
+            }
+        """)
+        layout.addWidget(self.similarity_bar)
+        
+        threshold_layout = QHBoxLayout()
+        threshold_layout.addStretch()
+        
+        self.threshold_label = QLabel(f"识别阈值: {self.threshold:.0%}")
+        self.threshold_label.setStyleSheet("font-size: 12px; color: #6c757d;")
+        threshold_layout.addWidget(self.threshold_label)
+        
+        layout.addLayout(threshold_layout)
+        
+        return panel
+        
+    def _on_test_path_completed(self, path):
+        self.test_path = path
+        self._calculate_similarity()
+        
+    def _calculate_similarity(self):
+        if not self.test_path or not self.reference_path:
+            return
+            
+        try:
+            similarity = self.path_analyzer.calculate_similarity(
+                self.reference_path, self.test_path
+            )
+            
+            self.similarity_score = similarity
+            self._update_similarity_display()
+            
+        except Exception as e:
+            self.similarity_title.setText(f"计算相似度失败: {str(e)}")
+            
+    def _update_similarity_display(self):
+        percentage = int(self.similarity_score * 100)
+        self.similarity_bar.setValue(percentage)
+        
+        threshold_percentage = int(self.threshold * 100)
+        
+        if self.similarity_score >= self.threshold:
+            color = "#28a745"
+            status = "✓ 可识别"
+            title_color = "#155724"
+        elif self.similarity_score >= self.threshold * 0.8:
+            color = "#ffc107"
+            status = "⚠ 接近阈值"
+            title_color = "#856404"
+        else:
+            color = "#dc3545"
+            status = "✗ 无法识别"
+            title_color = "#721c24"
+            
+        self.similarity_bar.setStyleSheet(f"""
+            QProgressBar {{
+                border: none;
+                border-radius: 8px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 14px;
+                color: white;
+                background-color: #f8f9fa;
+            }}
+            QProgressBar::chunk {{
+                background-color: {color};
+                border-radius: 6px;
+            }}
+        """)
+        
+        self.similarity_title.setText(f"相似度: {percentage}% - {status}")
+        self.similarity_title.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {title_color};")
+        
+    def _clear_test(self):
+        self.test_drawing.clear_drawing()
+        self.test_path = None
+        self.similarity_score = 0.0
+        self.similarity_bar.setValue(0)
+        self.similarity_title.setText("等待绘制测试路径...")
+        self.similarity_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #6c757d;")
+
+
+class ReferencePathDisplay(QWidget):
+    def __init__(self, path, parent=None):
+        super().__init__(parent)
+        self.path = path
+        self.setMinimumSize(250, 200)
+        self.setStyleSheet("background-color: white; border-radius: 4px;")
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        painter.fillRect(self.rect(), QColor(255, 255, 255))
+        
+        if not self.path or not self.path.get('points'):
+            painter.setPen(QColor(108, 117, 125))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "无路径数据")
+            return
+            
+        points = self.path['points']
+        if not points:
+            return
+            
+        min_x = min(p[0] for p in points)
+        max_x = max(p[0] for p in points)
+        min_y = min(p[1] for p in points)
+        max_y = max(p[1] for p in points)
+        
+        margin = 20
+        width = self.width() - 2 * margin
+        height = self.height() - 2 * margin
+        
+        path_width = max_x - min_x
+        path_height = max_y - min_y
+        
+        if path_width == 0 or path_height == 0:
+            scale = 1.0
+        else:
+            scale = min(width / path_width, height / path_height) * 0.8
+        
+        offset_x = margin + (width - path_width * scale) / 2 - min_x * scale
+        offset_y = margin + (height - path_height * scale) / 2 - min_y * scale
+        
+        pen = QPen(QColor(0, 123, 255), 3)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        
+        connections = self.path.get('connections', [])
+        for conn in connections:
+            from_idx = conn['from']
+            to_idx = conn['to']
+            
+            if 0 <= from_idx < len(points) and 0 <= to_idx < len(points):
+                from_point = points[from_idx]
+                to_point = points[to_idx]
+                
+                x1 = from_point[0] * scale + offset_x
+                y1 = from_point[1] * scale + offset_y
+                x2 = to_point[0] * scale + offset_x
+                y2 = to_point[1] * scale + offset_y
+                
+                painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+        
+        painter.setPen(QPen(QColor(220, 53, 69), 2))
+        painter.setBrush(QColor(255, 255, 255))
+        
+        for i, point in enumerate(points):
+            x = point[0] * scale + offset_x
+            y = point[1] * scale + offset_y
+            painter.drawEllipse(int(x) - 4, int(y) - 4, 8, 8)
+
+
+class TestDrawingWidget(QWidget):
+    pathCompleted = Signal(dict)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        self.path_analyzer = PathAnalyzer()
+        
+        self.drawing = False
+        self.current_path = []
+        self.completed_path = None
+        
+        self.setMinimumSize(250, 200)
+        self.setStyleSheet("background-color: white; border-radius: 4px;")
+        self.setMouseTracking(True)
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drawing = True
+            self.current_path = [event.pos()]
+            self.completed_path = None
+            self.update()
+            
+    def mouseMoveEvent(self, event):
+        if self.drawing:
+            self.current_path.append(event.pos())
+            self.update()
+            
+    def mouseReleaseEvent(self, event):
+        if self.drawing and event.button() == Qt.MouseButton.LeftButton:
+            self.drawing = False
+            
+            if len(self.current_path) > 5:
+                raw_points = [(p.x(), p.y(), 0.5, 0.0, 1) for p in self.current_path]
+                formatted_path = self.path_analyzer.format_raw_path(raw_points)
+                
+                if formatted_path and formatted_path.get('points'):
+                    self.completed_path = formatted_path
+                    self.pathCompleted.emit(formatted_path)
+                    
+            self.current_path = []
+            self.update()
+            
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        painter.fillRect(self.rect(), QColor(255, 255, 255))
+        
+        if not self.completed_path and not self.current_path:
+            painter.setPen(QColor(108, 117, 125))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "在此区域绘制测试手势")
+            return
+            
+        if self.current_path:
+            pen = QPen(QColor(108, 117, 125), 2)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            
+            for i in range(1, len(self.current_path)):
+                painter.drawLine(self.current_path[i-1], self.current_path[i])
+                
+        if self.completed_path:
+            self._draw_completed_path(painter)
+            
+    def _draw_completed_path(self, painter):
+        points = self.completed_path.get('points', [])
+        if not points:
+            return
+            
+        pen = QPen(QColor(40, 167, 69), 3)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        
+        connections = self.completed_path.get('connections', [])
+        for conn in connections:
+            from_idx = conn['from']
+            to_idx = conn['to']
+            
+            if 0 <= from_idx < len(points) and 0 <= to_idx < len(points):
+                from_point = points[from_idx]
+                to_point = points[to_idx]
+                painter.drawLine(int(from_point[0]), int(from_point[1]), 
+                               int(to_point[0]), int(to_point[1]))
+        
+        painter.setPen(QPen(QColor(220, 53, 69), 2))
+        painter.setBrush(QColor(255, 255, 255))
+        
+        for point in points:
+            painter.drawEllipse(int(point[0]) - 4, int(point[1]) - 4, 8, 8)
+            
+    def clear_drawing(self):
+        self.current_path = []
+        self.completed_path = None
+        self.drawing = False
+        self.update()
