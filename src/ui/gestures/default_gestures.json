@@ -1,7 +1,6 @@
 {
     "trigger_paths": {
-        "path_1": {
-            "id": 1,
+        "1": {
             "name": "向右-向下拐角",
             "path": {
                 "points": [[0, 0], [100, 0], [100, 100]],
@@ -11,8 +10,7 @@
                 ]
             }
         },
-        "path_2": {
-            "id": 2,
+        "2": {
             "name": "向下-向右拐角",
             "path": {
                 "points": [[0, 0], [0, 100], [100, 100]],
@@ -22,8 +20,7 @@
                 ]
             }
         },
-        "path_3": {
-            "id": 3,
+        "3": {
             "name": "左上到右下斜线",
             "path": {
                 "points": [[100, 0], [0, 100]],
@@ -32,8 +29,7 @@
                 ]
             }
         },
-        "path_4": {
-            "id": 4,
+        "4": {
             "name": "倒L型",
             "path": {
                 "points": [[100, 100], [0, 100], [0, 0]],
@@ -43,8 +39,7 @@
                 ]
             }
         },
-        "path_5": {
-            "id": 5,
+        "5": {
             "name": "正L型",
             "path": {
                 "points": [[0, 100], [100, 100], [100, 0]],
@@ -54,8 +49,7 @@
                 ]
             }
         },
-        "path_6": {
-            "id": 6,
+        "6": {
             "name": "方框型",
             "path": {
                 "points": [[0, 100], [0, 0], [100, 0], [100, 100]],
@@ -66,8 +60,7 @@
                 ]
             }
         },
-        "path_7": {
-            "id": 7,
+        "7": {
             "name": "圈形",
             "path": {
                 "points": [[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]],
@@ -79,8 +72,7 @@
                 ]
             }
         },
-        "path_8": {
-            "id": 8,
+        "8": {
             "name": "山形",
             "path": {
                 "points": [[50, 0], [0, 100], [100, 100]],
@@ -92,106 +84,89 @@
         }
     },
     "execute_actions": {
-        "action_1": {
-            "id": 1,
+        "1": {
             "name": "复制",
             "type": "shortcut",
             "value": "Ctrl+C"
         },
-        "action_2": {
-            "id": 2,
+        "2": {
             "name": "粘贴",
             "type": "shortcut",
             "value": "Ctrl+V"
         },
-        "action_3": {
-            "id": 3,
+        "3": {
             "name": "剪切",
             "type": "shortcut",
             "value": "Ctrl+X"
         },
-        "action_4": {
-            "id": 4,
+        "4": {
             "name": "撤销",
             "type": "shortcut",
             "value": "Ctrl+Z"
         },
-        "action_5": {
-            "id": 5,
+        "5": {
             "name": "重做",
             "type": "shortcut",
             "value": "Ctrl+Y"
         },
-        "action_6": {
-            "id": 6,
+        "6": {
             "name": "保存",
             "type": "shortcut",
             "value": "Ctrl+S"
         },
-        "action_7": {
-            "id": 7,
+        "7": {
             "name": "全选",
             "type": "shortcut",
             "value": "Ctrl+A"
         },
-        "action_8": {
-            "id": 8,
+        "8": {
             "name": "新建",
             "type": "shortcut",
             "value": "Ctrl+N"
         },
-        "action_9": {
-            "id": 9,
+        "9": {
             "name": "刷新",
             "type": "shortcut",
             "value": "F5"
         }
     },
     "gesture_mappings": {
-        "gesture_1": {
-            "id": 1,
+        "1": {
             "name": "复制",
             "trigger_path_id": 1,
             "execute_action_id": 1
         },
-        "gesture_2": {
-            "id": 2,
+        "2": {
             "name": "粘贴",
             "trigger_path_id": 2,
             "execute_action_id": 2
         },
-        "gesture_3": {
-            "id": 3,
+        "3": {
             "name": "剪切",
             "trigger_path_id": 3,
             "execute_action_id": 3
         },
-        "gesture_4": {
-            "id": 4,
+        "4": {
             "name": "撤销",
             "trigger_path_id": 4,
             "execute_action_id": 4
         },
-        "gesture_5": {
-            "id": 5,
+        "5": {
             "name": "重做",
             "trigger_path_id": 5,
             "execute_action_id": 5
         },
-        "gesture_6": {
-            "id": 6,
+        "6": {
             "name": "保存",
             "trigger_path_id": 6,
             "execute_action_id": 6
         },
-        "gesture_7": {
-            "id": 7,
+        "7": {
             "name": "全选",
             "trigger_path_id": 7,
             "execute_action_id": 7
         },
-        "gesture_8": {
-            "id": 8,
+        "8": {
             "name": "新建",
             "trigger_path_id": 8,
             "execute_action_id": 8

@@ -11,11 +11,13 @@ from ui.gestures.gestures import get_gesture_library
 
 
 def _find_parent_with_refresh(widget):
-    """查找具有refresh_list方法的父级容器"""
+    """查找带有refresh_list方法的父组件"""
     parent = widget.parent()
-    while parent and not hasattr(parent, 'refresh_list'):
+    while parent:
+        if hasattr(parent, "refresh_list"):
+            return parent
         parent = parent.parent()
-    return parent
+    return None
 
 
 def _create_card_button(text, tooltip, style_extra="", size=(20, 20), icon_name=None):
@@ -38,14 +40,6 @@ def _create_card_button(text, tooltip, style_extra="", size=(20, 20), icon_name=
             btn.setText("")  # 隐藏文本，只显示图标
     
     return btn
-
-
-def _find_key_by_id(data_dict, target_id):
-    """通过ID在数据字典中查找对应的key"""
-    for key, data in data_dict.items():
-        if data.get('id') == target_id:
-            return key
-    return None
 
 
 class ConnectionWidget(QWidget):
@@ -306,9 +300,9 @@ class ActionCardWidget(QWidget):
         from ui.gestures.gesture_dialogs import ExecuteActionEditDialog
         
         gesture_library = get_gesture_library()
-        action_key = _find_key_by_id(gesture_library.execute_actions, self.action_id)
+        action_key = str(self.action_id)
         
-        if action_key:
+        if action_key in gesture_library.execute_actions:
             dialog = ExecuteActionEditDialog(action_key, self.parent())
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 parent = _find_parent_with_refresh(self)
@@ -326,9 +320,9 @@ class ActionCardWidget(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 gesture_library = get_gesture_library()
-                action_key = _find_key_by_id(gesture_library.execute_actions, self.action_id)
+                action_key = str(self.action_id)
                 
-                if action_key:
+                if action_key in gesture_library.execute_actions:
                     del gesture_library.execute_actions[action_key]
                     gesture_library.mark_data_changed("execute_actions")
                     
@@ -446,9 +440,9 @@ class PathCardWidget(QWidget):
         from ui.gestures.gesture_dialogs import TriggerPathEditDialog
         
         gesture_library = get_gesture_library()
-        path_key = _find_key_by_id(gesture_library.trigger_paths, self.path_id)
+        path_key = str(self.path_id)
         
-        if path_key:
+        if path_key in gesture_library.trigger_paths:
             dialog = TriggerPathEditDialog(path_key, self.parent())
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 parent = _find_parent_with_refresh(self)
@@ -466,9 +460,9 @@ class PathCardWidget(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 gesture_library = get_gesture_library()
-                path_key = _find_key_by_id(gesture_library.trigger_paths, self.path_id)
+                path_key = str(self.path_id)
                 
-                if path_key:
+                if path_key in gesture_library.trigger_paths:
                     del gesture_library.trigger_paths[path_key]
                     gesture_library.mark_data_changed("trigger_paths")
                     
@@ -814,10 +808,10 @@ class GesturesPage(QWidget):
         self.action_cards_widget.clear_action_cards()
         
         execute_actions = self.gesture_library.execute_actions
-        sorted_actions = sorted(execute_actions.items(), key=lambda x: x[1].get('id', 0))
+        sorted_actions = sorted(execute_actions.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0)
         
         for action_key, action_data in sorted_actions:
-            action_id = action_data.get('id')
+            action_id = int(action_key) if action_key.isdigit() else 0
             action_name = action_data.get('name', f'操作{action_id}')
             action_value = action_data.get('value', '')
             
@@ -831,10 +825,10 @@ class GesturesPage(QWidget):
         self.path_cards_widget.clear_path_cards()
         
         trigger_paths = self.gesture_library.trigger_paths
-        sorted_paths = sorted(trigger_paths.items(), key=lambda x: x[1].get('id', 0))
+        sorted_paths = sorted(trigger_paths.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 0)
         
         for path_key, path_data in sorted_paths:
-            path_id = path_data.get('id')
+            path_id = int(path_key) if path_key.isdigit() else 0
             path_name = path_data.get('name', f'路径{path_id}')
             
             card = self.path_cards_widget.add_path_card(path_id, path_name)
@@ -873,8 +867,8 @@ class GesturesPage(QWidget):
         
     def _get_action_name_by_id(self, action_id):
         """根据ID获取操作名称"""
-        action_key = _find_key_by_id(self.gesture_library.execute_actions, action_id)
-        if action_key:
+        action_key = str(action_id)
+        if action_key in self.gesture_library.execute_actions:
             action_data = self.gesture_library.execute_actions[action_key]
             return action_data.get('name', f'操作{action_id}')
         return f'操作{action_id}(未找到)'
@@ -904,7 +898,7 @@ class GesturesPage(QWidget):
     def _create_mapping(self, action_id, path_id):
         """创建映射"""
         try:
-            existing_ids = [data.get('id', 0) for data in self.gesture_library.gesture_mappings.values()]
+            existing_ids = [int(key) for key in self.gesture_library.gesture_mappings.keys() if key.isdigit()]
             new_id = max(existing_ids, default=0) + 1
             
             old_mapping_keys = []
@@ -915,12 +909,11 @@ class GesturesPage(QWidget):
             for old_key in old_mapping_keys:
                 del self.gesture_library.gesture_mappings[old_key]
             
-            mapping_key = f"mapping_{new_id}"
+            mapping_key = str(new_id)
             action_name = self._get_action_name_by_id(action_id)
             path_name = self._get_path_name_by_id(path_id)
             
             self.gesture_library.gesture_mappings[mapping_key] = {
-                'id': new_id,
                 'name': f"{path_name} → {action_name}",
                 'trigger_path_id': path_id,
                 'execute_action_id': action_id
@@ -944,8 +937,8 @@ class GesturesPage(QWidget):
             
     def _get_path_name_by_id(self, path_id):
         """根据ID获取路径名称"""
-        path_key = _find_key_by_id(self.gesture_library.trigger_paths, path_id)
-        if path_key:
+        path_key = str(path_id)
+        if path_key in self.gesture_library.trigger_paths:
             path_data = self.gesture_library.trigger_paths[path_key]
             return path_data.get('name', f'路径{path_id}')
         return f'路径{path_id}(未找到)'

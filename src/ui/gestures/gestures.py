@@ -172,7 +172,7 @@ class GestureLibrary:
         
         normalized_drawn = self.path_analyzer.normalize_path_scale(drawn_path)
         
-        best_match_path_id = None
+        best_match_path_key = None
         best_similarity = 0.0
         best_trigger_path = None
         
@@ -186,13 +186,15 @@ class GestureLibrary:
             
             if similarity > best_similarity:
                 best_similarity = similarity
-                best_match_path_id = path_data.get("id")
+                best_match_path_key = path_key
                 best_trigger_path = path_data
         
         if best_similarity < similarity_threshold:
             return None, None, best_similarity
 
         matched_gesture = None
+        best_match_path_id = int(best_match_path_key) if best_match_path_key and best_match_path_key.isdigit() else None
+        
         for mapping_key, mapping_data in self.saved_gesture_mappings.items():
             if mapping_data.get("trigger_path_id") == best_match_path_id:
                 matched_gesture = mapping_data
@@ -203,15 +205,15 @@ class GestureLibrary:
         
         execute_action_id = matched_gesture.get("execute_action_id")
         execute_action = None
-        for action_key, action_data in self.saved_execute_actions.items():
-            if action_data.get("id") == execute_action_id:
-                execute_action = action_data
-                break
+        execute_action_key = str(execute_action_id) if execute_action_id is not None else None
+        
+        if execute_action_key and execute_action_key in self.saved_execute_actions:
+            execute_action = self.saved_execute_actions[execute_action_key]
         
         if not execute_action:
             return None, None, best_similarity
         
-        gesture_name = matched_gesture.get("name", f"手势{matched_gesture.get('id')}")
+        gesture_name = matched_gesture.get("name", f"手势{mapping_key}")
         return gesture_name, execute_action, best_similarity
 
     def get_gesture_count(self, use_saved=False):
@@ -223,25 +225,25 @@ class GestureLibrary:
     def _get_next_mapping_id(self):
         max_id = 0
         if self.gesture_mappings:
-            for mapping_data in self.gesture_mappings.values():
-                if mapping_data and isinstance(mapping_data, dict):
-                    max_id = max(max_id, mapping_data.get("id", 0))
+            for mapping_key in self.gesture_mappings.keys():
+                if mapping_key.isdigit():
+                    max_id = max(max_id, int(mapping_key))
         return max_id + 1
 
     def _get_next_path_id(self):
         max_id = 0
         if self.trigger_paths:
-            for path_data in self.trigger_paths.values():
-                if path_data and isinstance(path_data, dict):
-                    max_id = max(max_id, path_data.get("id", 0))
+            for path_key in self.trigger_paths.keys():
+                if path_key.isdigit():
+                    max_id = max(max_id, int(path_key))
         return max_id + 1
 
     def _get_next_action_id(self):
         max_id = 0
         if self.execute_actions:
-            for action_data in self.execute_actions.values():
-                if action_data and isinstance(action_data, dict):
-                    max_id = max(max_id, action_data.get("id", 0))
+            for action_key in self.execute_actions.keys():
+                if action_key.isdigit():
+                    max_id = max(max_id, int(action_key))
         return max_id + 1
 
     def reset_to_default(self):

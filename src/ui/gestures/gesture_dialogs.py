@@ -111,10 +111,9 @@ class TriggerPathEditDialog(QDialog):
                     path_data['path'] = self.current_path
             else:
                 path_id = self.gesture_library._get_next_path_id()
-                path_key = f"path_{path_id}"
+                path_key = str(path_id)
                 
                 new_path_data = {
-                    'id': path_id,
                     'name': name,
                     'path': self.current_path
                 }
@@ -228,10 +227,9 @@ class ExecuteActionEditDialog(QDialog):
                 action_data['value'] = value
             else:
                 action_id = self.gesture_library._get_next_action_id()
-                action_key = f"action_{action_id}"
+                action_key = str(action_id)
                 
                 new_action_data = {
-                    'id': action_id,
                     'name': name,
                     'type': action_type,
                     'value': value
