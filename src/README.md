@@ -43,7 +43,8 @@ GestroKey是一款手势控制工具，允许用户通过鼠标绘制手势来�
   - [3.2 core/path_analyzer.py](#32-corepath_analyzerpy)
   - [3.3 core/gesture_executor.py](#33-coregesture_executorpy)
   - [3.4 core/system_monitor.py](#34-coresystem_monitorpy)
-  - [3.5 core/logger.py](#35-coreloggerpy)
+  - [3.5 core/self_check.py](#35-coreself_checkpy)
+  - [3.6 core/logger.py](#36-coreloggerpy)
 
 ## 目录结构
 
@@ -58,6 +59,7 @@ src/
 │   ├── path_analyzer.py     # 路径分析模块
 │   ├── gesture_executor.py  # 手势执行模块
 │   ├── system_monitor.py    # 系统监测模块
+│   ├── self_check.py        # 自检模块
 │   └── logger.py            # 日志记录模块
 ├── ui/                      # 用户界面模块
 │   ├── console.py           # 控制台选项卡
@@ -385,8 +387,7 @@ console_page.update_system_info(system_data)
 ```json
 {
   "trigger_paths": {
-    "path_1": {
-      "id": 1,
+    "1": {
       "name": "向右滑动",
       "path": {
         "points": [[0, 0], [100, 0]],
@@ -395,16 +396,14 @@ console_page.update_system_info(system_data)
     }
   },
   "execute_actions": {
-    "action_1": {
-      "id": 1,
+    "1": {
       "name": "复制",
       "type": "shortcut",
       "value": "Ctrl+C"
     }
   },
   "gesture_mappings": {
-    "gesture_1": {
-      "id": 1,
+    "1": {
       "name": "复制手势",
       "trigger_path_id": 1,
       "execute_action_id": 1
@@ -1449,7 +1448,79 @@ print(f"内存使用: {format_bytes(current_data['memory_used'])}")
 monitor.stop()
 ```
 
-#### 3.5 core/logger.py
+#### 3.5 core/self_check.py
+
+**功能说明**：
+自检模块，负责系统启动时的完整性检查和测试。该模块会在程序启动时自动运行，检查手势库和设置文件的格式完整性，验证核心模块功能，并提供损坏文件的备份机制。
+
+**主要类和方法**：
+- `SelfChecker`：自检器类
+  - `__init__(self)`：初始化自检器，设置日志记录器
+  - `run_full_check(self)`：运行完整自检流程，包含所有检查项目
+  - `check_json_files(self)`：检查JSON文件格式和完整性，验证手势库和设置文件
+  - `backup_damaged_file(self, file_path, error_info)`：备份损坏的文件，使用base64编码输出
+  - `check_gesture_library_integrity(self)`：检查手势库数据结构完整性和ID引用关系
+  - `check_settings_integrity(self)`：检查设置文件的数据结构和必需字段
+  - `test_path_analyzer(self)`：测试路径分析器的基本功能
+  - `test_gesture_executor(self)`：测试手势执行器的初始化和基本功能
+  - `test_drawing_module(self)`：测试绘制模块的画笔创建功能
+  - `test_gestures_module(self)`：测试手势库模块的加载和查询功能
+  - `test_settings_module(self)`：测试设置模块的读写功能
+  - `_validate_gesture_ids(self, trigger_paths, execute_actions, gesture_mappings)`：验证手势库中的ID引用关系
+
+**全局函数**：
+- `run_self_check()`：执行自检的入口函数，创建检查器实例并运行检查
+
+**检查项目**：
+- **JSON文件完整性**：验证手势库和设置文件的JSON格式正确性
+- **数据结构验证**：检查手势库的三部分数据结构和设置文件结构
+- **ID引用关系**：验证手势映射中引用的路径ID和操作ID是否存在
+- **核心模块测试**：路径分析器、手势执行器、绘制模块、手势库、设置模块的功能测试
+- **损坏文件备份**：发现损坏文件时自动生成base64编码的备份输出
+
+**自动化功能**：
+- **启动时检查**：集成到main.py的init_global_resources方法中，每次程序启动自动运行
+- **错误恢复**：检测到问题时提供详细的错误信息和修复建议
+- **日志记录**：详细记录所有检查过程和结果
+
+**使用方法**：
+```python
+from core.self_check import run_self_check, SelfChecker
+
+# 运行完整自检（程序启动时自动调用）
+success = run_self_check()
+if success:
+    print("自检通过，系统正常")
+else:
+    print("自检发现问题，请查看日志")
+
+# 手动创建检查器进行特定检查
+checker = SelfChecker()
+json_ok = checker.check_json_files()
+gesture_ok = checker.check_gesture_library_integrity()
+settings_ok = checker.check_settings_integrity()
+
+# 测试特定模块
+path_analyzer_ok = checker.test_path_analyzer()
+gesture_executor_ok = checker.test_gesture_executor()
+```
+
+**集成方式**：
+在main.py的init_global_resources方法中自动调用：
+```python
+def init_global_resources(self):
+    """初始化设置管理器和手势库管理器等全局资源"""
+    from core.self_check import run_self_check
+    
+    # 运行自检
+    self_check_passed = run_self_check()
+    if not self_check_passed:
+        self.logger.warning("自检发现潜在问题，请检查日志")
+    
+    # ... 其他初始化代码
+```
+
+#### 3.6 core/logger.py
 
 **功能说明**：
 日志记录模块，提供统一的日志记录功能，支持多平台的日志文件存储和控制台输出。

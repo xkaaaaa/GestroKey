@@ -17,6 +17,7 @@ from qtpy.QtWidgets import (
 )
 
 from core.logger import get_logger
+from core.self_check import run_self_check
 from ui.console import ConsolePage
 from ui.gestures.gestures import get_gesture_library
 from ui.gestures.gestures_tab import GesturesPage
@@ -160,6 +161,16 @@ class GestroKeyApp(QMainWindow):
             self.logger.info("GestroKey应用程序已启动")
 
     def init_global_resources(self):
+        try:
+            self.logger.info("运行程序自检...")
+            
+            if not run_self_check():
+                self.logger.warning("自检发现问题，但程序继续启动")
+            else:
+                self.logger.info("程序自检通过")
+        except Exception as e:
+            self.logger.error(f"运行自检时发生异常: {e}")
+        
         try:
             settings = get_settings()
             self.logger.info("设置管理器初始化完成")
